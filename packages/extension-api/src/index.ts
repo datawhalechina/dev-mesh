@@ -208,6 +208,8 @@ export interface QualityScorePatch {
   weightDelta?: number;
   ratingDelta?: number;
   adoptionScoreDelta?: number;
+  sourceTrustDelta?: number;
+  freshnessDelta?: number;
   reasons: string[];
 }
 

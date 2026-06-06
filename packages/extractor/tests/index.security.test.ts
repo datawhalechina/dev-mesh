@@ -12,7 +12,8 @@ describe('secret redactor', () => {
       '-----BEGIN PRIVATE KEY-----',
       'very-secret-key-material',
       '-----END PRIVATE KEY-----',
-      'Read .env.local and certs/server.pem before sync.'
+      'Read .env.local and certs/server.pem before sync.',
+      'Contact alice@example.test or +1 (415) 555-0134 for customer follow-up.'
     ].join('\n');
 
     const result = await redactor.redact({ text: input });
@@ -24,7 +25,9 @@ describe('secret redactor', () => {
       'env-secret',
       'private-key',
       'sensitive-path',
-      'sensitive-path'
+      'sensitive-path',
+      'email',
+      'phone'
     ]);
     expect(result.text).toContain('Authorization: Bearer [REDACTED:authorization]');
     expect(result.text).toContain('Cookie: [REDACTED:cookie]');
@@ -32,9 +35,12 @@ describe('secret redactor', () => {
     expect(result.text).toContain('DATABASE_PASSWORD=[REDACTED:env-secret]');
     expect(result.text).toContain('[REDACTED:private-key]');
     expect(result.text).toContain('Read [REDACTED:sensitive-path] and [REDACTED:sensitive-path] before sync.');
+    expect(result.text).toContain('Contact [REDACTED:email] or [REDACTED:phone] for customer follow-up.');
     expect(result.text).not.toContain('abc.def.secret');
     expect(result.text).not.toContain('super-secret');
     expect(result.text).not.toContain('very-secret-key-material');
+    expect(result.text).not.toContain('alice@example.test');
+    expect(result.text).not.toContain('+1 (415) 555-0134');
   });
 
   it('exposes pure scan and redact helpers', () => {
