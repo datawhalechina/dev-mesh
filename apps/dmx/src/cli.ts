@@ -5,6 +5,7 @@ import { registerInboxCommand } from './commands/inbox.js';
 import { registerIndexCommand } from './commands/index-command.js';
 import { registerInitCommand } from './commands/init.js';
 import { registerJoinCommand } from './commands/join.js';
+import { registerProxyCommand } from './commands/proxy.js';
 import { registerRateCommand } from './commands/rate.js';
 import { registerSearchCommand } from './commands/search.js';
 import { registerStatusCommand } from './commands/status.js';
@@ -23,6 +24,7 @@ export function createDmxProgram(): Command {
   registerInboxCommand(program);
   registerIndexCommand(program);
   registerDoctorCommand(program);
+  registerProxyCommand(program);
 
   return program;
 }

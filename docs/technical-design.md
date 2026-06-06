@@ -753,6 +753,7 @@ dmx init --global --tools codex,claude,opencode --yes
 dmx join 192.168.1.10:8721 --group frontend-team --name 小云 --token <invite-token>
 dmx join https://dev-mesh.company.com --group frontend-team --name 小云 --handle xiaoyun --token <invite-token>
 dmx init .
+dmx proxy --root . --port 8722
 dmx configure codex --scope user
 dmx configure claude --scope project
 dmx configure opencode --scope project
@@ -2067,6 +2068,13 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 - 可以统一 Codex、Claude Code、opencode 的差异。
 - 可以采集 Git 和文件事件，这是远程 MCP 服务端无法直接做到的。
 
+当前实现状态：
+
+- `@mcp-dev-mesh/client` 已提供 Koa2 + 官方 MCP TypeScript SDK Streamable HTTP transport 的本地 proxy。
+- `dmx proxy --root . --port 8722` 会启动 `http://127.0.0.1:8722/mcp`，并在首次 MCP 会话时幂等创建或复用项目 `.dev-mesh/`。
+- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`。
+- 本地 proxy 不依赖 `packages/server`，只通过 `packages/mcp-contracts` 共享 tool schema，避免 client/server 反向耦合。
+
 ### 12.2 Adapter 接口
 
 ```ts
@@ -2278,7 +2286,7 @@ Registry 规则：
 ```bash
 pnpm install
 pnpm dev:server
-pnpm dev:client
+pnpm dev:client -- proxy --root . --port 8722
 ```
 
 本地默认端口：
@@ -2482,7 +2490,7 @@ CI 门禁：
 - tool selector for Codex / Claude Code / opencode（已支持 flags、CI 默认和轻量终端输入；完整 TUI 待增强）
 - local-only mode
 - `dmx join <ip> --group <groupKey> --name <displayName>`（已支持 well-known discovery、invite join、全局连接记录和 CLI 集成测试）
-- 本地 MCP Proxy
+- 本地 MCP Proxy（已支持 `dmx proxy`、Koa2、官方 MCP SDK Streamable HTTP transport 和 local-store capture/search）
 - `.dev-mesh/` local store manager
 - Codex 打开项目时自动 `ensureProjectStore`
 - 默认 `auto_init`、`auto_reference`、`auto_capture`，join 后开启 `auto_sync`
@@ -2494,7 +2502,7 @@ CI 门禁：
 - `dmx doctor`
 - 本地 SQLite 缓存
 - `dmx init --global`、`dmx join`、`dmx doctor` integration test
-- local MCP proxy capture/search integration test
+- local MCP proxy capture/search integration test（已覆盖 client 嵌入式 proxy 和 `dmx proxy` 启动）
 - adapter configure/remove/doctor integration test with temporary HOME
 - custom Agent 二次开发示例
 

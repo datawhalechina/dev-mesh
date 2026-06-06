@@ -1,0 +1,122 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { describe, expect, it } from 'vitest';
+import { createLocalMcpProxy } from '../src/index.js';
+
+describe('local MCP proxy', () => {
+  it('serves core MCP tools and writes captures to the project store', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-local-proxy-'));
+    const proxy = await createLocalMcpProxy({
+      projectRoot,
+      memberName: 'Xiaoyun'
+    });
+    const url = await proxy.listen({
+      host: '127.0.0.1',
+      port: 0
+    });
+    const client = new Client({
+      name: 'dev-mesh-local-proxy-test',
+      version: '0.1.0'
+    });
+
+    try {
+      const health = await requestJson(`${url}/healthz`);
+      const transport = new StreamableHTTPClientTransport(new URL(`${url}/mcp`));
+      await client.connect(transport as never);
+
+      const tools = await client.listTools();
+      const captureResult = await client.callTool({
+        name: 'mesh_capture_knowledge',
+        arguments: {
+          type: 'decision',
+          title: 'Local proxy captures knowledge',
+          summary: 'The local proxy should persist MCP capture calls into the current project store.',
+          layer: 'canonical',
+          tags: ['mcp', 'proxy']
+        }
+      });
+      const captured = JSON.parse(readTextToolResult(captureResult));
+      const searchResult = await client.callTool({
+        name: 'mesh_search_context',
+        arguments: {
+          query: 'local proxy',
+          layers: ['canonical']
+        }
+      });
+      const contextPack = JSON.parse(readTextToolResult(searchResult));
+      const knowledgeJsonl = await readFile(
+        join(projectRoot, '.dev-mesh', 'knowledge', 'canonical', 'entries.jsonl'),
+        'utf8'
+      );
+
+      expect(health.body).toMatchObject({
+        status: 'ok',
+        service: 'mcp-dev-mesh-local-proxy',
+        projectRoot,
+        mcpUrl: `${url}/mcp`
+      });
+      expect(tools.tools.map((tool) => tool.name)).toEqual(
+        expect.arrayContaining([
+          'mesh_search_context',
+          'mesh_capture_knowledge',
+          'mesh_capture_task',
+          'mesh_rate_knowledge',
+          'mesh_search_member_experience',
+          'mesh_resolve_term'
+        ])
+      );
+      expect(captured).toMatchObject({
+        title: 'Local proxy captures knowledge',
+        layer: 'canonical',
+        tags: ['mcp', 'proxy'],
+        createdBy: {
+          displayName: 'Xiaoyun'
+        },
+        event: {
+          kind: 'knowledge.captured',
+          payload: {
+            knowledgeId: captured.id
+          }
+        }
+      });
+      expect(contextPack).toMatchObject({
+        query: 'local proxy',
+        items: [
+          {
+            id: captured.id,
+            title: 'Local proxy captures knowledge'
+          }
+        ]
+      });
+      expect(knowledgeJsonl).toContain('"title":"Local proxy captures knowledge"');
+    } finally {
+      await client.close().catch(() => undefined);
+      await proxy.close();
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  }, 30000);
+});
+
+async function requestJson<T = any>(url: string): Promise<{ status: number; body: T }> {
+  const response = await fetch(url);
+  const text = await response.text();
+
+  return {
+    status: response.status,
+    body: text ? (JSON.parse(text) as T) : ({} as T)
+  };
+}
+
+function readTextToolResult(result: unknown): string {
+  const content = (result as { content?: Array<{ type: string; text?: string }> }).content;
+  const text = content?.find((item) => item.type === 'text')?.text;
+
+  if (text === undefined) {
+    throw new Error('Expected a text tool result.');
+  }
+
+  return text;
+}

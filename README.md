@@ -15,12 +15,12 @@
 ## 当前能力
 
 - `pnpm` workspace monorepo
-- `apps/dmx`：`dmx` CLI，本地 init/capture/search/status/rate/inbox/index/doctor、全局 init 工具选择和远端 group join
+- `apps/dmx`：`dmx` CLI，本地 init/capture/search/status/rate/inbox/index/doctor/proxy、全局 init 工具选择和远端 group join
 - `apps/mesh-server`：Koa2 Hub Server 启动入口
 - `apps/web-admin`：Vue 3 + Element Plus 管理后台
 - `packages/core`：知识条目、PARA、质量信号、搜索和评分
 - `packages/agent`：Context Pack 构建
-- `packages/client`：本地 runtime 和 local-only 组合
+- `packages/client`：本地 runtime、local-only 组合和 Koa2 + 官方 MCP SDK 本地 proxy
 - `packages/server`：Koa2 Hub HTTP API、官方 MCP SDK Streamable HTTP `/mcp` 和工具调用映射
 - `packages/local-store`：`.dev-mesh/` bootstrap、JSONL 本地存储、事件日志、review queue、ratings 和 SQLite FTS 索引
 - `packages/mcp-contracts`：MCP tools schema 和注册函数
@@ -101,11 +101,18 @@ pnpm dev:server
 pnpm dev:admin
 ```
 
+启动本地 MCP Proxy：
+
+```bash
+pnpm dev:client -- proxy --root . --port 8722
+```
+
 默认地址：
 
 ```text
 Hub Server: http://127.0.0.1:8721
 MCP endpoint: http://127.0.0.1:8721/mcp
+Local MCP Proxy: http://127.0.0.1:8722/mcp
 Web Admin: http://127.0.0.1:5173
 ```
 
@@ -138,6 +145,14 @@ pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 \
 ```
 
 `dmx join` 会先读取 `/.well-known/dev-mesh`，再调用 `/api/v1/join`。成功后会在全局 `config.toml` 写入 `[[servers]]` 和 `[[groups]]`，并把 access token 保存在本机 `identity.json`，不会写入可检查或可分享的 TOML 配置。
+
+启动当前项目的本地 MCP Proxy：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- proxy --root . --name local --port 8722
+```
+
+`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`。它使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport，暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
 
 初始化项目本地知识库：
 
@@ -244,6 +259,29 @@ pnpm --filter mcp-dev-mesh dev -- doctor --root .
 - `index/manifest.json` 和 `index/mesh.sqlite` 是可重建本地索引。
 - `queue/pending.jsonl` 保存待 review 候选，接受后写入 knowledge 和 events，拒绝后进入 `queue/rejected.jsonl`。
 - `secrets/` 永远不应该同步或提交。
+
+## 本地 MCP Proxy
+
+本地 proxy 由 `packages/client` 提供，可作为库嵌入，也可通过 `dmx proxy` 启动：
+
+```text
+GET  /healthz
+GET  /mcp
+POST /mcp
+```
+
+MCP tools 与 Hub Server 核心工具保持一致：
+
+```text
+mesh_search_context
+mesh_capture_knowledge
+mesh_capture_task
+mesh_rate_knowledge
+mesh_search_member_experience
+mesh_resolve_term
+```
+
+集成测试覆盖 SDK client 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_search_context`，并验证默认写入当前项目 store。
 
 ## HTTP API Skeleton
 
@@ -358,7 +396,7 @@ pnpm typecheck:examples
 
 当前重点已推进到阶段 2 Mesh Client：
 
-- 已完成 `dmx init --global` 首版和 `dmx join` join flow；下一步完善本地 MCP Proxy 和 adapter configure/remove/doctor。
+- 已完成 `dmx init --global` 首版、`dmx join` join flow 和 `dmx proxy` 本地 MCP Proxy；下一步完善 adapter configure/remove/doctor。
 - 接入真实 Codex、Claude Code、opencode adapter 配置流程。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。
