@@ -6,7 +6,7 @@ export default defineConfig({
     alias: devMeshAliases
   },
   test: {
-    include: ['packages/**/*.e2e.test.ts', 'apps/**/*.e2e.test.ts'],
+    include: ['packages/**/tests/**/*.e2e.test.ts', 'apps/**/tests/**/*.e2e.test.ts'],
     passWithNoTests: true
   }
 });

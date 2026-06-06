@@ -5,7 +5,7 @@ import {
   meshSearchContextInputSchema,
   registerMeshTools,
   type MeshToolHandlers
-} from './index.js';
+} from '../src/index.js';
 
 describe('MCP tool contract schemas', () => {
   it('applies defaults for context search', () => {

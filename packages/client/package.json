@@ -16,8 +16,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@mcp-dev-mesh/adapters": "workspace:*",
     "@mcp-dev-mesh/agent": "workspace:*",
     "@mcp-dev-mesh/core": "workspace:*",
+    "@mcp-dev-mesh/extractor": "workspace:*",
     "@mcp-dev-mesh/local-store": "workspace:*",
     "@mcp-dev-mesh/shared": "workspace:*"
   }

@@ -1,0 +1,86 @@
+import type { ProjectSummary } from '@mcp-dev-mesh/protocol';
+
+export const DEFAULT_LOCAL_INVITE_TOKEN = 'devmesh-local-invite';
+export const DEFAULT_GROUP_KEY = 'default';
+export const ACCESS_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export interface HubGroupSeed {
+  key: string;
+  displayName?: string;
+  description?: string;
+  joinMode?: 'invite' | 'open' | 'admin';
+}
+
+export interface HubInviteSeed {
+  token: string;
+  groupKey: string;
+  expiresAt?: string;
+  maxUses?: number;
+}
+
+export interface HubProjectSeed {
+  id: string;
+  groupKey: string;
+  name?: string;
+  projectKey?: string;
+  description?: string;
+  createdByMemberId?: string;
+  createdAt?: string;
+}
+
+export interface HubStateOptions {
+  groups?: HubGroupSeed[];
+  invites?: HubInviteSeed[];
+  projects?: HubProjectSeed[];
+}
+
+export interface HubAuthContext {
+  memberId: string;
+  clientId: string;
+  groupKey: string;
+}
+
+export interface HubError {
+  statusCode: number;
+  code: string;
+  message: string;
+}
+
+export type HubResult<T> = { ok: true; value: T } | { ok: false; error: HubError };
+
+export interface HubGroup {
+  key: string;
+  displayName: string;
+  joinMode: 'invite' | 'open' | 'admin';
+  description?: string;
+}
+
+export interface HubInvite {
+  token: string;
+  groupKey: string;
+  uses: number;
+  expiresAt?: string;
+  maxUses?: number;
+}
+
+export interface HubMember {
+  memberId: string;
+  clientId: string;
+  groupKey: string;
+  displayName: string;
+  handle: string;
+  joinedAt: string;
+}
+
+export interface HubAccessToken extends HubAuthContext {
+  token: string;
+  expiresAt: string;
+}
+
+export interface HubState {
+  groups: Map<string, HubGroup>;
+  invites: Map<string, HubInvite>;
+  members: Map<string, HubMember>;
+  tokens: Map<string, HubAccessToken>;
+  projects: Map<string, ProjectSummary>;
+}

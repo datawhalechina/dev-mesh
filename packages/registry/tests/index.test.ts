@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DevMeshExtension, SearchBackend, ToolAdapter } from '@mcp-dev-mesh/extension-api';
-import { createExtensionRegistry } from './index.js';
+import { createExtensionRegistry } from '../src/index.js';
 
 describe('DefaultExtensionRegistry', () => {
   it('resolves matching capabilities by priority and id', () => {

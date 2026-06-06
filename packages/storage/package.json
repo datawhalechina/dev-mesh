@@ -16,6 +16,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mcp-dev-mesh/extension-api": "workspace:*"
+    "@mcp-dev-mesh/core": "workspace:*",
+    "@mcp-dev-mesh/extension-api": "workspace:*",
+    "pg": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0"
   }
 }

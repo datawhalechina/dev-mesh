@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDevMeshCore, createKnowledgeItem, InMemoryKnowledgeRepository } from './index.js';
+import { createDevMeshCore, createKnowledgeItem, InMemoryKnowledgeRepository } from '../src/index.js';
 
 describe('createDevMeshCore', () => {
   it('captures and searches knowledge', async () => {

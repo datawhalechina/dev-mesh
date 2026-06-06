@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "types": ["node", "vite/client"],
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src", "tests", "vite.config.ts", "env.d.ts"]
+}

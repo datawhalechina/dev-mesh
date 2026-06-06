@@ -6,7 +6,7 @@ export default defineConfig({
     alias: devMeshAliases
   },
   test: {
-    include: ['packages/**/*.contract.test.ts', 'apps/**/*.contract.test.ts'],
+    include: ['packages/**/tests/**/*.contract.test.ts', 'apps/**/tests/**/*.contract.test.ts'],
     passWithNoTests: true
   }
 });

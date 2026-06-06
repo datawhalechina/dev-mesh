@@ -120,7 +120,7 @@ mcp-dev-mesh/
   apps/
     dmx/                    # CLI 可执行入口，依赖 @mcp-dev-mesh/client
     mesh-server/            # 服务端可执行入口，依赖 @mcp-dev-mesh/server
-    web/                    # 可选管理后台，依赖 server/client API
+    web-admin/              # Vue 管理后台，依赖 server admin API
   packages/
     core/                   # @mcp-dev-mesh/core：纯领域模型和核心服务
     agent/                  # @mcp-dev-mesh/agent：Agent 上下文编排、引用策略、沉淀流程
@@ -147,7 +147,8 @@ mcp-dev-mesh/
 | --- | --- |
 | 语言 | TypeScript |
 | MCP SDK | 官方 MCP TypeScript SDK：`@modelcontextprotocol/sdk` |
-| Server HTTP | Fastify 或 Hono |
+| Server HTTP | Koa2 |
+| 管理后台 | Vue 3 + Element Plus（或同级成熟 UI 组件库） |
 | Client CLI | Node.js + Commander 或 Clipanion |
 | Client daemon | Node.js long-running process，Windows Service / launchd / systemd |
 | 项目本地知识库 | 项目根目录 `.dev-mesh/`，SQLite + JSONL event log + 可重建检索索引 |
@@ -164,8 +165,11 @@ mcp-dev-mesh/
 - 服务端、客户端、共享包统一使用 TypeScript 开发。
 - MCP Server、MCP Client / Proxy、tools、resources、prompts、transport 适配必须基于官方 MCP TypeScript SDK：`@modelcontextprotocol/sdk`。
 - 不手写 JSON-RPC / MCP 协议实现，只在官方 SDK 之上封装项目级 contracts 和 adapters。
+- Server HTTP 层使用 Koa2；Hub 业务、MCP tool 映射和权限规则必须放在 `packages/server` 的框架无关模块中，避免路由层承载业务规则。
 - 核心流程只依赖 `packages/extension-api` 定义的接口，不直接依赖具体工具、模型、存储或检索实现。
 - 新增开发工具、采集来源、知识类型、评分策略、检索后端时，应通过 registry 注册扩展，不修改核心编排服务。
+
+日常开发规范见 [development-guide.md](./development-guide.md)。新增包、跨包依赖、public API、持久化 schema 或复杂注释策略时，应优先对照该指南，确保代码组织清晰、依赖不过度耦合、抽象不过早膨胀。
 
 ### 4.1 Library-first 分层包设计
 
@@ -402,6 +406,42 @@ GET  /api/v1/admin/audit
 ```
 
 `groupKey` 用于服务端群组隔离。同一个 Mesh Server 可以同时服务多个团队或项目集，例如 `frontend-team`、`backend-platform`、`customer-a`。客户端只同步已加入群组内授权项目的知识；未指定 `groupKey` 时，服务端可以根据 invite token 自动解析默认群组。
+
+当前开发期 Hub Server 使用内存状态实现 invite、member、access token、group 和 project registry：
+
+- `/api/v1/join` 要求 `inviteToken`，token 绑定一个 group；请求里的 `groupKey` 必须与 invite 绑定的 group 一致。
+- join 成功后返回 group-scoped Bearer token；后续 sync 和 projects API 必须携带 `Authorization: Bearer <token>`。
+- `/api/v1/projects` 和 `/api/v1/projects/:id/brief` 只返回当前 token 所属 group 的项目；访问其他 group 项目返回 404，避免泄露 project id。
+- 内存状态只用于当前 skeleton 和集成测试。生产实现应替换为 PostgreSQL-backed repository、短期 invite、token rotation、audit log 和更完整的 ACL。
+
+#### Server HTTP 框架选择
+
+当前实现已经切换为 Koa2，并验证了 Hub API 与 MCP Streamable HTTP 的行为边界。服务端必须保持以下边界：
+
+- Koa 只负责 request/response、路由、中间件、错误映射和生命周期，不承载 group、ACL、sync、MCP tool 映射等业务规则。
+- `packages/server` 应保留框架无关的 Hub service / handler，Koa route 只调用这些业务函数。
+- `/mcp` 仍必须基于官方 MCP TypeScript SDK 的 Streamable HTTP transport，不能手写 JSON-RPC。
+- Koa 实现必须通过 integration test，覆盖 health、well-known、groups、join、projects、admin API、sync 和 MCP tools。
+
+#### 管理后台和 Admin API
+
+团队管理后台放在 `apps/web-admin`，建议使用 Vue 3 + Element Plus。它通过 server admin API 管理和查看团队数据，不直接访问数据库或本地 `.dev-mesh/` 文件。
+
+首版页面范围：
+
+- 概览：server health、版本、MCP endpoint、同步状态和最近错误。
+- Groups / Members：查看 group、成员、client identity、token 过期时间和禁用状态。
+- Projects：查看 project、group 归属、ACL、project brief 状态。
+- Knowledge：查看 knowledge item、layer、PARA、来源成员、质量信号和 supersede/conflict 状态。
+- Review Queue：查看待确认候选，支持接受、拒绝和填写原因。
+- Audit Log：按 actor、group、project、action 和时间筛选审计记录。
+
+前端验收要求：
+
+- 所有列表必须有加载、空状态、错误状态和分页或虚拟滚动策略。
+- 所有管理写操作必须有确认、失败提示和审计日志。
+- UI 组件优先使用成熟组件库，不为常见表格、表单、弹窗、分页、筛选器重复造轮子。
+- 前端测试至少覆盖路由 smoke、关键列表渲染、API 错误提示和基础权限失败状态。
 
 ### 5.3 MCP Tools
 
@@ -829,6 +869,15 @@ Options:
 
 Press Enter to apply, Space to toggle, q to cancel.
 ```
+
+当前实现进度：
+
+- `dmx init --global` 已支持 `--tool codex --tool opencode`、`--tools codex,claude,opencode`、`--yes` / CI 默认全选，以及非 CI 终端下的轻量输入提示。
+- `packages/client` 负责工具别名归一化、默认选择、内置 adapter dry-run 检查和全局配置写入；`apps/dmx` 只做 CLI 参数收集。
+- `~/.dev-mesh/config.toml` 已写入 `[tools]` 的 Codex / Claude Code / opencode 选择状态，`identity.json` 已记录 `selectedTools`、`localProxyUrl` 和每个 adapter 的 detected/configured/message。
+- `dmx join <server> --group <groupKey> --name <displayName>` 已支持 well-known discovery、invite token join、全局 `[[servers]]` / `[[groups]]` 写入和 join 后 `auto_sync` 开启；access token 只写入本机 `identity.json`，不写入 TOML。
+- join 相关实现已按职责拆分：CLI 命令在 `apps/dmx/src/commands/join.ts`，client 编排在 `packages/client/src/join.ts`，HTTP discovery/join 在 `packages/client/src/join-http.ts`，全局配置落盘在 `packages/client/src/join-config.ts`，共享类型在 `packages/client/src/join-types.ts`。
+- 内置 adapter 当前仍是 scaffold，不会修改真实 Codex、Claude Code 或 opencode 配置；完整 TUI、scope 切换和真实 configure/remove/doctor 在阶段 2 后续任务中完成。
 
 加入群组流程：
 
@@ -2350,7 +2399,7 @@ MCP 调试建议使用 MCP Inspector 验证：
 | CLI local-only flow | 在临时目录运行 `dmx init`、`dmx capture`、`dmx search`、`dmx status`，验证 `.dev-mesh/` 结构、JSONL 内容和 Context Pack。 |
 | Global init flow | 运行 `dmx init --global --yes`，验证 `~/.dev-mesh/config.toml`、设备身份、MCP Host 选择结果和重复执行幂等。 |
 | Local MCP proxy flow | 启动本地 proxy，使用 MCP Inspector 或 SDK client 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_search_context`，验证写入默认落到当前项目 store。 |
-| Hub server HTTP flow | Fastify inject 或真实端口验证 `/healthz`、`/.well-known/dev-mesh`、`/api/v1/groups`、`/api/v1/join`、`/api/v1/projects/:id/brief`。 |
+| Hub server HTTP flow | 使用真实端口或 HTTP adapter 注入验证 `/healthz`、`/.well-known/dev-mesh`、`/api/v1/groups`、`/api/v1/join`、`/api/v1/projects/:id/brief`；Koa 实现需要跑同一组 parity 测试。 |
 | Sync push/pull flow | Client A capture 后 push，Client B pull，同 group 可见；不同 group 或无权限不可见；cursor 可增量推进。 |
 | Review queue flow | 高风险提取进入 `.dev-mesh/queue/pending.jsonl`，用户确认后写入 events，拒绝后进入 rejected，不同步。 |
 | Redaction flow | 输入包含 token、Authorization、cookie、`.env` 路径、pem/key 文件，验证输出脱敏并阻断 raw transcript 上传。 |
@@ -2363,6 +2412,7 @@ MCP 调试建议使用 MCP Inspector 验证：
 测试数据原则：
 
 - 所有集成测试使用临时目录、临时 HOME、临时端口和临时数据库，测试结束必须清理。
+- PostgreSQL repository integration test 必须使用显式 `DEV_MESH_POSTGRES_URL` 指向专用测试库，不能默认读取生产 `DATABASE_URL`。
 - 测试 fixture 不包含真实密钥、真实客户数据或真实对话全文。
 - 安全相关 fixture 使用明显假的 token，例如 `sk_test_redacted_example`。
 - JSONL fixture 一行一个对象，覆盖空文件、重复 id、损坏行、未知字段和旧 schema version。
@@ -2429,9 +2479,9 @@ CI 门禁：
 - `@mcp-dev-mesh/client` 提供可嵌入的 local proxy / daemon runtime
 - `@mcp-dev-mesh/agent` 提供 `buildContextPack`、自动引用策略和沉淀 orchestration API
 - `dmx init --global`
-- TUI tool selector for Codex / Claude Code / opencode
+- tool selector for Codex / Claude Code / opencode（已支持 flags、CI 默认和轻量终端输入；完整 TUI 待增强）
 - local-only mode
-- `dmx join <ip> --group <groupKey> --name <displayName>`
+- `dmx join <ip> --group <groupKey> --name <displayName>`（已支持 well-known discovery、invite join、全局连接记录和 CLI 集成测试）
 - 本地 MCP Proxy
 - `.dev-mesh/` local store manager
 - Codex 打开项目时自动 `ensureProjectStore`
@@ -2477,16 +2527,20 @@ CI 门禁：
 
 ### 阶段 4：团队化
 
-- Web dashboard
+- `apps/web-admin` Vue 3 + Element Plus 管理后台
+- dashboard overview：server health、MCP endpoint、sync 状态、最近错误
+- group / member / project 管理页面
 - project ACL
 - audit log
 - glossary 管理
 - supersede / duplicate / contradict edges
 - quality review dashboard
 - task digest
+- review queue 管理页面
 - ACL/audit/glossary management integration test
 - supersede / duplicate / contradict edge conflict test
-- Web dashboard API contract test
+- Web admin API contract test
+- Web admin smoke / component test
 - 企业内部二次开发指南：自定义工具适配器、自定义评分策略、自定义知识类型
 
 ### 阶段 5：分布式 Mesh

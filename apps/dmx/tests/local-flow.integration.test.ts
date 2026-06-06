@@ -1,12 +1,10 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import { runDmx } from './run-dmx.js';
 
-const repoRoot = join(import.meta.dirname, '..', '..', '..');
-
-describe('dmx CLI integration', () => {
+describe('dmx CLI local flow', () => {
   it('initializes a project, captures knowledge, searches it, and reports status', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-cli-'));
 
@@ -28,12 +26,38 @@ describe('dmx CLI integration', () => {
         'resources:test-commands'
       ]);
       const search = await runDmx(['search', 'focused tests', '--root', projectRoot]);
+      const rate = await runDmx([
+        'rate',
+        JSON.parse(capture.stdout).id,
+        '--root',
+        projectRoot,
+        '--name',
+        'Xiaoyun',
+        '--rating',
+        '1',
+        '--reason',
+        'Useful local command.'
+      ]);
       const status = await runDmx(['status', '--root', projectRoot]);
+      const index = await runDmx(['index', 'rebuild', '--root', projectRoot]);
 
       const initJson = JSON.parse(init.stdout);
       const captureJson = JSON.parse(capture.stdout);
       const searchJson = JSON.parse(search.stdout);
+      const rateJson = JSON.parse(rate.stdout);
       const statusJson = JSON.parse(status.stdout);
+      const indexJson = JSON.parse(index.stdout);
+      const indexManifest = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'index', 'manifest.json'), 'utf8'));
+      const ratingsJsonl = await readFile(
+        join(
+          projectRoot,
+          '.dev-mesh',
+          'knowledge',
+          'ratings',
+          `${rateJson.ratingEvent.createdAt.slice(0, 7)}.jsonl`
+        ),
+        'utf8'
+      );
       const config = await readFile(join(projectRoot, '.dev-mesh', 'config.toml'), 'utf8');
 
       expect(initJson.storeRoot).toBe(join(projectRoot, '.dev-mesh'));
@@ -52,51 +76,35 @@ describe('dmx CLI integration', () => {
         id: captureJson.id,
         title: 'Run focused tests'
       });
+      expect(rateJson).toMatchObject({
+        id: captureJson.id,
+        quality: {
+          rating: 1
+        },
+        ratingEvent: {
+          knowledgeId: captureJson.id,
+          reason: 'Useful local command.',
+          createdBy: {
+            displayName: 'Xiaoyun'
+          }
+        }
+      });
+      expect(ratingsJsonl).toContain(`"knowledgeId":"${captureJson.id}"`);
       expect(statusJson).toMatchObject({
         mode: 'local-only',
+        schemaVersion: 1,
         knowledgeItems: 1
+      });
+      expect(indexJson).toMatchObject({
+        documentCount: 1,
+        schemaVersion: 1
+      });
+      expect(indexManifest.documents[0]).toMatchObject({
+        id: captureJson.id,
+        title: 'Run focused tests'
       });
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
   }, 30000);
 });
-
-function runDmx(args: string[]): Promise<{ stdout: string; stderr: string }> {
-  const tsxCli = join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-  const entry = join(repoRoot, 'apps', 'dmx', 'src', 'index.ts');
-  const child = spawn(process.execPath, [tsxCli, entry, ...args], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      CI: '1'
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-  let stdout = '';
-  let stderr = '';
-
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', (chunk: string) => {
-    stdout += chunk;
-  });
-  child.stderr.on('data', (chunk: string) => {
-    stderr += chunk;
-  });
-
-  return new Promise((resolve, reject) => {
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve({
-          stdout: stdout.trim(),
-          stderr: stderr.trim()
-        });
-        return;
-      }
-
-      reject(new Error(`dmx exited with ${code}\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}`));
-    });
-  });
-}

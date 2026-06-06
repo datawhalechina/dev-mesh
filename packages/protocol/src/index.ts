@@ -39,6 +39,55 @@ export interface JoinResponse {
   expiresAt?: string;
 }
 
+/**
+ * Public metadata for a server group. This is intentionally small because the
+ * endpoint is discoverable before a member has joined the group.
+ */
+export interface ServerGroupSummary {
+  key: string;
+  displayName: string;
+  description?: string;
+  joinMode: 'invite' | 'open' | 'admin';
+  projectCount: number;
+  memberCount: number;
+}
+
+export interface GroupsResponse {
+  groups: ServerGroupSummary[];
+}
+
+export interface CreateProjectRequest {
+  id?: string;
+  projectKey?: string;
+  name: string;
+  description?: string;
+}
+
+export interface ProjectSummary {
+  id: string;
+  projectKey: string;
+  groupKey: string;
+  name: string;
+  description?: string;
+  createdByMemberId: string;
+  createdAt: string;
+}
+
+export interface ProjectsResponse {
+  projects: ProjectSummary[];
+}
+
+export interface ProjectResponse {
+  project: ProjectSummary;
+}
+
+export interface ErrorResponse {
+  error: {
+    code: string;
+    message: string;
+  };
+}
+
 export interface SyncEvent {
   id: string;
   kind: string;

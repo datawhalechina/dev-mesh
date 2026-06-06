@@ -15,13 +15,14 @@
 ## 当前能力
 
 - `pnpm` workspace monorepo
-- `apps/dmx`：`dmx` CLI skeleton
-- `apps/mesh-server`：Hub Server 启动入口
+- `apps/dmx`：`dmx` CLI，本地 init/capture/search/status/rate/inbox/index/doctor、全局 init 工具选择和远端 group join
+- `apps/mesh-server`：Koa2 Hub Server 启动入口
+- `apps/web-admin`：Vue 3 + Element Plus 管理后台
 - `packages/core`：知识条目、PARA、质量信号、搜索和评分
 - `packages/agent`：Context Pack 构建
 - `packages/client`：本地 runtime 和 local-only 组合
-- `packages/server`：Fastify HTTP API 和 MCP `/mcp` skeleton
-- `packages/local-store`：`.dev-mesh/` bootstrap 和 JSONL 本地存储
+- `packages/server`：Koa2 Hub HTTP API、官方 MCP SDK Streamable HTTP `/mcp` 和工具调用映射
+- `packages/local-store`：`.dev-mesh/` bootstrap、JSONL 本地存储、事件日志、review queue、ratings 和 SQLite FTS 索引
 - `packages/mcp-contracts`：MCP tools schema 和注册函数
 - `packages/extension-api`、`packages/registry`：扩展接口和注册解析
 - 分层测试脚本：unit、integration、contract、security、e2e
@@ -30,12 +31,19 @@
 
 ```text
 apps/
-  dmx/                    # CLI 可执行入口
-  mesh-server/            # Hub Server 可执行入口
+  dmx/
+    src/                  # CLI 可执行入口和 commands/*
+    tests/                # CLI 集成测试
+  mesh-server/
+    src/                  # Hub Server 可执行入口
+    tests/                # E2E smoke 测试
+  web-admin/              # Vue + Element Plus 管理后台
 packages/
+  */src/                  # 生产代码
+  */tests/                # 单元、集成、契约、安全测试
   core/                   # 纯领域模型和核心服务
   agent/                  # Agent context pack 编排
-  client/                 # 本地 runtime、CLI 支撑和项目 store 组合
+  client/                 # 本地 runtime、全局初始化和项目 store 组合
   server/                 # Hub Server、HTTP API、MCP endpoint
   extension-api/          # Adapter / Provider / Extractor / Scorer 等接口
   registry/               # 扩展注册和 capability resolve
@@ -49,7 +57,9 @@ packages/
   search/                 # 搜索 backend skeleton
   storage/                # 存储 backend skeleton
 docs/
+  README.md              # 文档索引
   technical-design.md     # 技术设计文档
+  TODO.md                 # 阶段任务清单
   adr/                    # ADR 模板和记录
 examples/                 # 二次开发示例
 ```
@@ -69,6 +79,7 @@ pnpm install
 
 ```bash
 pnpm typecheck
+pnpm typecheck:examples
 pnpm test
 pnpm test:unit
 pnpm test:integration
@@ -84,16 +95,51 @@ pnpm build
 pnpm dev:server
 ```
 
+启动管理后台：
+
+```bash
+pnpm dev:admin
+```
+
 默认地址：
 
 ```text
 Hub Server: http://127.0.0.1:8721
 MCP endpoint: http://127.0.0.1:8721/mcp
+Web Admin: http://127.0.0.1:5173
 ```
 
 ## CLI 示例
 
 当前 CLI 通过 workspace dev script 运行：
+
+初始化全局配置，并选择要注册的 MCP Host 工具：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- init --global --yes --tool codex --tool opencode
+```
+
+也可以用逗号列表：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --mcp-url http://127.0.0.1:8722/mcp --yes
+```
+
+该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。当前 adapter 仍是 scaffold，CLI 会记录选择和 dry-run 配置结果；真实 Codex、Claude Code、opencode 配置写入会在 adapter 实现阶段补齐。
+
+加入开发期 Hub Server 的 group：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 \
+  --group default \
+  --name Xiaoyun \
+  --token devmesh-local-invite \
+  --yes
+```
+
+`dmx join` 会先读取 `/.well-known/dev-mesh`，再调用 `/api/v1/join`。成功后会在全局 `config.toml` 写入 `[[servers]]` 和 `[[groups]]`，并把 access token 保存在本机 `identity.json`，不会写入可检查或可分享的 TOML 配置。
+
+初始化项目本地知识库：
 
 ```bash
 pnpm --filter mcp-dev-mesh dev -- init --root . --name local
@@ -111,6 +157,27 @@ pnpm --filter mcp-dev-mesh dev -- capture \
   --para resources:test-commands
 ```
 
+将高风险候选放入 review queue：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- capture \
+  --root . \
+  --name local \
+  --review \
+  --reason "High-risk automatic extraction" \
+  --title "Review before publishing" \
+  --summary "This candidate should be accepted before it becomes project knowledge." \
+  --type decision
+```
+
+查看、接受或拒绝 inbox 候选：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- inbox --root .
+pnpm --filter mcp-dev-mesh dev -- inbox accept <queue-id> --root .
+pnpm --filter mcp-dev-mesh dev -- inbox reject <queue-id> --root . --reason "Not durable enough"
+```
+
 检索本地知识：
 
 ```bash
@@ -122,6 +189,24 @@ pnpm --filter mcp-dev-mesh dev -- search "focused tests" --root .
 ```bash
 pnpm --filter mcp-dev-mesh dev -- status --root .
 ```
+
+提交显式反馈：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- rate <knowledge-id> \
+  --root . \
+  --name local \
+  --rating 1 \
+  --reason "Useful local command"
+```
+
+重建本地索引 manifest：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- index rebuild --root .
+```
+
+该命令会同时重建 `.dev-mesh/index/manifest.json` 和 `.dev-mesh/index/mesh.sqlite`，后者包含可重建的本地关键词 FTS 索引。
 
 运行 doctor：
 
@@ -155,13 +240,14 @@ pnpm --filter mcp-dev-mesh dev -- doctor --root .
 
 - `knowledge/*.jsonl` 保存本地知识视图。
 - `events/*.jsonl` 是 append-only 事件日志。
-- `index/` 是可重建索引。
-- `queue/` 保存待 review 或拒绝的候选。
+- `knowledge/ratings/*.jsonl` 保存显式反馈事件，不会被当作普通知识检索。
+- `index/manifest.json` 和 `index/mesh.sqlite` 是可重建本地索引。
+- `queue/pending.jsonl` 保存待 review 候选，接受后写入 knowledge 和 events，拒绝后进入 `queue/rejected.jsonl`。
 - `secrets/` 永远不应该同步或提交。
 
 ## HTTP API Skeleton
 
-开发期 Hub Server 已提供以下基础端点：
+开发期 Hub Server 使用 Koa2 提供以下基础端点，MCP `/mcp` 使用官方 MCP TypeScript SDK：
 
 ```text
 GET  /healthz
@@ -173,12 +259,20 @@ GET  /api/v1/sync/pull
 GET  /api/v1/projects
 POST /api/v1/projects
 GET  /api/v1/projects/:id/brief
+GET  /api/v1/admin/overview
+GET  /api/v1/admin/groups
+POST /api/v1/admin/groups
+GET  /api/v1/admin/members
+GET  /api/v1/admin/projects
+POST /api/v1/admin/projects
+GET  /api/v1/admin/knowledge
+GET  /api/v1/admin/review-queue
 GET  /api/v1/admin/audit
 GET  /mcp
 POST /mcp
 ```
 
-MCP tool contract 目前包含：
+MCP `/mcp` 已使用 SDK Streamable HTTP transport 接入，集成测试覆盖 `tools/list` 和 `tools/call`。MCP tool contract 目前包含：
 
 ```text
 mesh_search_context
@@ -189,18 +283,39 @@ mesh_search_member_experience
 mesh_resolve_term
 ```
 
+其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件。
+
+开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token 和 projects：
+
+- `GET /api/v1/groups` 返回可加入的 group 摘要。
+- `POST /api/v1/join` 需要有效 `inviteToken`，成功后签发 group-scoped Bearer access token。
+- `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
+- project list 和 project brief 默认只返回当前 token 所属 group 内的项目；跨 group 项目返回 404，避免泄露其他 group 的 project id。
+- 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、审计和更完整 ACL。
+- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、projects、knowledge、review queue 和 audit log，并支持创建 group / project。
+
 ## 测试策略
 
 本仓库按测试类型拆分 Vitest 配置：
 
 | 命令 | 范围 |
 | --- | --- |
-| `pnpm test:unit` | 纯领域逻辑、local-store、registry 等单元测试 |
+| `pnpm test:unit` | 纯领域逻辑、local-store、registry、依赖方向检查等单元测试 |
 | `pnpm test:integration` | CLI local-only flow、Hub Server HTTP flow 等集成测试 |
 | `pnpm test:contract` | MCP tool schema 和 contract 测试 |
-| `pnpm test:security` | 安全测试入口，当前预留 |
-| `pnpm test:e2e` | E2E smoke 入口，当前预留 |
+| `pnpm test:security` | redaction pipeline 和敏感内容写入安全测试 |
+| `pnpm test:e2e` | 启动真实 `dmx-server` 的 Streamable HTTP MCP smoke 测试 |
 | `pnpm test` | 运行全部已发现测试 |
+
+PostgreSQL repository 集成测试默认跳过；如需运行真实数据库测试，先提供专用测试库连接：
+
+```bash
+DEV_MESH_POSTGRES_URL=postgres://devmesh:devmesh@127.0.0.1:5432/devmesh_test pnpm exec vitest run packages/storage/tests/postgres.integration.test.ts
+```
+
+## 开发规范
+
+后续开发遵循 [docs/development-guide.md](./docs/development-guide.md)：代码组织以包职责和依赖方向为核心，避免过度耦合和过早抽象；实现保持简洁清晰，复杂边界、持久化格式、安全策略和跨包例外需要写清楚注释。
 
 ## 二次开发示例
 
@@ -223,17 +338,32 @@ const contextPack = await agent.buildContextPack({
 });
 ```
 
-更多示例见 [examples](./examples)。
+更多 typed examples 见 [examples](./examples)：
+
+```text
+custom-agent.ts        # 组合 core 和 agent 构建 Context Pack
+custom-scorer.ts       # 注册自定义 QualityScorer extension
+client-runtime.ts      # 嵌入 client runtime、review queue、索引和检索
+local-store-index.ts   # JSONL store + SQLite FTS 本地索引
+embedded-server.ts     # 作为库启动 Hub server 和 MCP endpoint
+```
+
+示例类型检查：
+
+```bash
+pnpm typecheck:examples
+```
 
 ## 开发状态
 
-当前重点是阶段 0 到阶段 1：
+当前重点已推进到阶段 2 Mesh Client：
 
-- 完善 MCP `/mcp` 的真实工具调用集成。
-- 扩展 local-store schema、migration 和索引能力。
-- 补充 redaction、安全测试和 review queue。
+- 已完成 `dmx init --global` 首版和 `dmx join` join flow；下一步完善本地 MCP Proxy 和 adapter configure/remove/doctor。
 - 接入真实 Codex、Claude Code、opencode adapter 配置流程。
-- 引入 SQLite/PostgreSQL repository 和同步测试。
+- 扩展自动沉淀的质量评分和低风险自动发布策略。
+- 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。
+
+后续任务清单见 [docs/TODO.md](./docs/TODO.md)。
 
 详细设计见 [docs/technical-design.md](./docs/technical-design.md)。
 
