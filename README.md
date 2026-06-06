@@ -50,7 +50,7 @@ packages/
   mcp-contracts/          # MCP tool schema 和注册
   protocol/               # Sync / join / well-known API 类型
   local-store/            # .dev-mesh 本地知识库
-  adapters/               # 内置工具适配器 skeleton
+  adapters/               # 内置 Codex / Claude Code / opencode 工具适配器
   providers/              # 内置采集源 skeleton
   extractor/              # 提取器 skeleton
   quality/                # 质量评分器 skeleton
@@ -132,7 +132,7 @@ pnpm --filter mcp-dev-mesh dev -- init --global --yes --tool codex --tool openco
 pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --mcp-url http://127.0.0.1:8722/mcp --yes
 ```
 
-该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。当前 adapter 仍是 scaffold，CLI 会记录选择和 dry-run 配置结果；真实 Codex、Claude Code、opencode 配置写入会在 adapter 实现阶段补齐。
+该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `dev-mesh` MCP server 配置。
 
 加入开发期 Hub Server 的 group：
 
@@ -396,10 +396,15 @@ pnpm typecheck:examples
 
 ## 开发状态
 
-当前重点已推进到阶段 2 Mesh Client：
+当前重点已推进到阶段 3 自动沉淀：
 
-- 已完成 `dmx init --global` 首版、`dmx join` join flow 和 `dmx proxy` 本地 MCP Proxy；下一步完善 adapter configure/remove/doctor。
-- 接入真实 Codex、Claude Code、opencode adapter 配置流程。
+- 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
+- 已完成 Git snapshot provider、filesystem snapshot provider 和 MCP tool call provider，能采集 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数、工具调用成功/失败信号，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
+- 已完成 rule-based extractor，能把 provider raw event 生成带 risk 和 evidence metadata 的 `task_progress`、`command`、`pitfall` 等 extract proposal。
+- 已完成内置 redactor 的 secret、PII、URL token、Authorization、cookie、private key 和 sensitive path 脱敏。
+- 已完成内置 quality scorers，覆盖 confidence、rating、adoption、freshness 和 source trust patch。
+- 已完成 client runtime 的 raw event capture pipeline：provider raw event 写入本地 event log，extract proposal 低风险自动发布，高/中风险进入 `dmx inbox`。
+- 下一步推进 member-specific experience search 和 hybrid search。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。
 

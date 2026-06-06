@@ -873,13 +873,13 @@ Press Enter to apply, Space to toggle, q to cancel.
 
 当前实现进度：
 
-- `dmx init --global` 已支持 `--tool codex --tool opencode`、`--tools codex,claude,opencode`、`--yes` / CI 默认全选，以及非 CI 终端下的轻量输入提示。
-- `packages/client` 负责工具别名归一化、默认选择、内置 adapter dry-run 检查和全局配置写入；`apps/dmx` 只做 CLI 参数收集。
-- `~/.dev-mesh/config.toml` 已写入 `[tools]` 的 Codex / Claude Code / opencode 选择状态，`identity.json` 已记录 `selectedTools`、`localProxyUrl` 和每个 adapter 的 detected/configured/message。
+- `dmx init --global` 已支持 `--tool codex --tool opencode`、`--tools codex,claude,opencode`、`--yes` / CI 默认全选，以及非 CI 终端下的 TUI 选择器。
+- `packages/client` 负责工具别名归一化、默认选择、内置 adapter 检查和全局配置写入；`apps/dmx` 只做 CLI 参数收集。
+- `~/.dev-mesh/config.toml` 已写入 `[tools]` 的 Codex / Claude Code / opencode 选择状态，`identity.json` 已记录 `selectedTools`、`localProxyUrl` 和每个 adapter 的 detected/configured/message/targetPath。
 - `dmx join <server> --group <groupKey> --name <displayName>` 已支持 well-known discovery、invite token join、全局 `[[servers]]` / `[[groups]]` 写入和 join 后 `auto_sync` 开启；access token 只写入本机 `identity.json`，不写入 TOML。
 - `dmx doctor` 已提供 store、privacy、sync、adapter 四类诊断，输出结构化 `checks`、`summary` 和可执行 `fixHint`；诊断逻辑位于 `packages/client`，CLI 只负责参数映射和输出。
 - join 相关实现已按职责拆分：CLI 命令在 `apps/dmx/src/commands/join.ts`，client 编排在 `packages/client/src/join.ts`，HTTP discovery/join 在 `packages/client/src/join-http.ts`，全局配置落盘在 `packages/client/src/join-config.ts`，共享类型在 `packages/client/src/join-types.ts`。
-- 内置 adapter 当前仍是 scaffold，不会修改真实 Codex、Claude Code 或 opencode 配置；完整 TUI、scope 切换和真实 configure/remove/doctor 在阶段 2 后续任务中完成。
+- Codex、Claude Code 和 opencode adapter 已支持 detect、user/project scope configure、remove 和 doctor，并在测试中通过临时 HOME / config 目录隔离真实用户配置。TUI 已支持 detected/configured 状态展示、键盘 toggle、scope 切换和取消。
 
 加入群组流程：
 
@@ -1321,6 +1321,8 @@ supportsSessionExport = opt-in only
 生成 task progress candidate。
 ```
 
+当前内置 Git provider 已输出结构化 `git.snapshot`，包含 branch、HEAD commit、HEAD subject、changed files、diff stat、issue keys 和可选测试摘要，但不包含完整 diff 内容。当前内置 filesystem provider 已输出结构化 `filesystem.snapshot`，只包含相对路径、mtime、大小、文件类别、TODO/FIXME 计数和过滤统计，并默认按 `.meshignore`、`.env`、credential 文件和 secrets 路径阻断敏感内容。当前内置 MCP tool call provider 已输出结构化 `mcp.tool_call`，只包含工具名、参数 key、成功/失败、耗时、结果形状和脱敏错误摘要，不记录参数值或工具返回正文。
+
 ### 7.2 知识提取流水线
 
 ```text
@@ -1336,6 +1338,14 @@ Raw Event
   -> Review Queue or Auto Publish
   -> Sync to Server
 ```
+
+当前内置 rule-based extractor 已支持 `git.snapshot`、`filesystem.snapshot` 和 `mcp.tool_call`，能生成 `task_progress`、`command`、`pitfall` 等 extract proposal，并在 `metadata` 中保留 `risk`、`sourceEventId`、`sourceEventKind` 和结构化 evidence。它只基于 provider 的结构化摘要提取，不读取完整 diff、文件正文或工具返回正文。
+
+当前内置 redactor 已覆盖 Authorization、Cookie、URL token、环境变量 secret、private key、sensitive path、email 和 phone 规则，输出统一的 `[REDACTED:*]` 标记，并在 scan 结果中保留 finding label、kind 和 severity。
+
+当前内置 quality scorers 已覆盖 confidence、rating、adoption、freshness 和 source trust 五类 patch。`QualityScorePatch` 支持 `confidenceDelta`、`weightDelta`、`ratingDelta`、`adoptionScoreDelta`、`freshnessDelta` 和 `sourceTrustDelta`，最终 `qualityScore` 仍由 core 按统一公式派生。
+
+当前 client runtime 已支持 raw event capture pipeline：先将 provider raw event 脱敏后写入 `.dev-mesh/events`，再用 extractor 生成 proposal；`metadata.risk=low` 的 proposal 自动写入本地 extract knowledge，高/中风险 proposal 进入 `.dev-mesh/queue` 供 `dmx inbox` review。
 
 知识类型：
 
@@ -2394,7 +2404,7 @@ MCP 调试建议使用 MCP Inspector 验证：
 | `packages/mcp-contracts` | 每个 MCP tool 的输入 schema、默认值、非法 enum 拒绝、返回 content 格式。 |
 | `packages/server` | `/healthz`、`/.well-known/dev-mesh`、join 参数校验、groupKey 解析、project brief 查询、MCP handler 到 core service 的参数映射。 |
 | `packages/client` | `dmx init --global` 配置生成、local-only status、`ensureProjectStore` 幂等、capture/search runtime 组合、join 后配置更新。 |
-| `packages/adapters` | Codex/Claude/opencode detect、configure dry-run、重复配置幂等、remove 恢复、doctor check 聚合。 |
+| `packages/adapters` | Codex、Claude Code、opencode detect/configure/remove/doctor、重复配置幂等和临时 HOME / config 目录测试隔离。 |
 | `packages/providers` | Git diff 摘要采集、文件事件过滤、命令结果采集、MCP tool call 事件规范化、provider detect false 时不采集。 |
 | `packages/extractor` | raw event 到 extract proposal 的分类、置信度默认值、低风险/高风险标记、重复 proposal 去重。 |
 | `packages/quality` | confidence、rating、adoption、freshness、source trust scorer 的加权计算、过期降权、人工 override 优先级。 |
@@ -2488,7 +2498,7 @@ CI 门禁：
 - `@mcp-dev-mesh/client` 提供可嵌入的 local proxy / daemon runtime
 - `@mcp-dev-mesh/agent` 提供 `buildContextPack`、自动引用策略和沉淀 orchestration API
 - `dmx init --global`
-- tool selector for Codex / Claude Code / opencode（已支持 flags、CI 默认和轻量终端输入；完整 TUI 待增强）
+- tool selector for Codex / Claude Code / opencode（已支持 flags、CI 默认、TUI 状态展示、键盘 toggle 和 scope 切换）
 - local-only mode
 - `dmx join <ip> --group <groupKey> --name <displayName>`（已支持 well-known discovery、invite join、全局连接记录和 CLI 集成测试）
 - 本地 MCP Proxy（已支持 `dmx proxy`、Koa2、官方 MCP SDK Streamable HTTP transport 和 local-store capture/search）
@@ -2509,13 +2519,13 @@ CI 门禁：
 
 ### 阶段 3：自动沉淀
 
-- Git provider
-- 文件事件 provider
-- MCP tool call provider
-- redaction pipeline
-- extractor / redactor / quality scorer extension interfaces
-- low-risk 自动发布，high-risk review queue `dmx inbox`
-- `.dev-mesh/events` append-only event log
+- Git provider（已支持结构化 snapshot，不采集完整 diff）
+- 文件事件 provider（已支持 `.meshignore` / 隐私过滤和路径级元数据采集）
+- MCP tool call provider（已支持成功/失败信号、参数 key、结果形状和脱敏错误摘要）
+- redaction pipeline（已支持 secret / PII / credential 脱敏）
+- extractor / redactor / quality scorer extension interfaces（extractor 已支持 provider raw event 的规则提取，redactor 已支持 secret / PII / credential 脱敏，quality scorer 已覆盖 confidence / rating / adoption / freshness / source trust）
+- low-risk 自动发布，high-risk review queue `dmx inbox`（已支持 extractor proposal 基于 `metadata.risk` 的发布/排队）
+- `.dev-mesh/events` append-only event log（已支持 raw capture event 写入）
 - `.dev-mesh/index` rebuildable local search
 - `.dev-mesh/knowledge/raw` 原始材料
 - `.dev-mesh/knowledge/extract` 提炼片段
@@ -2529,7 +2539,7 @@ CI 门禁：
 - pluggable search backend interface
 - redaction pipeline security test
 - review queue integration test
-- provider -> extractor -> local event log integration test
+- provider -> extractor -> local event log integration test（已覆盖 MCP tool provider capture pipeline）
 - hybrid search ranking integration test
 - 自定义 `Extractor`、`QualityScorer`、`SearchBackend` 插件示例
 - package API docs：core store、agent context、extension registry

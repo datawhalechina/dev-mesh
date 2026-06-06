@@ -43,29 +43,29 @@
 ## 阶段 2：Mesh Client
 
 - [x] 完成 `dmx init --global` 的工具选择器首版：支持 `--tool`、`--tools`、`--yes` / CI 默认和非 CI 终端输入，并写入全局 config / identity。
-- [ ] 增强 `dmx init --global` 为完整 TUI：展示 detected/configured 状态、scope 切换和键盘 toggle。
+- [x] 增强 `dmx init --global` 为完整 TUI：展示 detected/configured 状态、scope 切换和键盘 toggle。
 - [x] 完成 `dmx join <server> --group <groupKey> --name <displayName>`：支持 well-known discovery、invite join、全局 `[[servers]]` / `[[groups]]` 写入和 join 后 `auto_sync` 开启。
 - [x] 增加 `dmx join` client 单元测试和 CLI 集成测试，覆盖 token 不写入 TOML、identity 记录、真实 Hub Server join flow。
 - [x] 实现本地 MCP Proxy：`http://127.0.0.1:8722/mcp`。
-- [ ] Codex 打开项目时自动 `ensureProjectStore`。
+- [x] Codex 打开项目时自动 `ensureProjectStore`。
 - [x] 实现 `dmx doctor` 的 adapter、store、sync、privacy 检查。
-- [ ] Codex Adapter：detect、configure、remove、doctor。
-- [ ] Claude Code Adapter：detect、configure、remove、doctor。
-- [ ] opencode Adapter：detect、configure、remove、doctor。
-- [ ] adapter configure/remove/doctor 使用临时 HOME 的集成测试。
+- [x] Codex Adapter：detect、configure、remove、doctor。
+- [x] Claude Code Adapter：detect、configure、remove、doctor。
+- [x] opencode Adapter：detect、configure、remove、doctor。
+- [x] adapter configure/remove/doctor 使用临时 HOME 的集成测试。
 
 ## 阶段 3：自动沉淀
 
-- [ ] Git provider：采集 diff、commit、branch、测试结果摘要。
-- [ ] 文件事件 provider：按 `.meshignore` 和隐私策略过滤。
-- [ ] MCP tool call provider：采集工具调用结果和失败信号。
-- [ ] Extractor：从 raw event 生成 extract proposal。
-- [ ] Redactor：secret scan、PII scan、URL token、Authorization、cookie 脱敏。
-- [ ] Quality scorer：confidence、rating、adoption、freshness、source trust。
-- [ ] low-risk 自动发布，high-risk 进入 `dmx inbox`。
+- [x] Git provider：采集 diff、commit、branch、测试结果摘要。
+- [x] 文件事件 provider：按 `.meshignore` 和隐私策略过滤。
+- [x] MCP tool call provider：采集工具调用结果和失败信号。
+- [x] Extractor：从 raw event 生成 extract proposal。
+- [x] Redactor：secret scan、PII scan、URL token、Authorization、cookie 脱敏。
+- [x] Quality scorer：confidence、rating、adoption、freshness、source trust。
+- [x] low-risk 自动发布，high-risk 进入 `dmx inbox`。
 - [ ] member-specific experience search。
 - [ ] hybrid search with embeddings。
-- [ ] provider -> extractor -> local event log integration test。
+- [x] provider -> extractor -> local event log integration test。
 - [x] redaction pipeline security test。
 
 ## 阶段 4：团队化
