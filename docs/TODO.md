@@ -74,15 +74,15 @@
 - [x] Web dashboard：查看 server health、groups、members、projects、knowledge items、sync 状态和 review queue。
 - [x] 管理后台支持 group / project 的查看、筛选和创建，支持 member 查看。
 - [x] 管理后台支持 member 禁用和 invite 管理。
-- [ ] 更完整 project ACL 操作。
-- [ ] project ACL 管理。
+- [x] 更完整 project ACL 操作。
+- [x] project ACL 管理。
 - [x] audit log 写入和查询。
 - [ ] glossary 管理。
 - [ ] supersede / duplicate / contradict edge。
 - [ ] quality review dashboard。
 - [ ] task digest。
 - [x] 管理后台 API integration test、前端 API 单元测试和页面结构 smoke test。
-- [ ] ACL/glossary management integration test。
+- [ ] glossary management integration test。
 - [ ] conflict edge 检索和默认 active 项测试。
 
 ## 阶段 5：分布式 Mesh

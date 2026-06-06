@@ -15,7 +15,8 @@ import {
   fetchMembers,
   fetchProjects,
   fetchReviewQueue,
-  revokeInvite
+  revokeInvite,
+  updateProjectAcl
 } from './api.js';
 import type {
   AdminOverview,
@@ -26,6 +27,7 @@ import type {
   InviteSummary,
   KnowledgeItem,
   MemberSummary,
+  ProjectAclRole,
   ProjectInput,
   ProjectSummary,
   ReviewQueueItem
@@ -61,6 +63,8 @@ const knowledgeQuery = ref('');
 const groupDialogOpen = ref(false);
 const inviteDialogOpen = ref(false);
 const projectDialogOpen = ref(false);
+const projectAclDialogOpen = ref(false);
+const selectedAclProject = ref<ProjectSummary | null>(null);
 const groupForm = reactive<GroupInput>({
   key: '',
   displayName: '',
@@ -78,6 +82,11 @@ const inviteForm = reactive<InviteFormInput>({
   token: '',
   expiresAt: '',
   maxUses: ''
+});
+const projectAclForm = reactive<ProjectAclFormInput>({
+  visibility: 'group',
+  memberIds: [],
+  role: 'member'
 });
 
 const navItems = [
@@ -102,6 +111,14 @@ const stats = computed(() => {
     { label: 'Projects', value: overview.value.counts.projects, icon: Folder },
     { label: 'Knowledge', value: overview.value.counts.knowledgeItems, icon: Document }
   ];
+});
+
+const projectAclMembers = computed(() => {
+  if (selectedAclProject.value === null) {
+    return [];
+  }
+
+  return members.value.filter((member) => member.groupKey === selectedAclProject.value?.groupKey && member.status === 'active');
 });
 
 onMounted(() => {
@@ -262,6 +279,53 @@ async function disableMemberRow(row: MemberSummary): Promise<void> {
   }
 }
 
+function openProjectAcl(row: ProjectSummary): void {
+  const access = row.access ?? {
+    visibility: 'group',
+    members: []
+  };
+
+  selectedAclProject.value = row;
+  projectAclForm.visibility = access.visibility;
+  projectAclForm.memberIds = access.members.map((member) => member.memberId);
+  projectAclForm.role = access.members[0]?.role ?? 'member';
+  projectAclDialogOpen.value = true;
+}
+
+async function submitProjectAcl(): Promise<void> {
+  if (selectedAclProject.value === null) {
+    return;
+  }
+
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    await updateProjectAcl(selectedAclProject.value.groupKey, selectedAclProject.value.id, {
+      visibility: projectAclForm.visibility,
+      members:
+        projectAclForm.visibility === 'restricted'
+          ? projectAclForm.memberIds.map((memberId) => ({
+              memberId,
+              role: projectAclForm.role
+            }))
+          : []
+    });
+    projectAclDialogOpen.value = false;
+    selectedAclProject.value = null;
+    Object.assign(projectAclForm, {
+      visibility: 'group',
+      memberIds: [],
+      role: 'member'
+    });
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
 function memberStatusType(status: MemberSummary['status']): 'success' | 'danger' {
   return status === 'active' ? 'success' : 'danger';
 }
@@ -278,11 +342,35 @@ function inviteStatusType(status: InviteSummary['status']): 'success' | 'info' |
   return status === 'expired' ? 'info' : 'warning';
 }
 
+function projectAccessVisibility(project: ProjectSummary): 'group' | 'restricted' {
+  return project.access?.visibility ?? 'group';
+}
+
+function projectAccessMemberCount(project: ProjectSummary): number {
+  return project.access?.members.length ?? 0;
+}
+
+function projectAccessType(project: ProjectSummary): 'success' | 'warning' {
+  return projectAccessVisibility(project) === 'group' ? 'success' : 'warning';
+}
+
+function memberLabel(memberId: string): string {
+  const member = members.value.find((item) => item.memberId === memberId);
+
+  return member === undefined ? memberId : `${member.displayName} (${member.handle})`;
+}
+
 interface InviteFormInput {
   groupKey: string;
   token: string;
   expiresAt: string;
   maxUses: string;
+}
+
+interface ProjectAclFormInput {
+  visibility: 'group' | 'restricted';
+  memberIds: string[];
+  role: ProjectAclRole;
 }
 </script>
 
@@ -434,8 +522,21 @@ interface InviteFormInput {
               <el-table-column prop="id" label="ID" min-width="170" />
               <el-table-column prop="name" label="Name" min-width="190" />
               <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column label="Access" width="140">
+                <template #default="{ row }">
+                  <el-tag :type="projectAccessType(row)">{{ projectAccessVisibility(row) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="ACL Members" width="130">
+                <template #default="{ row }">{{ projectAccessMemberCount(row) }}</template>
+              </el-table-column>
               <el-table-column prop="createdByMemberId" label="Created By" min-width="180" />
               <el-table-column prop="description" label="Description" min-width="220" />
+              <el-table-column label="Actions" width="110" fixed="right">
+                <template #default="{ row }">
+                  <el-button :icon="Lock" size="small" @click="openProjectAcl(row)">ACL</el-button>
+                </template>
+              </el-table-column>
             </el-table>
           </section>
 
@@ -569,6 +670,47 @@ interface InviteFormInput {
       <template #footer>
         <el-button @click="projectDialogOpen = false">Cancel</el-button>
         <el-button type="primary" @click="submitProject">Create</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="projectAclDialogOpen" title="Project ACL" width="560px">
+      <el-form label-position="top">
+        <el-form-item label="Project">
+          <el-input :model-value="selectedAclProject ? `${selectedAclProject.groupKey}/${selectedAclProject.id}` : ''" disabled />
+        </el-form-item>
+        <el-form-item label="Visibility">
+          <el-radio-group v-model="projectAclForm.visibility">
+            <el-radio-button label="group">group</el-radio-button>
+            <el-radio-button label="restricted">restricted</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="Members">
+          <el-select
+            v-model="projectAclForm.memberIds"
+            :disabled="projectAclForm.visibility !== 'restricted'"
+            filterable
+            multiple
+          >
+            <el-option
+              v-for="member in projectAclMembers"
+              :key="member.memberId"
+              :label="memberLabel(member.memberId)"
+              :value="member.memberId"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Role">
+          <el-select v-model="projectAclForm.role" :disabled="projectAclForm.visibility !== 'restricted'">
+            <el-option label="owner" value="owner" />
+            <el-option label="maintainer" value="maintainer" />
+            <el-option label="member" value="member" />
+            <el-option label="readonly" value="readonly" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="projectAclDialogOpen = false">Cancel</el-button>
+        <el-button type="primary" @click="submitProjectAcl">Save</el-button>
       </template>
     </el-dialog>
   </el-config-provider>

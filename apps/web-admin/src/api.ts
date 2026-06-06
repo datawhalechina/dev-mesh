@@ -7,6 +7,7 @@ import type {
   InviteSummary,
   KnowledgeItem,
   MemberSummary,
+  ProjectAclInput,
   ProjectInput,
   ProjectSummary,
   ReviewQueueItem
@@ -72,6 +73,16 @@ export async function createProject(input: ProjectInput): Promise<ProjectSummary
     method: 'POST',
     body: input
   });
+}
+
+export async function updateProjectAcl(groupKey: string, projectId: string, input: ProjectAclInput): Promise<ProjectSummary> {
+  return requestJson<ProjectSummary>(
+    `/api/v1/admin/projects/${encodeURIComponent(groupKey)}/${encodeURIComponent(projectId)}/acl`,
+    {
+      method: 'PUT',
+      body: input
+    }
+  );
 }
 
 export async function fetchKnowledge(layer = '', query = ''): Promise<KnowledgeItem[]> {

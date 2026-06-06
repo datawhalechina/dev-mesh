@@ -28,11 +28,13 @@ import {
   listAdminProjects,
   listAdminReviewQueue,
   revokeAdminInvite,
+  updateAdminProjectAcl,
   type AdminAuditQuery,
   type AdminGroupInput,
   type AdminInviteInput,
   type AdminKnowledgeQuery,
   type AdminMemberDisableInput,
+  type AdminProjectAclInput,
   type AdminProjectInput
 } from './hub-admin.js';
 import {
@@ -364,6 +366,22 @@ function createHubRouter(
     sendHubResult(ctx, createAdminProject(hub, readBody<AdminProjectInput>(ctx)));
   });
 
+  router.put('/api/v1/admin/projects/:groupKey/:id/acl', (ctx) => {
+    const groupKey = ctx.params.groupKey;
+    const projectId = ctx.params.id;
+
+    if (groupKey === undefined || projectId === undefined) {
+      sendHubError(ctx, {
+        statusCode: 400,
+        code: 'admin.project_acl_target_required',
+        message: 'Project groupKey and id are required.'
+      });
+      return;
+    }
+
+    sendHubResult(ctx, updateAdminProjectAcl(hub, groupKey, projectId, readBody<AdminProjectAclInput>(ctx)));
+  });
+
   router.get('/api/v1/admin/knowledge', async (ctx) => {
     ctx.body = {
       items: await listAdminKnowledge(core, readAdminKnowledgeQuery(ctx))
@@ -408,7 +426,7 @@ function createErrorMiddleware(logger: boolean): Middleware {
 function createCorsMiddleware(): Middleware {
   return async (ctx, next) => {
     ctx.set('Access-Control-Allow-Origin', '*');
-    ctx.set('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+    ctx.set('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     ctx.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version');
 
     if (ctx.method === 'OPTIONS') {

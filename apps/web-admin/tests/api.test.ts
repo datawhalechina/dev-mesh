@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createGroup, createInvite, disableMember, fetchAdminOverview, fetchKnowledge, revokeInvite } from '../src/api.js';
+import {
+  createGroup,
+  createInvite,
+  disableMember,
+  fetchAdminOverview,
+  fetchKnowledge,
+  revokeInvite,
+  updateProjectAcl
+} from '../src/api.js';
 
 describe('web-admin API client', () => {
   afterEach(() => {
@@ -133,6 +141,52 @@ describe('web-admin API client', () => {
         method: 'POST',
         body: JSON.stringify({
           reason: 'Offboarded'
+        })
+      })
+    );
+  });
+
+  it('updates project ACLs through the admin API', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        id: 'component-library',
+        groupKey: 'design-team',
+        access: {
+          visibility: 'restricted',
+          members: [
+            {
+              memberId: 'member_design_xiaoyun',
+              role: 'maintainer'
+            }
+          ]
+        }
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await updateProjectAcl('design-team', 'component-library', {
+      visibility: 'restricted',
+      members: [
+        {
+          memberId: 'member_design_xiaoyun',
+          role: 'maintainer'
+        }
+      ]
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/admin/projects/design-team/component-library/acl',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({
+          visibility: 'restricted',
+          members: [
+            {
+              memberId: 'member_design_xiaoyun',
+              role: 'maintainer'
+            }
+          ]
         })
       })
     );

@@ -371,6 +371,7 @@ POST /api/v1/admin/invites
 DELETE /api/v1/admin/invites/:token
 GET  /api/v1/admin/projects
 POST /api/v1/admin/projects
+PUT  /api/v1/admin/projects/:groupKey/:id/acl
 GET  /api/v1/admin/knowledge
 GET  /api/v1/admin/review-queue
 GET  /api/v1/admin/audit
@@ -423,8 +424,8 @@ GET  /api/v1/admin/audit
 
 - `/api/v1/join` 要求 `inviteToken`，token 绑定一个 group；请求里的 `groupKey` 必须与 invite 绑定的 group 一致。
 - join 成功后返回 group-scoped Bearer token；后续 sync 和 projects API 必须携带 `Authorization: Bearer <token>`。
-- `/api/v1/projects` 和 `/api/v1/projects/:id/brief` 只返回当前 token 所属 group 的项目；访问其他 group 项目返回 404，避免泄露 project id。
-- Admin API 支持创建或撤销 invite、禁用 member、创建 group/project，并把这些写操作追加到 audit log；被禁用 member 的既有 Bearer token 会被拒绝。
+- `/api/v1/projects` 和 `/api/v1/projects/:id/brief` 只返回当前 token 所属 group 且 ACL 允许访问的项目；访问其他 group 或未授权项目返回 404，避免泄露 project id。
+- Admin API 支持创建或撤销 invite、禁用 member、创建 group/project、配置 project ACL，并把这些写操作追加到 audit log；被禁用 member 的既有 Bearer token 会被拒绝。
 - 内存状态只用于当前 skeleton 和集成测试。生产实现应替换为 PostgreSQL-backed repository、短期 invite、token rotation、持久化 audit log 和更完整的 ACL。
 
 #### Server HTTP 框架选择
@@ -444,7 +445,7 @@ GET  /api/v1/admin/audit
 
 - 概览：server health、版本、MCP endpoint、同步状态和最近错误。
 - Groups / Members / Invites：查看 group、成员、client identity、token 过期时间、禁用状态和 invite 生命周期。
-- Projects：查看 project、group 归属、ACL、project brief 状态。
+- Projects：查看 project、group 归属、ACL、project brief 状态，并支持 group/restricted visibility 与成员角色配置。
 - Knowledge：查看 knowledge item、layer、PARA、来源成员、质量信号和 supersede/conflict 状态。
 - Review Queue：查看待确认候选，支持接受、拒绝和填写原因。
 - Audit Log：按 actor、group、project、action 和时间筛选审计记录。
@@ -2564,7 +2565,7 @@ CI 门禁：
 - `apps/web-admin` Vue 3 + Element Plus 管理后台
 - dashboard overview：server health、MCP endpoint、sync 状态、最近错误
 - group / member / invite / project 管理页面（已支持 group/project 创建、invite 创建/撤销、member 禁用）
-- project ACL
+- project ACL（已支持 group/restricted visibility、成员角色配置和项目接口过滤）
 - audit log（已支持内存写入、查询和 admin table）
 - glossary 管理
 - supersede / duplicate / contradict edges

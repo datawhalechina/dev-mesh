@@ -1,4 +1,4 @@
-import type { ProjectSummary } from '@mcp-dev-mesh/protocol';
+import type { ProjectAccess, ProjectSummary } from '@mcp-dev-mesh/protocol';
 
 export const DEFAULT_LOCAL_INVITE_TOKEN = 'devmesh-local-invite';
 export const DEFAULT_GROUP_KEY = 'default';
@@ -26,6 +26,7 @@ export interface HubProjectSeed {
   description?: string;
   createdByMemberId?: string;
   createdAt?: string;
+  access?: ProjectAccess;
 }
 
 export interface HubStateOptions {

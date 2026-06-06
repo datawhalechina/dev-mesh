@@ -1,4 +1,4 @@
-import type { CreateProjectRequest, ProjectSummary, ServerGroupSummary } from '@mcp-dev-mesh/protocol';
+import type { CreateProjectRequest, ProjectAccess, ProjectSummary, ServerGroupSummary } from '@mcp-dev-mesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubResult, HubState } from './hub-model.js';
 import { countByGroup, hubError, ok, projectMapKey, slugHandle } from './hub-utils.js';
@@ -25,7 +25,8 @@ export function listHubGroups(state: HubState): ServerGroupSummary[] {
 
 export function listHubProjects(state: HubState, auth: HubAuthContext): ProjectSummary[] {
   return [...state.projects.values()]
-    .filter((project) => project.groupKey === auth.groupKey)
+    .filter((project) => canAccessProject(project, auth))
+    .map((project) => withNormalizedAccess(project))
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -85,7 +86,7 @@ export function createHubProject(
     }
   });
 
-  return ok(project);
+  return ok(withNormalizedAccess(project));
 }
 
 /**
@@ -96,10 +97,38 @@ export function createHubProject(
 export function getHubProject(state: HubState, auth: HubAuthContext, id: string): HubResult<ProjectSummary> {
   const project = state.projects.get(projectMapKey(auth.groupKey, id));
 
-  if (!project) {
+  if (!project || !canAccessProject(project, auth)) {
     // Return 404 rather than 403 so project ids in other groups are not leaked.
     return hubError(404, 'project.not_found', 'Project was not found in the joined group.');
   }
 
-  return ok(project);
+  return ok(withNormalizedAccess(project));
+}
+
+export function normalizeProjectAccess(project: ProjectSummary): ProjectAccess {
+  return project.access ?? {
+    visibility: 'group',
+    members: []
+  };
+}
+
+export function withNormalizedAccess(project: ProjectSummary): ProjectSummary {
+  return {
+    ...project,
+    access: normalizeProjectAccess(project)
+  };
+}
+
+export function canAccessProject(project: ProjectSummary, auth: HubAuthContext): boolean {
+  if (project.groupKey !== auth.groupKey) {
+    return false;
+  }
+
+  const access = normalizeProjectAccess(project);
+
+  if (access.visibility === 'group') {
+    return true;
+  }
+
+  return access.members.some((member) => member.memberId === auth.memberId);
 }

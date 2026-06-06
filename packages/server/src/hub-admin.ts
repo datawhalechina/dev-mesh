@@ -6,7 +6,7 @@ import type {
   KnowledgeLayer,
   SearchKnowledgeInput
 } from '@mcp-dev-mesh/core';
-import type { ProjectSummary } from '@mcp-dev-mesh/protocol';
+import type { ProjectAclMember, ProjectAclRole, ProjectAclVisibility, ProjectSummary } from '@mcp-dev-mesh/protocol';
 import {
   type HubGroup,
   type HubInvite,
@@ -14,6 +14,7 @@ import {
   type HubState
 } from './hub-model.js';
 import { appendHubAuditLog } from './hub-audit.js';
+import { withNormalizedAccess } from './hub-projects.js';
 import { countByGroup, hubError, ok, projectMapKey, slugHandle } from './hub-utils.js';
 
 export interface AdminOverview {
@@ -48,6 +49,14 @@ export interface AdminProjectInput {
   projectKey?: string;
   name?: string;
   description?: string;
+}
+
+export interface AdminProjectAclInput {
+  visibility?: ProjectAclVisibility;
+  members?: Array<{
+    memberId?: string;
+    role?: ProjectAclRole;
+  }>;
 }
 
 export interface AdminInviteInput {
@@ -106,7 +115,9 @@ export function listAdminMembers(state: HubState): AdminMemberSummary[] {
 }
 
 export function listAdminProjects(state: HubState): ProjectSummary[] {
-  return [...state.projects.values()].sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.id.localeCompare(b.id));
+  return [...state.projects.values()]
+    .map((project) => withNormalizedAccess(project))
+    .sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.id.localeCompare(b.id));
 }
 
 export function listAdminInvites(state: HubState): AdminInviteSummary[] {
@@ -208,7 +219,7 @@ export function createAdminProject(state: HubState, input: AdminProjectInput): H
   const existing = state.projects.get(key);
 
   if (existing !== undefined) {
-    return ok(existing);
+    return ok(withNormalizedAccess(existing));
   }
 
   const project: ProjectSummary = {
@@ -238,7 +249,51 @@ export function createAdminProject(state: HubState, input: AdminProjectInput): H
     }
   });
 
-  return ok(project);
+  return ok(withNormalizedAccess(project));
+}
+
+export function updateAdminProjectAcl(
+  state: HubState,
+  groupKey: string,
+  projectId: string,
+  input: AdminProjectAclInput
+): HubResult<ProjectSummary> {
+  const project = state.projects.get(projectMapKey(groupKey, projectId));
+
+  if (project === undefined) {
+    return hubError(404, 'admin.project_not_found', 'Project was not found.');
+  }
+
+  const visibility = input.visibility ?? project.access?.visibility ?? 'group';
+
+  if (visibility !== 'group' && visibility !== 'restricted') {
+    return hubError(400, 'admin.project_acl_visibility_invalid', 'Project ACL visibility is invalid.');
+  }
+
+  const members = input.members === undefined ? project.access?.members ?? [] : normalizeAclMembers(state, groupKey, input.members);
+
+  if (!Array.isArray(members)) {
+    return members;
+  }
+
+  project.access = {
+    visibility,
+    members: visibility === 'restricted' ? members : []
+  };
+
+  appendHubAuditLog(state, {
+    actor: 'admin',
+    action: 'project.acl.updated',
+    targetType: 'project',
+    targetId: project.id,
+    groupKey,
+    payload: {
+      visibility: project.access.visibility,
+      memberIds: project.access.members.map((member) => member.memberId)
+    }
+  });
+
+  return ok(withNormalizedAccess(project));
 }
 
 export function createAdminInvite(state: HubState, input: AdminInviteInput): HubResult<AdminInviteSummary> {
@@ -473,4 +528,43 @@ function getInviteStatus(invite: HubInvite): AdminInviteSummary['status'] {
   }
 
   return 'active';
+}
+
+function normalizeAclMembers(
+  state: HubState,
+  groupKey: string,
+  members: NonNullable<AdminProjectAclInput['members']>
+): ProjectAclMember[] | HubResult<never> {
+  const normalized = new Map<string, ProjectAclMember>();
+
+  for (const member of members) {
+    const memberId = member.memberId?.trim();
+
+    if (!memberId) {
+      return hubError(400, 'admin.project_acl_member_required', 'ACL memberId is required.');
+    }
+
+    const existingMember = state.members.get(memberId);
+
+    if (existingMember === undefined || existingMember.groupKey !== groupKey) {
+      return hubError(404, 'admin.project_acl_member_not_found', 'ACL member must belong to the project group.');
+    }
+
+    const role = member.role ?? 'member';
+
+    if (!isProjectAclRole(role)) {
+      return hubError(400, 'admin.project_acl_role_invalid', 'ACL member role is invalid.');
+    }
+
+    normalized.set(memberId, {
+      memberId,
+      role
+    });
+  }
+
+  return [...normalized.values()].sort((a, b) => a.memberId.localeCompare(b.memberId));
+}
+
+function isProjectAclRole(value: string): value is ProjectAclRole {
+  return value === 'owner' || value === 'maintainer' || value === 'member' || value === 'readonly';
 }

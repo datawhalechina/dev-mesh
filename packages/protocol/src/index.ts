@@ -71,6 +71,20 @@ export interface ProjectSummary {
   description?: string;
   createdByMemberId: string;
   createdAt: string;
+  access?: ProjectAccess;
+}
+
+export type ProjectAclVisibility = 'group' | 'restricted';
+export type ProjectAclRole = 'owner' | 'maintainer' | 'member' | 'readonly';
+
+export interface ProjectAclMember {
+  memberId: string;
+  role: ProjectAclRole;
+}
+
+export interface ProjectAccess {
+  visibility: ProjectAclVisibility;
+  members: ProjectAclMember[];
 }
 
 export interface ProjectsResponse {

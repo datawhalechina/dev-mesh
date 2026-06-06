@@ -17,6 +17,8 @@ describe('web-admin app structure', () => {
     expect(source).toContain('submitGroup');
     expect(source).toContain('submitInvite');
     expect(source).toContain('submitProject');
+    expect(source).toContain('openProjectAcl');
+    expect(source).toContain('submitProjectAcl');
     expect(source).toContain('disableMemberRow');
     expect(source).toContain('revokeInviteRow');
   });

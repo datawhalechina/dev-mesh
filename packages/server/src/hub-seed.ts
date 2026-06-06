@@ -121,5 +121,9 @@ function addProjectSeed(state: HubState, seed: HubProjectSeed): void {
     project.description = seed.description;
   }
 
+  if (seed.access !== undefined) {
+    project.access = seed.access;
+  }
+
   state.projects.set(projectMapKey(project.groupKey, project.id), project);
 }

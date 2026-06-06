@@ -453,6 +453,118 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('enforces admin-managed project ACLs for project lists and briefs', async () => {
+    const { app, url } = await startHubServer({
+      core: createDevMeshCore()
+    });
+
+    try {
+      const owner = await joinDefaultGroup(url);
+      const maintainerJoin = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: DEFAULT_LOCAL_INVITE_TOKEN,
+          displayName: 'Ayuan',
+          handle: 'ayuan'
+        }
+      });
+      const created = await requestJson(`${url}/api/v1/projects`, {
+        method: 'POST',
+        headers: authHeaders(owner.accessToken),
+        body: {
+          id: 'restricted-dashboard',
+          name: 'Restricted Dashboard'
+        }
+      });
+      const acl = await requestJson(`${url}/api/v1/admin/projects/default/restricted-dashboard/acl`, {
+        method: 'PUT',
+        body: {
+          visibility: 'restricted',
+          members: [
+            {
+              memberId: maintainerJoin.body.memberId,
+              role: 'maintainer'
+            }
+          ]
+        }
+      });
+      const ownerProjects = await requestJson(`${url}/api/v1/projects`, {
+        headers: authHeaders(owner.accessToken)
+      });
+      const ownerBrief = await requestJson(`${url}/api/v1/projects/restricted-dashboard/brief`, {
+        headers: authHeaders(owner.accessToken)
+      });
+      const maintainerProjects = await requestJson(`${url}/api/v1/projects`, {
+        headers: authHeaders(maintainerJoin.body.accessToken)
+      });
+      const adminProjects = await requestJson(`${url}/api/v1/admin/projects`);
+      const aclAudit = await requestJson(`${url}/api/v1/admin/audit?action=project.acl.updated`);
+
+      expect(created.body.project).toMatchObject({
+        id: 'restricted-dashboard',
+        access: {
+          visibility: 'group',
+          members: []
+        }
+      });
+      expect(acl.body).toMatchObject({
+        id: 'restricted-dashboard',
+        access: {
+          visibility: 'restricted',
+          members: [
+            {
+              memberId: maintainerJoin.body.memberId,
+              role: 'maintainer'
+            }
+          ]
+        }
+      });
+      expect(ownerProjects.body.projects).toEqual([]);
+      expect(ownerBrief.status).toBe(404);
+      expect(ownerBrief.body).toMatchObject({
+        error: {
+          code: 'project.not_found'
+        }
+      });
+      expect(maintainerProjects.body.projects).toEqual([
+        expect.objectContaining({
+          id: 'restricted-dashboard',
+          access: {
+            visibility: 'restricted',
+            members: [
+              {
+                memberId: maintainerJoin.body.memberId,
+                role: 'maintainer'
+              }
+            ]
+          }
+        })
+      ]);
+      expect(adminProjects.body.projects).toEqual([
+        expect.objectContaining({
+          id: 'restricted-dashboard',
+          access: {
+            visibility: 'restricted',
+            members: [
+              {
+                memberId: maintainerJoin.body.memberId,
+                role: 'maintainer'
+              }
+            ]
+          }
+        })
+      ]);
+      expect(aclAudit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'project.acl.updated',
+          targetId: 'restricted-dashboard'
+        })
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('returns a project brief from canonical knowledge', async () => {
     const core = createDevMeshCore();
     await core.captureKnowledge({
