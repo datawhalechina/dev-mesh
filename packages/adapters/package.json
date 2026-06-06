@@ -16,6 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mcp-dev-mesh/extension-api": "workspace:*"
+    "@mcp-dev-mesh/extension-api": "workspace:*",
+    "jsonc-parser": "^3.3.1"
   }
 }

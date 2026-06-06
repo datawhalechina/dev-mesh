@@ -1,8 +1,10 @@
-export { initGlobalConfig } from './global-init.js';
+export { initGlobalConfig, inspectGlobalToolStatuses } from './global-init.js';
 export type {
   GlobalInitResult,
   GlobalToolKey,
+  GlobalToolScope,
   GlobalToolStatus,
+  InspectGlobalToolsOptions,
   InitGlobalConfigOptions
 } from './global-init.js';
 export { runDevMeshDoctor } from './doctor.js';

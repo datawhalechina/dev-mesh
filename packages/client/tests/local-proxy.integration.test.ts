@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -92,6 +92,40 @@ describe('local MCP proxy', () => {
         ]
       });
       expect(knowledgeJsonl).toContain('"title":"Local proxy captures knowledge"');
+    } finally {
+      await client.close().catch(() => undefined);
+      await proxy.close();
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it('initializes the project store when an MCP session starts', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-local-proxy-auto-init-'));
+    const proxy = await createLocalMcpProxy({
+      projectRoot,
+      memberName: 'Xiaoyun'
+    });
+    const url = await proxy.listen({
+      host: '127.0.0.1',
+      port: 0
+    });
+    const client = new Client({
+      name: 'dev-mesh-local-proxy-auto-init-test',
+      version: '0.1.0'
+    });
+
+    try {
+      await expect(stat(join(projectRoot, '.dev-mesh'))).rejects.toMatchObject({
+        code: 'ENOENT'
+      });
+
+      const transport = new StreamableHTTPClientTransport(new URL(`${url}/mcp`));
+      await client.connect(transport as never);
+      await client.listTools();
+
+      await expect(readFile(join(projectRoot, '.dev-mesh', 'config.toml'), 'utf8')).resolves.toContain(
+        'auto_init = true'
+      );
     } finally {
       await client.close().catch(() => undefined);
       await proxy.close();

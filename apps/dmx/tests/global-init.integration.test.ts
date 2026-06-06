@@ -7,13 +7,33 @@ import { runDmx } from './run-dmx.js';
 describe('dmx CLI global init', () => {
   it('initializes global config with selected MCP host tools', async () => {
     const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-global-'));
+    const codexHome = await mkdtemp(join(tmpdir(), 'dev-mesh-codex-home-'));
+    const claudeHome = await mkdtemp(join(tmpdir(), 'dev-mesh-claude-home-'));
+    const opencodeConfigHome = await mkdtemp(join(tmpdir(), 'dev-mesh-opencode-config-'));
     const mcpUrl = 'http://127.0.0.1:9999/mcp';
 
     try {
       const init = await runDmx(
-        ['init', '--global', '--name', 'Xiaoyun', '--tool', 'codex', '--tool', 'opencode', '--mcp-url', mcpUrl],
+        [
+          'init',
+          '--global',
+          '--name',
+          'Xiaoyun',
+          '--tool',
+          'codex',
+          '--tool',
+          'claude',
+          '--tool',
+          'opencode',
+          '--mcp-url',
+          mcpUrl
+        ],
         {
-          DEV_MESH_HOME: globalRoot
+          DEV_MESH_HOME: globalRoot,
+          CODEX_HOME: codexHome,
+          HOME: claudeHome,
+          USERPROFILE: claudeHome,
+          XDG_CONFIG_HOME: opencodeConfigHome
         }
       );
       const initJson = JSON.parse(init.stdout) as GlobalInitOutput;
@@ -25,41 +45,50 @@ describe('dmx CLI global init', () => {
         globalRoot,
         configPath: join(globalRoot, 'config.toml'),
         identityPath: join(globalRoot, 'identity.json'),
-        selectedTools: ['codex', 'opencode']
+        selectedTools: ['codex', 'claude', 'opencode']
       });
       expect(toolByKey.codex).toMatchObject({
         adapterId: 'codex',
         selected: true,
-        detected: false,
-        configured: false,
-        message: `Would configure codex for ${mcpUrl}`
+        configured: true,
+        message: `Configured codex for ${mcpUrl}`,
+        targetPath: join(codexHome, 'config.toml')
       });
       expect(toolByKey.claude).toMatchObject({
         adapterId: 'claude-code',
-        selected: false,
-        detected: false,
-        configured: false
+        selected: true,
+        configured: true,
+        message: `Configured claude-code for ${mcpUrl}`,
+        targetPath: join(claudeHome, '.claude.json')
       });
       expect(toolByKey.opencode).toMatchObject({
         adapterId: 'opencode',
         selected: true,
-        detected: false,
-        configured: false,
-        message: `Would configure opencode for ${mcpUrl}`
+        configured: true,
+        message: `Configured opencode for ${mcpUrl}`,
+        targetPath: join(opencodeConfigHome, 'opencode', 'opencode.json')
       });
       expect(config).toContain(`local_proxy_url = "${mcpUrl}"`);
       expect(config).toContain('[tools]');
       expect(config).toContain('codex = true');
-      expect(config).toContain('claude = false');
+      expect(config).toContain('claude = true');
       expect(config).toContain('opencode = true');
       expect(identity).toMatchObject({
         displayName: 'Xiaoyun',
         localProxyUrl: mcpUrl,
-        selectedTools: ['codex', 'opencode']
+        selectedTools: ['codex', 'claude', 'opencode']
       });
       expect(identity.tools).toEqual(initJson.tools);
+      await expect(readFile(join(codexHome, 'config.toml'), 'utf8')).resolves.toContain(`url = "${mcpUrl}"`);
+      await expect(readFile(join(claudeHome, '.claude.json'), 'utf8')).resolves.toContain(`"url": "${mcpUrl}"`);
+      await expect(readFile(join(opencodeConfigHome, 'opencode', 'opencode.json'), 'utf8')).resolves.toContain(
+        `"url": "${mcpUrl}"`
+      );
     } finally {
       await rm(globalRoot, { recursive: true, force: true });
+      await rm(codexHome, { recursive: true, force: true });
+      await rm(claudeHome, { recursive: true, force: true });
+      await rm(opencodeConfigHome, { recursive: true, force: true });
     }
   }, 30000);
 });
@@ -70,6 +99,7 @@ interface GlobalToolOutput {
   selected: boolean;
   detected: boolean;
   configured: boolean;
+  targetPath?: string;
   message?: string;
 }
 

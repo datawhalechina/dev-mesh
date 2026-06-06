@@ -4,6 +4,7 @@ import { createBuiltInAdapters, type BuiltInToolAdapterId } from '@mcp-dev-mesh/
 import { DEFAULT_LOCAL_PROXY_URL, escapeToml, getGlobalConfigPaths } from './global-config.js';
 
 export type GlobalToolKey = 'codex' | 'claude' | 'opencode';
+export type GlobalToolScope = 'user' | 'project';
 
 export interface GlobalToolStatus {
   key: GlobalToolKey;
@@ -12,14 +13,26 @@ export interface GlobalToolStatus {
   selected: boolean;
   detected: boolean;
   configured: boolean;
+  scope: GlobalToolScope;
   reason?: string;
   message?: string;
+  targetPath?: string;
 }
 
 export interface InitGlobalConfigOptions {
   globalRoot?: string;
   mcpUrl?: string;
+  projectRoot?: string;
   tools?: string[];
+  toolScopes?: Partial<Record<GlobalToolKey, GlobalToolScope>>;
+  configureTools?: boolean;
+}
+
+export interface InspectGlobalToolsOptions {
+  mcpUrl?: string;
+  projectRoot?: string;
+  tools?: string[];
+  toolScopes?: Partial<Record<GlobalToolKey, GlobalToolScope>>;
 }
 
 export interface GlobalInitResult {
@@ -52,8 +65,17 @@ export async function initGlobalConfig(
 ): Promise<GlobalInitResult> {
   const { globalRoot, configPath, identityPath } = getGlobalConfigPaths(options.globalRoot);
   const mcpUrl = options.mcpUrl ?? DEFAULT_LOCAL_PROXY_URL;
+  const projectRoot = options.projectRoot ?? process.cwd();
   const selectedTools = normalizeGlobalTools(options.tools);
-  const tools = await inspectGlobalTools(selectedTools, mcpUrl);
+  const toolScopes = normalizeGlobalToolScopes(options.toolScopes);
+  const tools = await inspectGlobalTools({
+    selectedTools,
+    mcpUrl,
+    projectRoot,
+    toolScopes,
+    configureTools: options.configureTools ?? true,
+    checkConfiguredForAll: false
+  });
 
   await mkdir(globalRoot, { recursive: true });
   await writeFile(configPath, createGlobalConfigToml(displayName, mcpUrl, selectedTools), 'utf8');
@@ -81,6 +103,24 @@ export async function initGlobalConfig(
     selectedTools,
     tools
   };
+}
+
+export async function inspectGlobalToolStatuses(
+  options: InspectGlobalToolsOptions = {}
+): Promise<GlobalToolStatus[]> {
+  const mcpUrl = options.mcpUrl ?? DEFAULT_LOCAL_PROXY_URL;
+  const projectRoot = options.projectRoot ?? process.cwd();
+  const selectedTools =
+    options.tools === undefined ? GLOBAL_TOOL_DEFINITIONS.map((definition) => definition.key) : normalizeGlobalTools(options.tools);
+
+  return inspectGlobalTools({
+    selectedTools,
+    mcpUrl,
+    projectRoot,
+    toolScopes: normalizeGlobalToolScopes(options.toolScopes),
+    configureTools: false,
+    checkConfiguredForAll: true
+  });
 }
 
 function createGlobalConfigToml(displayName: string, mcpUrl: string, selectedTools: GlobalToolKey[]): string {
@@ -136,15 +176,23 @@ function normalizeGlobalTools(tools?: string[]): GlobalToolKey[] {
   return GLOBAL_TOOL_DEFINITIONS.filter((definition) => selected.has(definition.key)).map((definition) => definition.key);
 }
 
-async function inspectGlobalTools(selectedTools: GlobalToolKey[], mcpUrl: string): Promise<GlobalToolStatus[]> {
+async function inspectGlobalTools(options: {
+  selectedTools: GlobalToolKey[];
+  mcpUrl: string;
+  projectRoot: string;
+  toolScopes: Record<GlobalToolKey, GlobalToolScope>;
+  configureTools: boolean;
+  checkConfiguredForAll: boolean;
+}): Promise<GlobalToolStatus[]> {
+  const { selectedTools, mcpUrl, projectRoot, toolScopes, configureTools, checkConfiguredForAll } = options;
   const selected = new Set(selectedTools);
   const adapters = new Map(createBuiltInAdapters().map((adapter) => [adapter.id, adapter]));
-  const projectRoot = process.cwd();
   const statuses: GlobalToolStatus[] = [];
 
   for (const definition of GLOBAL_TOOL_DEFINITIONS) {
     const adapter = adapters.get(`dev-mesh.adapter.${definition.adapterId}`);
     const isSelected = selected.has(definition.key);
+    const scope = toolScopes[definition.key];
 
     if (adapter === undefined) {
       statuses.push({
@@ -154,20 +202,22 @@ async function inspectGlobalTools(selectedTools: GlobalToolKey[], mcpUrl: string
         selected: isSelected,
         detected: false,
         configured: false,
+        scope,
         reason: 'Built-in adapter is not registered.'
       });
       continue;
     }
 
     const detection = await adapter.detect();
-    const configured = isSelected ? await adapter.isConfigured(projectRoot) : false;
+    let configured = isSelected || checkConfiguredForAll ? await adapter.isConfigured(projectRoot) : false;
     const status: GlobalToolStatus = {
       key: definition.key,
       adapterId: definition.adapterId,
       displayName: definition.displayName,
       selected: isSelected,
       detected: detection.detected,
-      configured
+      configured,
+      scope
     };
 
     if (detection.reason !== undefined) {
@@ -175,17 +225,24 @@ async function inspectGlobalTools(selectedTools: GlobalToolKey[], mcpUrl: string
     }
 
     if (isSelected) {
-      // Adapter writes are intentionally dry-run until host-specific configure
-      // implementations are complete; init still records the user's selection.
       const configure = await adapter.configure({
         projectRoot,
         mcpUrl,
-        scope: 'user',
-        dryRun: true
+        scope,
+        dryRun: !configureTools
       });
+
+      if (configureTools) {
+        configured = await adapter.isConfigured(projectRoot);
+        status.configured = configured;
+      }
 
       if (configure.message !== undefined) {
         status.message = configure.message;
+      }
+
+      if (configure.targetPath !== undefined) {
+        status.targetPath = configure.targetPath;
       }
     }
 
@@ -193,6 +250,16 @@ async function inspectGlobalTools(selectedTools: GlobalToolKey[], mcpUrl: string
   }
 
   return statuses;
+}
+
+function normalizeGlobalToolScopes(
+  scopes: Partial<Record<GlobalToolKey, GlobalToolScope>> = {}
+): Record<GlobalToolKey, GlobalToolScope> {
+  return {
+    codex: scopes.codex ?? 'user',
+    claude: scopes.claude ?? 'user',
+    opencode: scopes.opencode ?? 'user'
+  };
 }
 
 function createGlobalToolAliasMap(): Map<string, GlobalToolKey> {

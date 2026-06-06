@@ -27,7 +27,7 @@ async function ensureGlobalConfig(globalRoot: string, displayName: string): Prom
   try {
     await readFile(paths.configPath, 'utf8');
   } catch {
-    await initGlobalConfig(displayName, { globalRoot });
+    await initGlobalConfig(displayName, { globalRoot, configureTools: false });
   }
 }
 

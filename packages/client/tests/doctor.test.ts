@@ -1,15 +1,27 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initGlobalConfig, runDevMeshDoctor } from '../src/index.js';
 
 describe('runDevMeshDoctor', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('checks store, sync, privacy, and adapters', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-project-'));
     const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-global-'));
+    const codexHome = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-codex-home-'));
+    const claudeHome = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-claude-home-'));
+    const opencodeConfigHome = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-opencode-config-'));
 
     try {
+      vi.stubEnv('CODEX_HOME', codexHome);
+      vi.stubEnv('HOME', claudeHome);
+      vi.stubEnv('USERPROFILE', claudeHome);
+      vi.stubEnv('XDG_CONFIG_HOME', opencodeConfigHome);
+
       await initGlobalConfig('Xiaoyun', {
         globalRoot,
         tools: ['codex']
@@ -44,22 +56,42 @@ describe('runDevMeshDoctor', () => {
           }),
           expect.objectContaining({
             id: 'adapter.codex.detect',
+            category: 'adapter'
+          }),
+          expect.objectContaining({
+            id: 'adapter.codex.configured',
             category: 'adapter',
-            status: 'warn'
+            status: 'ok'
+          }),
+          expect.objectContaining({
+            id: 'adapter.codex.mcp-config',
+            category: 'adapter',
+            status: 'ok'
           })
         ])
       );
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
       await rm(globalRoot, { recursive: true, force: true });
+      await rm(codexHome, { recursive: true, force: true });
+      await rm(claudeHome, { recursive: true, force: true });
+      await rm(opencodeConfigHome, { recursive: true, force: true });
     }
   });
 
   it('warns when privacy and sync settings are risky', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-project-'));
     const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-global-'));
+    const codexHome = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-codex-home-'));
+    const claudeHome = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-claude-home-'));
+    const opencodeConfigHome = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-opencode-config-'));
 
     try {
+      vi.stubEnv('CODEX_HOME', codexHome);
+      vi.stubEnv('HOME', claudeHome);
+      vi.stubEnv('USERPROFILE', claudeHome);
+      vi.stubEnv('XDG_CONFIG_HOME', opencodeConfigHome);
+
       await runDevMeshDoctor({
         projectRoot,
         globalRoot
@@ -105,6 +137,9 @@ describe('runDevMeshDoctor', () => {
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
       await rm(globalRoot, { recursive: true, force: true });
+      await rm(codexHome, { recursive: true, force: true });
+      await rm(claudeHome, { recursive: true, force: true });
+      await rm(opencodeConfigHome, { recursive: true, force: true });
     }
   });
 });
