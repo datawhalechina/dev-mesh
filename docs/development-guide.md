@@ -181,5 +181,8 @@ export async function captureProjectKnowledge(...) {}
 - 每次完成一轮开发后，必须运行与变更范围匹配的验证命令，并进行一次 git commit。
 - 提交前检查 `git status --short`、`git diff --name-status` 和 `git diff --check`，避免提交临时目录、构建产物、日志、真实密钥或无关文件。
 - 只提交本轮开发相关变更；如果工作区存在无关用户改动，保留未暂存并在交付说明里说明。
-- commit message 默认使用中文，保持简短、具体、动作导向，例如 `切换Koa服务端并新增管理后台`。
+- commit message 统一使用英文 Conventional Commits，格式为 `<type>(optional-scope): <description>`。
+- 常用 type 包括 `feat`、`fix`、`docs`、`test`、`refactor`、`chore`、`build`、`ci`、`perf`、`style`、`revert`。
+- description 使用英文祈使句或简短动词短语，保持具体、可搜索，例如 `feat: add local MCP proxy`、`docs: update development guide`。
+- 不再使用中文提交信息；需要说明中文背景时放在 PR 描述、issue 或文档中，而不是 commit subject。
 - 不用 `git reset --hard`、`git checkout --` 等破坏性命令清理工作区；需要移除自己生成的临时文件时，先确认路径在当前 workspace 内。
