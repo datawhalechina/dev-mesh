@@ -1,10 +1,6 @@
 import type { CaptureKnowledgeInput } from '@mcp-dev-mesh/core';
-import type {
-  CaptureProjectTaskInput,
-  EnqueuePendingKnowledgeOptions,
-  RateProjectKnowledgeOptions
-} from '@mcp-dev-mesh/local-store';
-import type { Redactor } from '@mcp-dev-mesh/extension-api';
+import type { CaptureProjectTaskInput, EnqueuePendingKnowledgeOptions, RateProjectKnowledgeOptions } from '@mcp-dev-mesh/local-store';
+import type { RawEvent, Redactor } from '@mcp-dev-mesh/extension-api';
 
 export async function redactCaptureKnowledgeInput(
   input: CaptureKnowledgeInput,
@@ -104,6 +100,47 @@ export async function redactRateOptions(
   }
 
   return output;
+}
+
+export async function redactRawEvent(event: RawEvent, redactor: Redactor): Promise<RawEvent> {
+  const output: RawEvent = {
+    ...event,
+    summary: (await redactor.redact({ text: event.summary })).text
+  };
+
+  if (event.payload !== undefined) {
+    output.payload = (await redactRecord(event.payload, redactor)) as Record<string, unknown>;
+  }
+
+  if (event.source !== undefined) {
+    output.source = (await redactRecord(event.source, redactor)) as Record<string, unknown>;
+  }
+
+  return output;
+}
+
+async function redactRecord(value: Record<string, unknown>, redactor: Redactor): Promise<Record<string, unknown>> {
+  const entries = await Promise.all(
+    Object.entries(value).map(async ([key, entryValue]) => [key, await redactUnknown(entryValue, redactor)] as const)
+  );
+
+  return Object.fromEntries(entries);
+}
+
+async function redactUnknown(value: unknown, redactor: Redactor): Promise<unknown> {
+  if (typeof value === 'string') {
+    return (await redactor.redact({ text: value })).text;
+  }
+
+  if (Array.isArray(value)) {
+    return Promise.all(value.map((item) => redactUnknown(item, redactor)));
+  }
+
+  if (value !== null && typeof value === 'object') {
+    return redactRecord(value as Record<string, unknown>, redactor);
+  }
+
+  return value;
 }
 
 export function withDefaultMember(input: CaptureKnowledgeInput, memberName?: string): CaptureKnowledgeInput {

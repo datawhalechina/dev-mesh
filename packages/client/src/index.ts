@@ -26,4 +26,9 @@ export {
 } from './local-proxy.js';
 export type { LocalMcpProxyListenOptions, LocalMcpProxyOptions } from './local-proxy.js';
 export { createDevMeshClientRuntime } from './runtime.js';
-export type { DevMeshClientOptions, DevMeshClientRuntime } from './runtime.js';
+export type {
+  CaptureRawEventResult,
+  DevMeshClientOptions,
+  DevMeshClientRuntime,
+  PublishExtractProposalResult
+} from './runtime.js';
