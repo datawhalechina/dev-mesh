@@ -361,6 +361,18 @@ GET  /api/v1/sync/pull
 GET  /api/v1/projects
 POST /api/v1/projects
 GET  /api/v1/projects/:id/brief
+GET  /api/v1/admin/overview
+GET  /api/v1/admin/groups
+POST /api/v1/admin/groups
+GET  /api/v1/admin/members
+POST /api/v1/admin/members/:memberId/disable
+GET  /api/v1/admin/invites
+POST /api/v1/admin/invites
+DELETE /api/v1/admin/invites/:token
+GET  /api/v1/admin/projects
+POST /api/v1/admin/projects
+GET  /api/v1/admin/knowledge
+GET  /api/v1/admin/review-queue
 GET  /api/v1/admin/audit
 ```
 
@@ -407,12 +419,13 @@ GET  /api/v1/admin/audit
 
 `groupKey` 用于服务端群组隔离。同一个 Mesh Server 可以同时服务多个团队或项目集，例如 `frontend-team`、`backend-platform`、`customer-a`。客户端只同步已加入群组内授权项目的知识；未指定 `groupKey` 时，服务端可以根据 invite token 自动解析默认群组。
 
-当前开发期 Hub Server 使用内存状态实现 invite、member、access token、group 和 project registry：
+当前开发期 Hub Server 使用内存状态实现 invite、member、access token、group、project registry 和 audit log：
 
 - `/api/v1/join` 要求 `inviteToken`，token 绑定一个 group；请求里的 `groupKey` 必须与 invite 绑定的 group 一致。
 - join 成功后返回 group-scoped Bearer token；后续 sync 和 projects API 必须携带 `Authorization: Bearer <token>`。
 - `/api/v1/projects` 和 `/api/v1/projects/:id/brief` 只返回当前 token 所属 group 的项目；访问其他 group 项目返回 404，避免泄露 project id。
-- 内存状态只用于当前 skeleton 和集成测试。生产实现应替换为 PostgreSQL-backed repository、短期 invite、token rotation、audit log 和更完整的 ACL。
+- Admin API 支持创建或撤销 invite、禁用 member、创建 group/project，并把这些写操作追加到 audit log；被禁用 member 的既有 Bearer token 会被拒绝。
+- 内存状态只用于当前 skeleton 和集成测试。生产实现应替换为 PostgreSQL-backed repository、短期 invite、token rotation、持久化 audit log 和更完整的 ACL。
 
 #### Server HTTP 框架选择
 
@@ -430,7 +443,7 @@ GET  /api/v1/admin/audit
 首版页面范围：
 
 - 概览：server health、版本、MCP endpoint、同步状态和最近错误。
-- Groups / Members：查看 group、成员、client identity、token 过期时间和禁用状态。
+- Groups / Members / Invites：查看 group、成员、client identity、token 过期时间、禁用状态和 invite 生命周期。
 - Projects：查看 project、group 归属、ACL、project brief 状态。
 - Knowledge：查看 knowledge item、layer、PARA、来源成员、质量信号和 supersede/conflict 状态。
 - Review Queue：查看待确认候选，支持接受、拒绝和填写原因。
@@ -1346,6 +1359,8 @@ Raw Event
 当前内置 quality scorers 已覆盖 confidence、rating、adoption、freshness 和 source trust 五类 patch。`QualityScorePatch` 支持 `confidenceDelta`、`weightDelta`、`ratingDelta`、`adoptionScoreDelta`、`freshnessDelta` 和 `sourceTrustDelta`，最终 `qualityScore` 仍由 core 按统一公式派生。
 
 当前 client runtime 已支持 raw event capture pipeline：先将 provider raw event 脱敏后写入 `.dev-mesh/events`，再用 extractor 生成 proposal；`metadata.risk=low` 的 proposal 自动写入本地 extract knowledge，高/中风险 proposal 进入 `.dev-mesh/queue` 供 `dmx inbox` review。
+
+当前内置 search backend 已支持 member-specific experience filters（`authorName` / `memberName`）和 hybrid ranking。Hybrid backend 使用可替换 `EmbeddingProvider`，默认提供 deterministic embedding mock，并组合 keyword、vector similarity、recency、qualityScore、adoptionScore 和 weight。`JsonlKnowledgeRepository` 在 SQLite FTS 命中后也会叠加 core ranking，避免本地索引绕开质量排序。
 
 知识类型：
 
@@ -2533,8 +2548,8 @@ CI 门禁：
 - `.dev-mesh/knowledge/ratings` 知识反馈事件
 - `.dev-mesh/knowledge/usage` 引用后隐式反馈事件
 - `.dev-mesh/knowledge/para` PARA 索引
-- member-specific experience search
-- hybrid search with embeddings
+- member-specific experience search（已支持 author/member filters）
+- hybrid search with embeddings（已支持 deterministic embedding mock 和 hybrid ranking）
 - confidence / weight / rating / adoptionScore / qualityScore ranking
 - pluggable search backend interface
 - redaction pipeline security test
@@ -2548,9 +2563,9 @@ CI 门禁：
 
 - `apps/web-admin` Vue 3 + Element Plus 管理后台
 - dashboard overview：server health、MCP endpoint、sync 状态、最近错误
-- group / member / project 管理页面
+- group / member / invite / project 管理页面（已支持 group/project 创建、invite 创建/撤销、member 禁用）
 - project ACL
-- audit log
+- audit log（已支持内存写入、查询和 admin table）
 - glossary 管理
 - supersede / duplicate / contradict edges
 - quality review dashboard

@@ -303,6 +303,10 @@ GET  /api/v1/admin/overview
 GET  /api/v1/admin/groups
 POST /api/v1/admin/groups
 GET  /api/v1/admin/members
+POST /api/v1/admin/members/:memberId/disable
+GET  /api/v1/admin/invites
+POST /api/v1/admin/invites
+DELETE /api/v1/admin/invites/:token
 GET  /api/v1/admin/projects
 POST /api/v1/admin/projects
 GET  /api/v1/admin/knowledge
@@ -325,14 +329,15 @@ mesh_resolve_term
 
 其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件。
 
-开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token 和 projects：
+开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token、projects 和 audit logs：
 
 - `GET /api/v1/groups` 返回可加入的 group 摘要。
 - `POST /api/v1/join` 需要有效 `inviteToken`，成功后签发 group-scoped Bearer access token。
 - `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
 - project list 和 project brief 默认只返回当前 token 所属 group 内的项目；跨 group 项目返回 404，避免泄露其他 group 的 project id。
-- 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、审计和更完整 ACL。
-- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、projects、knowledge、review queue 和 audit log，并支持创建 group / project。
+- 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
+- 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、持久化审计和更完整 ACL。
+- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、knowledge、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member。
 
 ## 测试策略
 
@@ -396,7 +401,7 @@ pnpm typecheck:examples
 
 ## 开发状态
 
-当前重点已推进到阶段 3 自动沉淀：
+当前重点已推进到阶段 4 团队化：
 
 - 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
 - 已完成 Git snapshot provider、filesystem snapshot provider 和 MCP tool call provider，能采集 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数、工具调用成功/失败信号，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
@@ -404,7 +409,9 @@ pnpm typecheck:examples
 - 已完成内置 redactor 的 secret、PII、URL token、Authorization、cookie、private key 和 sensitive path 脱敏。
 - 已完成内置 quality scorers，覆盖 confidence、rating、adoption、freshness 和 source trust patch。
 - 已完成 client runtime 的 raw event capture pipeline：provider raw event 写入本地 event log，extract proposal 低风险自动发布，高/中风险进入 `dmx inbox`。
-- 下一步推进 member-specific experience search 和 hybrid search。
+- 已完成 member-specific experience search 和内置 hybrid search backend，支持 keyword、deterministic embedding mock、recency、quality 和 adoption ranking。
+- 已完成 web-admin 的 member 禁用、invite 创建/撤销，以及 Hub admin audit log 写入和查询。
+- 下一步推进 project ACL、glossary 管理、quality review、conflict edge 和更完整的分布式同步能力。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。
 
@@ -417,4 +424,4 @@ pnpm typecheck:examples
 - 默认不上传原始对话全文。
 - 默认启用脱敏策略，后续高风险内容应进入 review queue。
 - `.dev-mesh/secrets/`、credential 文件、`.env`、`*.pem`、`*.key` 不应同步或提交。
-- 当前实现仍是开发骨架，生产部署前需要补齐认证、ACL、审计、redaction 和同步安全测试。
+- 当前实现仍是开发骨架，生产部署前需要补齐认证、持久化 ACL、持久化审计、redaction 和同步安全测试。
