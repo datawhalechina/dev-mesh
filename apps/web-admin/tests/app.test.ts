@@ -9,11 +9,15 @@ describe('web-admin app structure', () => {
     expect(source).toContain("key: 'overview'");
     expect(source).toContain("key: 'groups'");
     expect(source).toContain("key: 'members'");
+    expect(source).toContain("key: 'invites'");
     expect(source).toContain("key: 'projects'");
     expect(source).toContain("key: 'knowledge'");
     expect(source).toContain("key: 'review'");
     expect(source).toContain("key: 'audit'");
     expect(source).toContain('submitGroup');
+    expect(source).toContain('submitInvite');
     expect(source).toContain('submitProject');
+    expect(source).toContain('disableMemberRow');
+    expect(source).toContain('revokeInviteRow');
   });
 });

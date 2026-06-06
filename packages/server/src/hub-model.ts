@@ -59,8 +59,12 @@ export interface HubInvite {
   token: string;
   groupKey: string;
   uses: number;
+  createdAt: string;
+  createdBy: string;
   expiresAt?: string;
   maxUses?: number;
+  revokedAt?: string;
+  revokedBy?: string;
 }
 
 export interface HubMember {
@@ -70,11 +74,25 @@ export interface HubMember {
   displayName: string;
   handle: string;
   joinedAt: string;
+  status: 'active' | 'disabled';
+  disabledAt?: string;
+  disabledReason?: string;
 }
 
 export interface HubAccessToken extends HubAuthContext {
   token: string;
   expiresAt: string;
+}
+
+export interface HubAuditLog {
+  id: string;
+  actor: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  groupKey?: string;
+  createdAt: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface HubState {
@@ -83,4 +101,5 @@ export interface HubState {
   members: Map<string, HubMember>;
   tokens: Map<string, HubAccessToken>;
   projects: Map<string, ProjectSummary>;
+  auditLogs: HubAuditLog[];
 }

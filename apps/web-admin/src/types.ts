@@ -33,6 +33,9 @@ export interface MemberSummary {
   displayName: string;
   handle: string;
   joinedAt: string;
+  status: 'active' | 'disabled';
+  disabledAt?: string;
+  disabledReason?: string;
   tokenExpiresAt?: string;
 }
 
@@ -80,7 +83,24 @@ export interface AuditLog {
   id: string;
   actor: string;
   action: string;
+  targetType: string;
+  targetId: string;
+  groupKey?: string;
   createdAt: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface InviteSummary {
+  token: string;
+  groupKey: string;
+  uses: number;
+  createdAt: string;
+  createdBy: string;
+  status: 'active' | 'expired' | 'exhausted' | 'revoked';
+  expiresAt?: string;
+  maxUses?: number;
+  revokedAt?: string;
+  revokedBy?: string;
 }
 
 export interface GroupInput {
@@ -95,4 +115,11 @@ export interface ProjectInput {
   id?: string;
   name: string;
   description?: string;
+}
+
+export interface InviteInput {
+  groupKey: string;
+  token?: string;
+  expiresAt?: string;
+  maxUses?: number;
 }

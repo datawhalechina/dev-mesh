@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createGroup, fetchAdminOverview, fetchKnowledge } from '../src/api.js';
+import { createGroup, createInvite, disableMember, fetchAdminOverview, fetchKnowledge, revokeInvite } from '../src/api.js';
 
 describe('web-admin API client', () => {
   afterEach(() => {
@@ -83,6 +83,59 @@ describe('web-admin API client', () => {
     await fetchKnowledge('canonical', 'project brief');
 
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/knowledge?layer=canonical&query=project+brief', expect.any(Object));
+  });
+
+  it('posts invite and member management requests', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        token: 'inv_design',
+        groupKey: 'design-team',
+        uses: 0,
+        status: 'active',
+        createdAt: '2026-06-06T00:00:00.000Z',
+        createdBy: 'admin'
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createInvite({
+      groupKey: 'design-team',
+      token: 'inv_design',
+      maxUses: 2
+    });
+    await revokeInvite('inv_design');
+    await disableMember('member_design_xiaoyun', 'Offboarded');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/admin/invites',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          groupKey: 'design-team',
+          token: 'inv_design',
+          maxUses: 2
+        })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/admin/invites/inv_design',
+      expect.objectContaining({
+        method: 'DELETE'
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/admin/members/member_design_xiaoyun/disable',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          reason: 'Offboarded'
+        })
+      })
+    );
   });
 });
 

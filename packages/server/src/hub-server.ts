@@ -17,15 +17,22 @@ import {
 } from '@mcp-dev-mesh/protocol';
 import {
   createAdminGroup,
+  createAdminInvite,
   createAdminOverview,
   createAdminProject,
+  disableAdminMember,
   listAdminAuditLogs,
+  listAdminInvites,
   listAdminKnowledge,
   listAdminMembers,
   listAdminProjects,
   listAdminReviewQueue,
+  revokeAdminInvite,
+  type AdminAuditQuery,
   type AdminGroupInput,
+  type AdminInviteInput,
   type AdminKnowledgeQuery,
+  type AdminMemberDisableInput,
   type AdminProjectInput
 } from './hub-admin.js';
 import {
@@ -307,6 +314,46 @@ function createHubRouter(
     };
   });
 
+  router.post('/api/v1/admin/members/:memberId/disable', (ctx) => {
+    const memberId = ctx.params.memberId;
+
+    if (memberId === undefined) {
+      sendHubError(ctx, {
+        statusCode: 400,
+        code: 'admin.member_id_required',
+        message: 'Member id is required.'
+      });
+      return;
+    }
+
+    sendHubResult(ctx, disableAdminMember(hub, memberId, readBody<AdminMemberDisableInput>(ctx)));
+  });
+
+  router.get('/api/v1/admin/invites', (ctx) => {
+    ctx.body = {
+      invites: listAdminInvites(hub)
+    };
+  });
+
+  router.post('/api/v1/admin/invites', (ctx) => {
+    sendHubResult(ctx, createAdminInvite(hub, readBody<AdminInviteInput>(ctx)));
+  });
+
+  router.delete('/api/v1/admin/invites/:token', (ctx) => {
+    const token = ctx.params.token;
+
+    if (token === undefined) {
+      sendHubError(ctx, {
+        statusCode: 400,
+        code: 'admin.invite_token_required',
+        message: 'Invite token is required.'
+      });
+      return;
+    }
+
+    sendHubResult(ctx, revokeAdminInvite(hub, token));
+  });
+
   router.get('/api/v1/admin/projects', (ctx) => {
     ctx.body = {
       projects: listAdminProjects(hub)
@@ -328,7 +375,7 @@ function createHubRouter(
   });
 
   router.get('/api/v1/admin/audit', (ctx) => {
-    ctx.body = listAdminAuditLogs();
+    ctx.body = listAdminAuditLogs(hub, readAdminAuditQuery(ctx));
   });
 
   router.all('/mcp', async (ctx) => {
@@ -501,6 +548,27 @@ function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
 
   if (layer === 'raw' || layer === 'extract' || layer === 'canonical') {
     query.layer = layer;
+  }
+
+  if (Number.isFinite(limit) && limit > 0) {
+    query.limit = Math.min(limit, 100);
+  }
+
+  return query;
+}
+
+function readAdminAuditQuery(ctx: Context): AdminAuditQuery {
+  const query: AdminAuditQuery = {};
+  const groupKey = readQueryString(ctx, 'groupKey');
+  const action = readQueryString(ctx, 'action');
+  const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  if (groupKey !== undefined) {
+    query.groupKey = groupKey;
+  }
+
+  if (action !== undefined) {
+    query.action = action;
   }
 
   if (Number.isFinite(limit) && limit > 0) {

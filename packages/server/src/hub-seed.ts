@@ -23,7 +23,8 @@ export function createHubState(options: HubStateOptions = {}): HubState {
     invites: new Map(),
     members: new Map(),
     tokens: new Map(),
-    projects: new Map()
+    projects: new Map(),
+    auditLogs: []
   };
   const groups = options.groups?.length
     ? options.groups
@@ -85,7 +86,9 @@ function addInvite(state: HubState, seed: HubInviteSeed): void {
   const invite: HubInvite = {
     token: seed.token,
     groupKey: seed.groupKey,
-    uses: 0
+    uses: 0,
+    createdAt: new Date().toISOString(),
+    createdBy: 'system'
   };
 
   if (seed.expiresAt !== undefined) {

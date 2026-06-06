@@ -339,6 +339,120 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('manages invites, disabled members, and audit logs through admin APIs', async () => {
+    const { app, url } = await startHubServer({
+      core: createDevMeshCore()
+    });
+
+    try {
+      const invite = await requestJson(`${url}/api/v1/admin/invites`, {
+        method: 'POST',
+        body: {
+          groupKey: 'default',
+          token: 'inv_admin_panel',
+          maxUses: 2
+        }
+      });
+      const invites = await requestJson(`${url}/api/v1/admin/invites`);
+      const joined = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_admin_panel',
+          displayName: 'Xiaoyun',
+          handle: 'xiaoyun'
+        }
+      });
+      const disabled = await requestJson(`${url}/api/v1/admin/members/${joined.body.memberId}/disable`, {
+        method: 'POST',
+        body: {
+          reason: 'Rotated off the project'
+        }
+      });
+      const rejectedProjects = await requestJson(`${url}/api/v1/projects`, {
+        headers: authHeaders(joined.body.accessToken)
+      });
+      const revoked = await requestJson(`${url}/api/v1/admin/invites/inv_admin_panel`, {
+        method: 'DELETE'
+      });
+      const revokedJoin = await requestJson(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_admin_panel',
+          displayName: 'Ayuan',
+          handle: 'ayuan'
+        }
+      });
+      const audit = await requestJson(`${url}/api/v1/admin/audit?limit=10`);
+      const memberAudit = await requestJson(`${url}/api/v1/admin/audit?action=member.disabled`);
+
+      expect(invite.body).toMatchObject({
+        token: 'inv_admin_panel',
+        groupKey: 'default',
+        uses: 0,
+        maxUses: 2,
+        status: 'active'
+      });
+      expect(invites.body.invites).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            token: 'inv_admin_panel',
+            status: 'active'
+          })
+        ])
+      );
+      expect(disabled.body).toMatchObject({
+        memberId: joined.body.memberId,
+        status: 'disabled',
+        disabledReason: 'Rotated off the project'
+      });
+      expect(rejectedProjects.status).toBe(403);
+      expect(rejectedProjects.body).toMatchObject({
+        error: {
+          code: 'auth.member_disabled'
+        }
+      });
+      expect(revoked.body).toMatchObject({
+        token: 'inv_admin_panel',
+        status: 'revoked',
+        revokedBy: 'admin'
+      });
+      expect(revokedJoin.status).toBe(401);
+      expect(revokedJoin.body).toMatchObject({
+        error: {
+          code: 'join.invite_invalid'
+        }
+      });
+      expect(audit.body.auditLogs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: 'invite.created',
+            targetId: 'inv_admin_panel'
+          }),
+          expect.objectContaining({
+            action: 'member.joined',
+            targetId: joined.body.memberId
+          }),
+          expect.objectContaining({
+            action: 'member.disabled',
+            targetId: joined.body.memberId
+          }),
+          expect.objectContaining({
+            action: 'invite.revoked',
+            targetId: 'inv_admin_panel'
+          })
+        ])
+      );
+      expect(memberAudit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'member.disabled',
+          targetId: joined.body.memberId
+        })
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('returns a project brief from canonical knowledge', async () => {
     const core = createDevMeshCore();
     await core.captureKnowledge({

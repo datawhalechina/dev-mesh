@@ -3,21 +3,27 @@ import * as ElementPlusIcons from '@element-plus/icons-vue';
 import type { Component } from 'vue';
 import { computed, onMounted, reactive, ref } from 'vue';
 import {
+  createInvite,
   createGroup,
   createProject,
+  disableMember,
   fetchAdminOverview,
   fetchAuditLogs,
   fetchGroups,
+  fetchInvites,
   fetchKnowledge,
   fetchMembers,
   fetchProjects,
-  fetchReviewQueue
+  fetchReviewQueue,
+  revokeInvite
 } from './api.js';
 import type {
   AdminOverview,
   AuditLog,
   GroupInput,
   GroupSummary,
+  InviteInput,
+  InviteSummary,
   KnowledgeItem,
   MemberSummary,
   ProjectInput,
@@ -45,6 +51,7 @@ const errorMessage = ref('');
 const overview = ref<AdminOverview | null>(null);
 const groups = ref<GroupSummary[]>([]);
 const members = ref<MemberSummary[]>([]);
+const invites = ref<InviteSummary[]>([]);
 const projects = ref<ProjectSummary[]>([]);
 const knowledge = ref<KnowledgeItem[]>([]);
 const reviewQueue = ref<ReviewQueueItem[]>([]);
@@ -52,6 +59,7 @@ const auditLogs = ref<AuditLog[]>([]);
 const knowledgeLayer = ref('');
 const knowledgeQuery = ref('');
 const groupDialogOpen = ref(false);
+const inviteDialogOpen = ref(false);
 const projectDialogOpen = ref(false);
 const groupForm = reactive<GroupInput>({
   key: '',
@@ -65,11 +73,18 @@ const projectForm = reactive<ProjectInput>({
   name: '',
   description: ''
 });
+const inviteForm = reactive<InviteFormInput>({
+  groupKey: '',
+  token: '',
+  expiresAt: '',
+  maxUses: ''
+});
 
 const navItems = [
   { key: 'overview', label: 'Overview', icon: DataAnalysis },
   { key: 'groups', label: 'Groups', icon: Collection },
   { key: 'members', label: 'Members', icon: User },
+  { key: 'invites', label: 'Invites', icon: Lock },
   { key: 'projects', label: 'Projects', icon: Folder },
   { key: 'knowledge', label: 'Knowledge', icon: Document },
   { key: 'review', label: 'Review Queue', icon: Memo },
@@ -98,10 +113,11 @@ async function refreshAll(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    const [overviewData, groupData, memberData, projectData, knowledgeData, queueData, auditData] = await Promise.all([
+    const [overviewData, groupData, memberData, inviteData, projectData, knowledgeData, queueData, auditData] = await Promise.all([
       fetchAdminOverview(),
       fetchGroups(),
       fetchMembers(),
+      fetchInvites(),
       fetchProjects(),
       fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value),
       fetchReviewQueue(),
@@ -111,6 +127,7 @@ async function refreshAll(): Promise<void> {
     overview.value = overviewData;
     groups.value = groupData;
     members.value = memberData;
+    invites.value = inviteData;
     projects.value = projectData;
     knowledge.value = knowledgeData;
     reviewQueue.value = queueData;
@@ -175,6 +192,97 @@ async function submitProject(): Promise<void> {
   } finally {
     loading.value = false;
   }
+}
+
+async function submitInvite(): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    const payload: InviteInput = {
+      groupKey: inviteForm.groupKey
+    };
+    const token = inviteForm.token.trim();
+    const expiresAt = inviteForm.expiresAt.trim();
+    const maxUses = Number.parseInt(inviteForm.maxUses.trim(), 10);
+
+    if (token) {
+      payload.token = token;
+    }
+
+    if (expiresAt) {
+      payload.expiresAt = expiresAt;
+    }
+
+    if (Number.isFinite(maxUses) && maxUses > 0) {
+      payload.maxUses = maxUses;
+    }
+
+    await createInvite(payload);
+    inviteDialogOpen.value = false;
+    Object.assign(inviteForm, {
+      groupKey: '',
+      token: '',
+      expiresAt: '',
+      maxUses: ''
+    });
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function revokeInviteRow(row: InviteSummary): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    await revokeInvite(row.token);
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function disableMemberRow(row: MemberSummary): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    await disableMember(row.memberId, 'Disabled from web admin');
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+function memberStatusType(status: MemberSummary['status']): 'success' | 'danger' {
+  return status === 'active' ? 'success' : 'danger';
+}
+
+function inviteStatusType(status: InviteSummary['status']): 'success' | 'info' | 'warning' | 'danger' {
+  if (status === 'active') {
+    return 'success';
+  }
+
+  if (status === 'revoked') {
+    return 'danger';
+  }
+
+  return status === 'expired' ? 'info' : 'warning';
+}
+
+interface InviteFormInput {
+  groupKey: string;
+  token: string;
+  expiresAt: string;
+  maxUses: string;
 }
 </script>
 
@@ -263,8 +371,58 @@ async function submitProject(): Promise<void> {
               <el-table-column prop="displayName" label="Name" min-width="160" />
               <el-table-column prop="handle" label="Handle" width="140" />
               <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column label="Status" width="120">
+                <template #default="{ row }">
+                  <el-tag :type="memberStatusType(row.status)">{{ row.status }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column prop="clientId" label="Client" min-width="260" />
               <el-table-column prop="tokenExpiresAt" label="Token Expires" min-width="190" />
+              <el-table-column label="Actions" width="130" fixed="right">
+                <template #default="{ row }">
+                  <el-button
+                    :disabled="row.status === 'disabled'"
+                    :icon="Lock"
+                    size="small"
+                    type="danger"
+                    @click="disableMemberRow(row)"
+                  >
+                    Disable
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </section>
+
+          <section v-else-if="activeView === 'invites'" class="view">
+            <div class="toolbar">
+              <el-button :icon="Plus" type="primary" @click="inviteDialogOpen = true">New Invite</el-button>
+            </div>
+            <el-table :data="invites" empty-text="No invites">
+              <el-table-column prop="token" label="Token" min-width="230" />
+              <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column label="Status" width="120">
+                <template #default="{ row }">
+                  <el-tag :type="inviteStatusType(row.status)">{{ row.status }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="uses" label="Uses" width="90" />
+              <el-table-column prop="maxUses" label="Max" width="90" />
+              <el-table-column prop="expiresAt" label="Expires" min-width="190" />
+              <el-table-column prop="createdAt" label="Created" min-width="190" />
+              <el-table-column label="Actions" width="120" fixed="right">
+                <template #default="{ row }">
+                  <el-button
+                    :disabled="row.status === 'revoked'"
+                    :icon="Lock"
+                    size="small"
+                    type="danger"
+                    @click="revokeInviteRow(row)"
+                  >
+                    Revoke
+                  </el-button>
+                </template>
+              </el-table-column>
             </el-table>
           </section>
 
@@ -333,6 +491,9 @@ async function submitProject(): Promise<void> {
             <el-table :data="auditLogs" empty-text="No audit logs">
               <el-table-column prop="actor" label="Actor" min-width="180" />
               <el-table-column prop="action" label="Action" min-width="220" />
+              <el-table-column prop="targetType" label="Target Type" width="140" />
+              <el-table-column prop="targetId" label="Target" min-width="190" />
+              <el-table-column prop="groupKey" label="Group" width="150" />
               <el-table-column prop="createdAt" label="Created" width="190" />
             </el-table>
           </section>
@@ -362,6 +523,29 @@ async function submitProject(): Promise<void> {
       <template #footer>
         <el-button @click="groupDialogOpen = false">Cancel</el-button>
         <el-button type="primary" @click="submitGroup">Create</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="inviteDialogOpen" title="New Invite" width="520px">
+      <el-form label-position="top">
+        <el-form-item label="Group">
+          <el-select v-model="inviteForm.groupKey" filterable>
+            <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Token">
+          <el-input v-model="inviteForm.token" />
+        </el-form-item>
+        <el-form-item label="Max Uses">
+          <el-input v-model="inviteForm.maxUses" type="number" />
+        </el-form-item>
+        <el-form-item label="Expires At">
+          <el-input v-model="inviteForm.expiresAt" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="inviteDialogOpen = false">Cancel</el-button>
+        <el-button type="primary" @click="submitInvite">Create</el-button>
       </template>
     </el-dialog>
 

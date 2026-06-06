@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { JoinRequest, JoinResponse } from '@mcp-dev-mesh/protocol';
+import { appendHubAuditLog } from './hub-audit.js';
 import { ACCESS_TOKEN_TTL_MS, type HubAuthContext, type HubResult, type HubState } from './hub-model.js';
 import { hubError, isExpired, ok, slugHandle } from './hub-utils.js';
 
@@ -23,7 +24,7 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
 
   const invite = state.invites.get(inviteToken);
 
-  if (!invite || isExpired(invite.expiresAt)) {
+  if (!invite || invite.revokedAt !== undefined || isExpired(invite.expiresAt)) {
     return hubError(401, 'join.invite_invalid', 'inviteToken is invalid or expired.');
   }
 
@@ -45,6 +46,12 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
 
   const handle = slugHandle(input.handle ?? displayName);
   const memberId = `member_${slugHandle(group.key)}_${handle}`;
+  const existingMember = state.members.get(memberId);
+
+  if (existingMember?.status === 'disabled') {
+    return hubError(403, 'join.member_disabled', 'This member has been disabled by an administrator.');
+  }
+
   const clientId = `client_${slugHandle(group.key)}_${handle}_${randomUUID().slice(0, 8)}`;
   const accessToken = `mesh_${randomUUID().replace(/-/g, '')}`;
   const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS).toISOString();
@@ -56,7 +63,8 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
     groupKey: group.key,
     displayName,
     handle,
-    joinedAt
+    joinedAt,
+    status: 'active'
   });
   state.tokens.set(accessToken, {
     token: accessToken,
@@ -66,6 +74,16 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
     expiresAt
   });
   invite.uses += 1;
+  appendHubAuditLog(state, {
+    actor: memberId,
+    action: 'member.joined',
+    targetType: 'member',
+    targetId: memberId,
+    groupKey: group.key,
+    payload: {
+      clientId
+    }
+  });
 
   return ok({
     memberId,
@@ -90,6 +108,12 @@ export function authenticateHubToken(state: HubState, token: string | undefined)
 
   if (!accessToken || isExpired(accessToken.expiresAt)) {
     return hubError(401, 'auth.invalid_token', 'Bearer access token is invalid or expired.');
+  }
+
+  const member = state.members.get(accessToken.memberId);
+
+  if (member?.status === 'disabled') {
+    return hubError(403, 'auth.member_disabled', 'The authenticated member has been disabled.');
   }
 
   return ok({

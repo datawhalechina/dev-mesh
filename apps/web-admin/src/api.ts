@@ -3,6 +3,8 @@ import type {
   AuditLog,
   GroupInput,
   GroupSummary,
+  InviteInput,
+  InviteSummary,
   KnowledgeItem,
   MemberSummary,
   ProjectInput,
@@ -31,6 +33,32 @@ export async function fetchMembers(): Promise<MemberSummary[]> {
   const response = await requestJson<{ members: MemberSummary[] }>('/api/v1/admin/members');
 
   return response.members;
+}
+
+export async function disableMember(memberId: string, reason?: string): Promise<MemberSummary> {
+  return requestJson<MemberSummary>(`/api/v1/admin/members/${encodeURIComponent(memberId)}/disable`, {
+    method: 'POST',
+    body: reason ? { reason } : {}
+  });
+}
+
+export async function fetchInvites(): Promise<InviteSummary[]> {
+  const response = await requestJson<{ invites: InviteSummary[] }>('/api/v1/admin/invites');
+
+  return response.invites;
+}
+
+export async function createInvite(input: InviteInput): Promise<InviteSummary> {
+  return requestJson<InviteSummary>('/api/v1/admin/invites', {
+    method: 'POST',
+    body: input
+  });
+}
+
+export async function revokeInvite(token: string): Promise<InviteSummary> {
+  return requestJson<InviteSummary>(`/api/v1/admin/invites/${encodeURIComponent(token)}`, {
+    method: 'DELETE'
+  });
 }
 
 export async function fetchProjects(): Promise<ProjectSummary[]> {

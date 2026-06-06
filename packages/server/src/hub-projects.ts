@@ -1,4 +1,5 @@
 import type { CreateProjectRequest, ProjectSummary, ServerGroupSummary } from '@mcp-dev-mesh/protocol';
+import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubResult, HubState } from './hub-model.js';
 import { countByGroup, hubError, ok, projectMapKey, slugHandle } from './hub-utils.js';
 
@@ -72,6 +73,17 @@ export function createHubProject(
   }
 
   state.projects.set(key, project);
+  appendHubAuditLog(state, {
+    actor: auth.memberId,
+    action: 'project.created',
+    targetType: 'project',
+    targetId: project.id,
+    groupKey: auth.groupKey,
+    payload: {
+      projectKey: project.projectKey,
+      name: project.name
+    }
+  });
 
   return ok(project);
 }
