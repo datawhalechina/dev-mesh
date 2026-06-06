@@ -1,5 +1,6 @@
 import {
   matchesKnowledgeFilter,
+  rankKnowledgeItem,
   type KnowledgeFilter,
   type KnowledgeItem,
   type KnowledgeRepository,
@@ -43,9 +44,20 @@ export class JsonlKnowledgeRepository implements KnowledgeRepository {
       const byId = new Map(filteredItems.map((item) => [item.id, item]));
 
       return indexed
-        .map((candidate) => byId.get(candidate.id))
-        .filter((item): item is KnowledgeItem => item !== undefined)
-        .slice(0, input.limit ?? 8);
+        .map((candidate) => {
+          const item = byId.get(candidate.id);
+
+          return item === undefined
+            ? undefined
+            : {
+                item,
+                score: candidate.score * 0.65 + rankKnowledgeItem(item, input) * 0.35
+              };
+        })
+        .filter((candidate): candidate is { item: KnowledgeItem; score: number } => candidate !== undefined)
+        .sort((a, b) => b.score - a.score || b.item.updatedAt.localeCompare(a.item.updatedAt))
+        .slice(0, input.limit ?? 8)
+        .map((candidate) => candidate.item);
     }
 
     return filterAndRankKnowledgeItems(items, input);

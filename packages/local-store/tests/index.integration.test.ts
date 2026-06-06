@@ -89,4 +89,51 @@ describe('local-store SQLite repository integration', () => {
       await rm(projectRoot, { recursive: true, force: true });
     }
   });
+
+  it('combines SQLite keyword hits with member filters and quality ranking', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-sqlite-member-search-'));
+
+    try {
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const lowWeight = await captureProjectKnowledge(projectRoot, {
+        type: 'decision',
+        layer: 'extract',
+        title: 'Member memory ranking token',
+        summary: 'The ranking-token entry has the same keyword text but weak local quality.',
+        weight: 0.2,
+        createdBy: {
+          displayName: 'Ayuan',
+          handle: 'ayuan'
+        }
+      });
+      const highWeight = await captureProjectKnowledge(projectRoot, {
+        type: 'decision',
+        layer: 'extract',
+        title: 'Member memory ranking token',
+        summary: 'The ranking-token entry has the same keyword text and strong local quality.',
+        weight: 2,
+        createdBy: {
+          displayName: 'Xiaoyun',
+          handle: 'xiaoyun'
+        }
+      });
+
+      await rebuildProjectIndex(projectRoot);
+
+      const ranked = await repository.search({
+        query: 'ranking-token',
+        limit: 2
+      });
+      const memberSpecific = await repository.search({
+        query: 'ranking-token',
+        authorName: 'xiao',
+        limit: 2
+      });
+
+      expect(ranked.map((item) => item.id)).toEqual([highWeight.item.id, lowWeight.item.id]);
+      expect(memberSpecific.map((item) => item.id)).toEqual([highWeight.item.id]);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
 });
