@@ -96,11 +96,25 @@ export interface HubAuditLog {
   payload?: Record<string, unknown>;
 }
 
+export type HubKnowledgeEdgeKind = 'supersedes' | 'duplicates' | 'contradicts';
+
+export interface HubKnowledgeEdge {
+  id: string;
+  kind: HubKnowledgeEdgeKind;
+  fromId: string;
+  toId: string;
+  createdBy: string;
+  createdAt: string;
+  groupKey?: string;
+  reason?: string;
+}
+
 export interface HubState {
   groups: Map<string, HubGroup>;
   invites: Map<string, HubInvite>;
   members: Map<string, HubMember>;
   tokens: Map<string, HubAccessToken>;
   projects: Map<string, ProjectSummary>;
+  knowledgeEdges: HubKnowledgeEdge[];
   auditLogs: HubAuditLog[];
 }

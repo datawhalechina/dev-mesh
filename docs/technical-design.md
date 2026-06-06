@@ -376,6 +376,8 @@ GET  /api/v1/admin/glossary
 POST /api/v1/admin/glossary
 PUT  /api/v1/admin/glossary/:id
 GET  /api/v1/admin/knowledge
+GET  /api/v1/admin/knowledge-edges
+POST /api/v1/admin/knowledge-edges
 GET  /api/v1/admin/review-queue
 GET  /api/v1/admin/audit
 ```
@@ -423,12 +425,12 @@ GET  /api/v1/admin/audit
 
 `groupKey` 用于服务端群组隔离。同一个 Mesh Server 可以同时服务多个团队或项目集，例如 `frontend-team`、`backend-platform`、`customer-a`。客户端只同步已加入群组内授权项目的知识；未指定 `groupKey` 时，服务端可以根据 invite token 自动解析默认群组。
 
-当前开发期 Hub Server 使用内存状态实现 invite、member、access token、group、project registry 和 audit log：
+当前开发期 Hub Server 使用内存状态实现 invite、member、access token、group、project registry、knowledge edges 和 audit log：
 
 - `/api/v1/join` 要求 `inviteToken`，token 绑定一个 group；请求里的 `groupKey` 必须与 invite 绑定的 group 一致。
 - join 成功后返回 group-scoped Bearer token；后续 sync 和 projects API 必须携带 `Authorization: Bearer <token>`。
 - `/api/v1/projects` 和 `/api/v1/projects/:id/brief` 只返回当前 token 所属 group 且 ACL 允许访问的项目；访问其他 group 或未授权项目返回 404，避免泄露 project id。
-- Admin API 支持创建或撤销 invite、禁用 member、创建 group/project、配置 project ACL、管理 canonical glossary term，并把这些写操作追加到 audit log；被禁用 member 的既有 Bearer token 会被拒绝。
+- Admin API 支持创建或撤销 invite、禁用 member、创建 group/project、配置 project ACL、管理 canonical glossary term、创建 supersede / duplicate / contradict edge，并把这些写操作追加到 audit log；被禁用 member 的既有 Bearer token 会被拒绝。
 - 内存状态只用于当前 skeleton 和集成测试。生产实现应替换为 PostgreSQL-backed repository、短期 invite、token rotation、持久化 audit log 和更完整的 ACL。
 
 #### Server HTTP 框架选择
@@ -2572,7 +2574,7 @@ CI 门禁：
 - project ACL（已支持 group/restricted visibility、成员角色配置和项目接口过滤）
 - audit log（已支持内存写入、查询和 admin table）
 - glossary 管理（已支持 admin API、web-admin 创建/编辑和 `mesh_resolve_term` 复用）
-- supersede / duplicate / contradict edges
+- supersede / duplicate / contradict edges（已支持 admin API、web-admin 创建和默认 active 检索测试）
 - quality review dashboard
 - task digest
 - review queue 管理页面

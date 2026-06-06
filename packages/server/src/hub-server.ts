@@ -19,6 +19,7 @@ import {
   createAdminGroup,
   createAdminGlossary,
   createAdminInvite,
+  createAdminKnowledgeEdge,
   createAdminOverview,
   createAdminProject,
   disableAdminMember,
@@ -26,6 +27,7 @@ import {
   listAdminGlossary,
   listAdminInvites,
   listAdminKnowledge,
+  listAdminKnowledgeEdges,
   listAdminMembers,
   listAdminProjects,
   listAdminReviewQueue,
@@ -37,6 +39,8 @@ import {
   type AdminGlossaryQuery,
   type AdminGroupInput,
   type AdminInviteInput,
+  type AdminKnowledgeEdgeInput,
+  type AdminKnowledgeEdgeQuery,
   type AdminKnowledgeQuery,
   type AdminMemberDisableInput,
   type AdminProjectAclInput,
@@ -418,6 +422,16 @@ function createHubRouter(
     };
   });
 
+  router.get('/api/v1/admin/knowledge-edges', (ctx) => {
+    ctx.body = {
+      edges: listAdminKnowledgeEdges(hub, readAdminKnowledgeEdgeQuery(ctx))
+    };
+  });
+
+  router.post('/api/v1/admin/knowledge-edges', async (ctx) => {
+    sendHubResult(ctx, await createAdminKnowledgeEdge(hub, core, readBody<AdminKnowledgeEdgeInput>(ctx)));
+  });
+
   router.get('/api/v1/admin/review-queue', (ctx) => {
     ctx.body = listAdminReviewQueue();
   });
@@ -584,10 +598,25 @@ function readQueryString(ctx: Context, key: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function readQueryBoolean(ctx: Context, key: string): boolean | undefined {
+  const value = readQueryString(ctx, key)?.toLowerCase();
+
+  if (value === 'true' || value === '1') {
+    return true;
+  }
+
+  if (value === 'false' || value === '0') {
+    return false;
+  }
+
+  return undefined;
+}
+
 function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
   const query: AdminKnowledgeQuery = {};
   const search = readQueryString(ctx, 'query');
   const layer = readQueryString(ctx, 'layer');
+  const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
 
   if (search !== undefined) {
@@ -596,6 +625,31 @@ function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
 
   if (layer === 'raw' || layer === 'extract' || layer === 'canonical') {
     query.layer = layer;
+  }
+
+  if (includeSuperseded !== undefined) {
+    query.includeSuperseded = includeSuperseded;
+  }
+
+  if (Number.isFinite(limit) && limit > 0) {
+    query.limit = Math.min(limit, 100);
+  }
+
+  return query;
+}
+
+function readAdminKnowledgeEdgeQuery(ctx: Context): AdminKnowledgeEdgeQuery {
+  const query: AdminKnowledgeEdgeQuery = {};
+  const groupKey = readQueryString(ctx, 'groupKey');
+  const kind = readQueryString(ctx, 'kind');
+  const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  if (groupKey !== undefined) {
+    query.groupKey = groupKey;
+  }
+
+  if (kind === 'supersedes' || kind === 'duplicates' || kind === 'contradicts') {
+    query.kind = kind;
   }
 
   if (Number.isFinite(limit) && limit > 0) {

@@ -314,6 +314,8 @@ GET  /api/v1/admin/glossary
 POST /api/v1/admin/glossary
 PUT  /api/v1/admin/glossary/:id
 GET  /api/v1/admin/knowledge
+GET  /api/v1/admin/knowledge-edges
+POST /api/v1/admin/knowledge-edges
 GET  /api/v1/admin/review-queue
 GET  /api/v1/admin/audit
 GET  /mcp
@@ -333,7 +335,7 @@ mesh_resolve_term
 
 其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件。
 
-开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token、projects 和 audit logs：
+开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token、projects、knowledge edges 和 audit logs：
 
 - `GET /api/v1/groups` 返回可加入的 group 摘要。
 - `POST /api/v1/join` 需要有效 `inviteToken`，成功后签发 group-scoped Bearer access token。
@@ -341,7 +343,7 @@ mesh_resolve_term
 - project list 和 project brief 默认只返回当前 token 所属 group 内且 ACL 允许的项目；跨 group 或未授权项目返回 404，避免泄露 project id。
 - 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
 - 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、持久化审计和更完整 ACL。
-- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、glossary、knowledge、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、配置 project ACL、创建和编辑 glossary term。
+- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、glossary、knowledge、knowledge edges、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、配置 project ACL、创建和编辑 glossary term，以及创建 supersede / duplicate / contradict edge。
 
 ## 测试策略
 
@@ -417,7 +419,8 @@ pnpm typecheck:examples
 - 已完成 web-admin 的 member 禁用、invite 创建/撤销，以及 Hub admin audit log 写入和查询。
 - 已完成 project ACL 管理：支持 group/restricted visibility、成员角色配置、项目列表和 brief ACL 过滤。
 - 已完成 glossary 管理：支持 admin API 和 web-admin 创建、查询、编辑 canonical glossary term，并复用 `mesh_resolve_term` 检索。
-- 下一步推进 quality review、conflict edge 和更完整的分布式同步能力。
+- 已完成 knowledge edge 管理：支持 supersede / duplicate / contradict edge，supersede 后默认检索仅返回 active 项，可通过 `includeSuperseded=true` 查看旧项。
+- 下一步推进 quality review、task digest 和更完整的分布式同步能力。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。
 

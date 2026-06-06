@@ -649,6 +649,151 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('manages knowledge edges and keeps superseded items out of default search', async () => {
+    const core = createDevMeshCore();
+    const oldItem = await core.captureKnowledge({
+      type: 'decision',
+      layer: 'canonical',
+      title: 'edge-conflict status uses the legacy workflow',
+      summary: 'The edge-conflict status check should prefer the legacy workflow.'
+    });
+    const newItem = await core.captureKnowledge({
+      type: 'decision',
+      layer: 'canonical',
+      title: 'edge-conflict status uses the current workflow',
+      summary: 'The edge-conflict status check should prefer the current workflow.'
+    });
+    const peerItem = await core.captureKnowledge({
+      type: 'decision',
+      layer: 'canonical',
+      title: 'edge-conflict status duplicates the current workflow',
+      summary: 'The duplicate item describes the same current workflow.'
+    });
+    const contradictingItem = await core.captureKnowledge({
+      type: 'decision',
+      layer: 'canonical',
+      title: 'edge-conflict status rejects the current workflow',
+      summary: 'The contradicting item disagrees with the current workflow.'
+    });
+    const { app, url } = await startHubServer({ core });
+
+    try {
+      const supersedes = await requestJson(`${url}/api/v1/admin/knowledge-edges`, {
+        method: 'POST',
+        body: {
+          kind: 'supersedes',
+          fromId: newItem.id,
+          toId: oldItem.id,
+          groupKey: 'default',
+          reason: 'The current workflow replaces the legacy workflow.'
+        }
+      });
+      const duplicates = await requestJson(`${url}/api/v1/admin/knowledge-edges`, {
+        method: 'POST',
+        body: {
+          kind: 'duplicates',
+          fromId: newItem.id,
+          toId: peerItem.id,
+          groupKey: 'default'
+        }
+      });
+      const contradicts = await requestJson(`${url}/api/v1/admin/knowledge-edges`, {
+        method: 'POST',
+        body: {
+          kind: 'contradicts',
+          fromId: newItem.id,
+          toId: contradictingItem.id,
+          groupKey: 'default'
+        }
+      });
+      const defaultSearch = await requestJson(`${url}/api/v1/admin/knowledge?query=edge-conflict%20status&limit=10`);
+      const allSearch = await requestJson(
+        `${url}/api/v1/admin/knowledge?query=edge-conflict%20status&includeSuperseded=true&limit=10`
+      );
+      const edges = await requestJson(`${url}/api/v1/admin/knowledge-edges?groupKey=default`);
+      const conflictEdges = await requestJson(`${url}/api/v1/admin/knowledge-edges?kind=contradicts`);
+      const audit = await requestJson(`${url}/api/v1/admin/audit?action=knowledge.edge.created&limit=10`);
+
+      expect(supersedes.body).toMatchObject({
+        kind: 'supersedes',
+        fromId: newItem.id,
+        toId: oldItem.id,
+        groupKey: 'default',
+        reason: 'The current workflow replaces the legacy workflow.'
+      });
+      expect(duplicates.body).toMatchObject({
+        kind: 'duplicates',
+        fromId: newItem.id,
+        toId: peerItem.id
+      });
+      expect(contradicts.body).toMatchObject({
+        kind: 'contradicts',
+        fromId: newItem.id,
+        toId: contradictingItem.id
+      });
+      expect(defaultSearch.body.items).toEqual(
+        expect.not.arrayContaining([
+          expect.objectContaining({
+            id: oldItem.id
+          })
+        ])
+      );
+      expect(defaultSearch.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: newItem.id,
+            status: 'active'
+          })
+        ])
+      );
+      expect(allSearch.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: oldItem.id,
+            status: 'superseded'
+          }),
+          expect.objectContaining({
+            id: newItem.id,
+            status: 'active'
+          })
+        ])
+      );
+      expect(edges.body.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'supersedes',
+            toId: oldItem.id
+          }),
+          expect.objectContaining({
+            kind: 'duplicates',
+            toId: peerItem.id
+          }),
+          expect.objectContaining({
+            kind: 'contradicts',
+            toId: contradictingItem.id
+          })
+        ])
+      );
+      expect(conflictEdges.body.edges).toEqual([
+        expect.objectContaining({
+          id: contradicts.body.id,
+          kind: 'contradicts'
+        })
+      ]);
+      expect(audit.body.auditLogs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: 'knowledge.edge.created',
+            targetId: supersedes.body.id,
+            groupKey: 'default'
+          })
+        ])
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
   it('returns a project brief from canonical knowledge', async () => {
     const core = createDevMeshCore();
     await core.captureKnowledge({

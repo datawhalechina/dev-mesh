@@ -78,12 +78,12 @@
 - [x] project ACL 管理。
 - [x] audit log 写入和查询。
 - [x] glossary 管理。
-- [ ] supersede / duplicate / contradict edge。
+- [x] supersede / duplicate / contradict edge。
 - [ ] quality review dashboard。
 - [ ] task digest。
 - [x] 管理后台 API integration test、前端 API 单元测试和页面结构 smoke test。
 - [x] glossary management integration test。
-- [ ] conflict edge 检索和默认 active 项测试。
+- [x] conflict edge 检索和默认 active 项测试。
 
 ## 阶段 5：分布式 Mesh
 

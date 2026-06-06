@@ -24,6 +24,7 @@ export function createHubState(options: HubStateOptions = {}): HubState {
     members: new Map(),
     tokens: new Map(),
     projects: new Map(),
+    knowledgeEdges: [],
     auditLogs: []
   };
   const groups = options.groups?.length

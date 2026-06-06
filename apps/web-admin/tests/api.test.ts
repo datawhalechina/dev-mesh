@@ -3,10 +3,12 @@ import {
   createGlossaryItem,
   createGroup,
   createInvite,
+  createKnowledgeEdge,
   disableMember,
   fetchAdminOverview,
   fetchGlossary,
   fetchKnowledge,
+  fetchKnowledgeEdges,
   revokeInvite,
   updateGlossaryItem,
   updateProjectAcl
@@ -94,6 +96,68 @@ describe('web-admin API client', () => {
     await fetchKnowledge('canonical', 'project brief');
 
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/knowledge?layer=canonical&query=project+brief', expect.any(Object));
+  });
+
+  it('builds superseded knowledge filters and manages knowledge edges', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: []
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          edges: []
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'edge_1',
+          kind: 'supersedes',
+          fromId: 'can_new',
+          toId: 'can_old',
+          createdBy: 'admin',
+          createdAt: '2026-06-06T00:00:00.000Z'
+        })
+      );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchKnowledge('canonical', 'project brief', true);
+    await fetchKnowledgeEdges('contradicts', 'default');
+    await createKnowledgeEdge({
+      kind: 'supersedes',
+      fromId: 'can_new',
+      toId: 'can_old',
+      groupKey: 'default',
+      reason: 'Replaced by the latest canonical item.'
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/admin/knowledge?layer=canonical&query=project+brief&includeSuperseded=true',
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/admin/knowledge-edges?kind=contradicts&groupKey=default',
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/admin/knowledge-edges',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'supersedes',
+          fromId: 'can_new',
+          toId: 'can_old',
+          groupKey: 'default',
+          reason: 'Replaced by the latest canonical item.'
+        })
+      })
+    );
   });
 
   it('posts invite and member management requests', async () => {

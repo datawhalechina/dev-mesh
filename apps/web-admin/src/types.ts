@@ -52,6 +52,8 @@ export interface ProjectSummary {
 
 export type ProjectAclVisibility = 'group' | 'restricted';
 export type ProjectAclRole = 'owner' | 'maintainer' | 'member' | 'readonly';
+export type KnowledgeStatus = 'active' | 'superseded' | 'tombstone';
+export type KnowledgeEdgeKind = 'supersedes' | 'duplicates' | 'contradicts';
 
 export interface ProjectAclMember {
   memberId: string;
@@ -61,6 +63,17 @@ export interface ProjectAclMember {
 export interface ProjectAccess {
   visibility: ProjectAclVisibility;
   members: ProjectAclMember[];
+}
+
+export interface KnowledgeEdge {
+  id: string;
+  kind: KnowledgeEdgeKind;
+  fromId: string;
+  toId: string;
+  createdBy: string;
+  createdAt: string;
+  groupKey?: string;
+  reason?: string;
 }
 
 export interface KnowledgeItem {
@@ -85,6 +98,7 @@ export interface KnowledgeItem {
   };
   createdAt: string;
   updatedAt: string;
+  status: KnowledgeStatus;
   quality: {
     qualityScore: number;
     confidence: number;
@@ -158,4 +172,12 @@ export interface GlossaryInput {
   projectKey?: string;
   aliases?: string[];
   tags?: string[];
+}
+
+export interface KnowledgeEdgeInput {
+  kind: KnowledgeEdgeKind;
+  fromId: string;
+  toId: string;
+  groupKey?: string;
+  reason?: string;
 }

@@ -6,6 +6,8 @@ import type {
   GroupSummary,
   InviteInput,
   InviteSummary,
+  KnowledgeEdge,
+  KnowledgeEdgeInput,
   KnowledgeItem,
   MemberSummary,
   ProjectAclInput,
@@ -86,7 +88,7 @@ export async function updateProjectAcl(groupKey: string, projectId: string, inpu
   );
 }
 
-export async function fetchKnowledge(layer = '', query = ''): Promise<KnowledgeItem[]> {
+export async function fetchKnowledge(layer = '', query = '', includeSuperseded = false): Promise<KnowledgeItem[]> {
   const params = new URLSearchParams();
 
   if (layer) {
@@ -97,10 +99,38 @@ export async function fetchKnowledge(layer = '', query = ''): Promise<KnowledgeI
     params.set('query', query.trim());
   }
 
+  if (includeSuperseded) {
+    params.set('includeSuperseded', 'true');
+  }
+
   const suffix = params.toString() ? `?${params.toString()}` : '';
   const response = await requestJson<{ items: KnowledgeItem[] }>(`/api/v1/admin/knowledge${suffix}`);
 
   return response.items;
+}
+
+export async function fetchKnowledgeEdges(kind = '', groupKey = ''): Promise<KnowledgeEdge[]> {
+  const params = new URLSearchParams();
+
+  if (kind) {
+    params.set('kind', kind);
+  }
+
+  if (groupKey) {
+    params.set('groupKey', groupKey);
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const response = await requestJson<{ edges: KnowledgeEdge[] }>(`/api/v1/admin/knowledge-edges${suffix}`);
+
+  return response.edges;
+}
+
+export async function createKnowledgeEdge(input: KnowledgeEdgeInput): Promise<KnowledgeEdge> {
+  return requestJson<KnowledgeEdge>('/api/v1/admin/knowledge-edges', {
+    method: 'POST',
+    body: input
+  });
 }
 
 export async function fetchGlossary(query = '', groupKey = '', projectKey = ''): Promise<KnowledgeItem[]> {

@@ -6,6 +6,7 @@ import {
   createGlossaryItem,
   createInvite,
   createGroup,
+  createKnowledgeEdge,
   createProject,
   disableMember,
   fetchAdminOverview,
@@ -14,6 +15,7 @@ import {
   fetchGroups,
   fetchInvites,
   fetchKnowledge,
+  fetchKnowledgeEdges,
   fetchMembers,
   fetchProjects,
   fetchReviewQueue,
@@ -29,6 +31,9 @@ import type {
   GroupSummary,
   InviteInput,
   InviteSummary,
+  KnowledgeEdge,
+  KnowledgeEdgeInput,
+  KnowledgeEdgeKind,
   KnowledgeItem,
   MemberSummary,
   ProjectAclRole,
@@ -61,10 +66,13 @@ const invites = ref<InviteSummary[]>([]);
 const projects = ref<ProjectSummary[]>([]);
 const glossary = ref<KnowledgeItem[]>([]);
 const knowledge = ref<KnowledgeItem[]>([]);
+const edgeKnowledge = ref<KnowledgeItem[]>([]);
+const knowledgeEdges = ref<KnowledgeEdge[]>([]);
 const reviewQueue = ref<ReviewQueueItem[]>([]);
 const auditLogs = ref<AuditLog[]>([]);
 const knowledgeLayer = ref('');
 const knowledgeQuery = ref('');
+const knowledgeIncludeSuperseded = ref(false);
 const glossaryQuery = ref('');
 const glossaryGroupKey = ref('');
 const glossaryProjectKey = ref('');
@@ -73,6 +81,7 @@ const inviteDialogOpen = ref(false);
 const projectDialogOpen = ref(false);
 const projectAclDialogOpen = ref(false);
 const glossaryDialogOpen = ref(false);
+const edgeDialogOpen = ref(false);
 const selectedAclProject = ref<ProjectSummary | null>(null);
 const editingGlossaryId = ref<string | null>(null);
 const groupForm = reactive<GroupInput>({
@@ -107,6 +116,13 @@ const glossaryForm = reactive<GlossaryFormInput>({
   aliases: '',
   tags: ''
 });
+const edgeForm = reactive<KnowledgeEdgeFormInput>({
+  kind: 'supersedes',
+  groupKey: '',
+  fromId: '',
+  toId: '',
+  reason: ''
+});
 
 const navItems = [
   { key: 'overview', label: 'Overview', icon: DataAnalysis },
@@ -116,6 +132,7 @@ const navItems = [
   { key: 'projects', label: 'Projects', icon: Folder },
   { key: 'glossary', label: 'Glossary', icon: Memo },
   { key: 'knowledge', label: 'Knowledge', icon: Document },
+  { key: 'edges', label: 'Edges', icon: Connection },
   { key: 'review', label: 'Review Queue', icon: Memo },
   { key: 'audit', label: 'Audit Log', icon: Lock }
 ];
@@ -141,6 +158,15 @@ const projectAclMembers = computed(() => {
   return members.value.filter((member) => member.groupKey === selectedAclProject.value?.groupKey && member.status === 'active');
 });
 
+const edgeKnowledgeOptions = computed(() =>
+  edgeKnowledge.value.map((item) => ({
+    label: knowledgeLabel(item.id),
+    value: item.id
+  }))
+);
+
+const edgeFormInvalid = computed(() => !edgeForm.fromId || !edgeForm.toId || edgeForm.fromId === edgeForm.toId);
+
 onMounted(() => {
   void refreshAll();
 });
@@ -150,18 +176,31 @@ async function refreshAll(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    const [overviewData, groupData, memberData, inviteData, projectData, glossaryData, knowledgeData, queueData, auditData] =
-      await Promise.all([
-        fetchAdminOverview(),
-        fetchGroups(),
-        fetchMembers(),
-        fetchInvites(),
-        fetchProjects(),
-        fetchGlossary(glossaryQuery.value, glossaryGroupKey.value, glossaryProjectKey.value),
-        fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value),
-        fetchReviewQueue(),
-        fetchAuditLogs()
-      ]);
+    const [
+      overviewData,
+      groupData,
+      memberData,
+      inviteData,
+      projectData,
+      glossaryData,
+      knowledgeData,
+      edgeKnowledgeData,
+      edgeData,
+      queueData,
+      auditData
+    ] = await Promise.all([
+      fetchAdminOverview(),
+      fetchGroups(),
+      fetchMembers(),
+      fetchInvites(),
+      fetchProjects(),
+      fetchGlossary(glossaryQuery.value, glossaryGroupKey.value, glossaryProjectKey.value),
+      fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value, knowledgeIncludeSuperseded.value),
+      fetchKnowledge('', '', true),
+      fetchKnowledgeEdges(),
+      fetchReviewQueue(),
+      fetchAuditLogs()
+    ]);
 
     overview.value = overviewData;
     groups.value = groupData;
@@ -170,6 +209,8 @@ async function refreshAll(): Promise<void> {
     projects.value = projectData;
     glossary.value = glossaryData;
     knowledge.value = knowledgeData;
+    edgeKnowledge.value = edgeKnowledgeData;
+    knowledgeEdges.value = edgeData;
     reviewQueue.value = queueData;
     auditLogs.value = auditData;
   } catch (error) {
@@ -184,7 +225,7 @@ async function reloadKnowledge(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    knowledge.value = await fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value);
+    knowledge.value = await fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value, knowledgeIncludeSuperseded.value);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -436,6 +477,60 @@ async function submitGlossary(): Promise<void> {
   }
 }
 
+function openEdgeDialog(): void {
+  Object.assign(edgeForm, {
+    kind: 'supersedes',
+    groupKey: groups.value[0]?.key ?? '',
+    fromId: edgeKnowledge.value[0]?.id ?? '',
+    toId: edgeKnowledge.value[1]?.id ?? '',
+    reason: ''
+  });
+  edgeDialogOpen.value = true;
+}
+
+async function submitEdge(): Promise<void> {
+  if (edgeFormInvalid.value) {
+    errorMessage.value = 'Choose two different knowledge items.';
+    return;
+  }
+
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    const payload: KnowledgeEdgeInput = {
+      kind: edgeForm.kind,
+      fromId: edgeForm.fromId,
+      toId: edgeForm.toId
+    };
+    const groupKey = edgeForm.groupKey.trim();
+    const reason = edgeForm.reason.trim();
+
+    if (groupKey) {
+      payload.groupKey = groupKey;
+    }
+
+    if (reason) {
+      payload.reason = reason;
+    }
+
+    await createKnowledgeEdge(payload);
+    edgeDialogOpen.value = false;
+    Object.assign(edgeForm, {
+      kind: 'supersedes',
+      groupKey: '',
+      fromId: '',
+      toId: '',
+      reason: ''
+    });
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
 function memberStatusType(status: MemberSummary['status']): 'success' | 'danger' {
   return status === 'active' ? 'success' : 'danger';
 }
@@ -450,6 +545,22 @@ function inviteStatusType(status: InviteSummary['status']): 'success' | 'info' |
   }
 
   return status === 'expired' ? 'info' : 'warning';
+}
+
+function knowledgeStatusType(status: KnowledgeItem['status']): 'success' | 'warning' | 'danger' {
+  if (status === 'active') {
+    return 'success';
+  }
+
+  return status === 'superseded' ? 'warning' : 'danger';
+}
+
+function edgeKindType(kind: KnowledgeEdgeKind): 'success' | 'warning' | 'danger' {
+  if (kind === 'supersedes') {
+    return 'warning';
+  }
+
+  return kind === 'contradicts' ? 'danger' : 'success';
 }
 
 function projectAccessVisibility(project: ProjectSummary): 'group' | 'restricted' {
@@ -468,6 +579,12 @@ function memberLabel(memberId: string): string {
   const member = members.value.find((item) => item.memberId === memberId);
 
   return member === undefined ? memberId : `${member.displayName} (${member.handle})`;
+}
+
+function knowledgeLabel(id: string): string {
+  const item = edgeKnowledge.value.find((candidate) => candidate.id === id) ?? knowledge.value.find((candidate) => candidate.id === id);
+
+  return item === undefined ? id : `${item.title} (${item.id})`;
 }
 
 function glossaryScope(row: KnowledgeItem): string {
@@ -522,6 +639,14 @@ interface GlossaryFormInput {
   content: string;
   aliases: string;
   tags: string;
+}
+
+interface KnowledgeEdgeFormInput {
+  kind: KnowledgeEdgeKind;
+  groupKey: string;
+  fromId: string;
+  toId: string;
+  reason: string;
 }
 </script>
 
@@ -749,11 +874,21 @@ interface GlossaryFormInput {
                 placeholder="Search knowledge"
                 @keyup.enter="reloadKnowledge"
               />
+              <el-switch
+                v-model="knowledgeIncludeSuperseded"
+                active-text="Include Superseded"
+                @change="reloadKnowledge"
+              />
               <el-button @click="reloadKnowledge">Apply</el-button>
             </div>
             <el-table :data="knowledge" empty-text="No knowledge">
               <el-table-column prop="title" label="Title" min-width="260" />
               <el-table-column prop="layer" label="Layer" width="120" />
+              <el-table-column label="Status" width="130">
+                <template #default="{ row }">
+                  <el-tag :type="knowledgeStatusType(row.status)">{{ row.status }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column prop="type" label="Type" width="130" />
               <el-table-column label="PARA" min-width="190">
                 <template #default="{ row }">{{ row.para.category }}/{{ row.para.key }}</template>
@@ -766,6 +901,28 @@ interface GlossaryFormInput {
               <el-table-column label="Owner" width="150">
                 <template #default="{ row }">{{ row.createdBy.displayName }}</template>
               </el-table-column>
+            </el-table>
+          </section>
+
+          <section v-else-if="activeView === 'edges'" class="view">
+            <div class="toolbar">
+              <el-button :icon="Plus" type="primary" @click="openEdgeDialog">New Edge</el-button>
+            </div>
+            <el-table :data="knowledgeEdges" empty-text="No knowledge edges">
+              <el-table-column label="Kind" width="130">
+                <template #default="{ row }">
+                  <el-tag :type="edgeKindType(row.kind)">{{ row.kind }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="From" min-width="260">
+                <template #default="{ row }">{{ knowledgeLabel(row.fromId) }}</template>
+              </el-table-column>
+              <el-table-column label="To" min-width="260">
+                <template #default="{ row }">{{ knowledgeLabel(row.toId) }}</template>
+              </el-table-column>
+              <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column prop="reason" label="Reason" min-width="220" />
+              <el-table-column prop="createdAt" label="Created" width="190" />
             </el-table>
           </section>
 
@@ -896,6 +1053,50 @@ interface GlossaryFormInput {
       <template #footer>
         <el-button @click="glossaryDialogOpen = false">Cancel</el-button>
         <el-button type="primary" @click="submitGlossary">Save</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="edgeDialogOpen" title="Knowledge Edge" width="600px">
+      <el-form label-position="top">
+        <el-form-item label="Kind">
+          <el-radio-group v-model="edgeForm.kind">
+            <el-radio-button label="supersedes">supersedes</el-radio-button>
+            <el-radio-button label="duplicates">duplicates</el-radio-button>
+            <el-radio-button label="contradicts">contradicts</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="Group">
+          <el-select v-model="edgeForm.groupKey" clearable filterable>
+            <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="From">
+          <el-select v-model="edgeForm.fromId" filterable>
+            <el-option
+              v-for="item in edgeKnowledgeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="To">
+          <el-select v-model="edgeForm.toId" filterable>
+            <el-option
+              v-for="item in edgeKnowledgeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Reason">
+          <el-input v-model="edgeForm.reason" type="textarea" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="edgeDialogOpen = false">Cancel</el-button>
+        <el-button :disabled="edgeFormInvalid" type="primary" @click="submitEdge">Create</el-button>
       </template>
     </el-dialog>
 

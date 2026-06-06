@@ -12,6 +12,8 @@ import {
   DEFAULT_GROUP_KEY,
   type HubGroup,
   type HubInvite,
+  type HubKnowledgeEdge,
+  type HubKnowledgeEdgeKind,
   type HubResult,
   type HubState
 } from './hub-model.js';
@@ -80,6 +82,14 @@ export interface AdminGlossaryInput {
   projectKey?: string;
   aliases?: string[];
   tags?: string[];
+}
+
+export interface AdminKnowledgeEdgeInput {
+  kind?: HubKnowledgeEdgeKind;
+  fromId?: string;
+  toId?: string;
+  groupKey?: string;
+  reason?: string;
 }
 
 export async function createAdminOverview(
@@ -153,6 +163,10 @@ export async function listAdminKnowledge(
       limit
     };
 
+    if (input.includeSuperseded !== undefined) {
+      search.includeSuperseded = input.includeSuperseded;
+    }
+
     if (input.layer !== undefined) {
       search.layers = [input.layer];
     }
@@ -162,6 +176,10 @@ export async function listAdminKnowledge(
 
   const filter: KnowledgeFilter = {};
 
+  if (input.includeSuperseded !== undefined) {
+    filter.includeSuperseded = input.includeSuperseded;
+  }
+
   if (input.layer !== undefined) {
     filter.layers = [input.layer];
   }
@@ -169,6 +187,20 @@ export async function listAdminKnowledge(
   const items = await core.listKnowledge(filter);
 
   return items.slice(0, limit);
+}
+
+export function listAdminKnowledgeEdges(
+  state: HubState,
+  input: AdminKnowledgeEdgeQuery = {}
+): HubKnowledgeEdge[] {
+  const limit = input.limit ?? 50;
+
+  return state.knowledgeEdges
+    .filter((edge) => input.groupKey === undefined || edge.groupKey === input.groupKey)
+    .filter((edge) => input.kind === undefined || edge.kind === input.kind)
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+    .slice(0, limit);
 }
 
 export async function listAdminGlossary(
@@ -326,6 +358,99 @@ export function updateAdminProjectAcl(
   });
 
   return ok(withNormalizedAccess(project));
+}
+
+export async function createAdminKnowledgeEdge(
+  state: HubState,
+  core: DevMeshCore,
+  input: AdminKnowledgeEdgeInput
+): Promise<HubResult<HubKnowledgeEdge>> {
+  const kind = input.kind?.trim();
+  const fromId = input.fromId?.trim();
+  const toId = input.toId?.trim();
+
+  if (!isKnowledgeEdgeKind(kind)) {
+    return hubError(400, 'admin.knowledge_edge_kind_invalid', 'Knowledge edge kind is invalid.');
+  }
+
+  if (!fromId || !toId) {
+    return hubError(400, 'admin.knowledge_edge_target_required', 'Knowledge edge fromId and toId are required.');
+  }
+
+  if (fromId === toId) {
+    return hubError(400, 'admin.knowledge_edge_self_reference', 'Knowledge edge cannot reference the same item.');
+  }
+
+  const groupKey = resolveKnowledgeEdgeGroupKey(state, input.groupKey);
+
+  if (!groupKey.ok) {
+    return groupKey;
+  }
+
+  const fromItem = await core.getKnowledge(fromId);
+
+  if (fromItem === undefined) {
+    return hubError(404, 'admin.knowledge_edge_from_not_found', 'Knowledge edge source item was not found.');
+  }
+
+  const toItem = await core.getKnowledge(toId);
+
+  if (toItem === undefined) {
+    return hubError(404, 'admin.knowledge_edge_to_not_found', 'Knowledge edge target item was not found.');
+  }
+
+  const createdAt = new Date().toISOString();
+
+  if (kind === 'supersedes') {
+    await core.repository.upsert({
+      ...toItem,
+      status: 'superseded',
+      updatedAt: createdAt
+    });
+  }
+
+  const edge: HubKnowledgeEdge = {
+    id: createKnowledgeEdgeId(),
+    kind,
+    fromId,
+    toId,
+    createdBy: 'admin',
+    createdAt
+  };
+  const reason = input.reason?.trim();
+
+  if (groupKey.value !== undefined) {
+    edge.groupKey = groupKey.value;
+  }
+
+  if (reason) {
+    edge.reason = reason;
+  }
+
+  state.knowledgeEdges.push(edge);
+  const auditPayload = {
+    actor: 'admin',
+    action: 'knowledge.edge.created',
+    targetType: 'knowledge-edge',
+    targetId: edge.id,
+    payload: {
+      kind: edge.kind,
+      fromId: edge.fromId,
+      toId: edge.toId
+    }
+  };
+
+  appendHubAuditLog(
+    state,
+    edge.groupKey === undefined
+      ? auditPayload
+      : {
+          ...auditPayload,
+          groupKey: edge.groupKey
+        }
+  );
+
+  return ok(edge);
 }
 
 export async function createAdminGlossary(
@@ -628,6 +753,13 @@ export interface AdminKnowledgeQuery {
   query?: string;
   layer?: KnowledgeLayer;
   limit?: number;
+  includeSuperseded?: boolean;
+}
+
+export interface AdminKnowledgeEdgeQuery {
+  groupKey?: string;
+  kind?: HubKnowledgeEdgeKind;
+  limit?: number;
 }
 
 export interface AdminGlossaryQuery {
@@ -682,6 +814,10 @@ function createInviteToken(state: HubState): string {
   } while (state.invites.has(token));
 
   return token;
+}
+
+function createKnowledgeEdgeId(): string {
+  return `edge_${randomUUID().replace(/-/g, '')}`;
 }
 
 function getInviteStatus(invite: HubInvite): AdminInviteSummary['status'] {
@@ -739,11 +875,25 @@ function isProjectAclRole(value: string): value is ProjectAclRole {
   return value === 'owner' || value === 'maintainer' || value === 'member' || value === 'readonly';
 }
 
+function isKnowledgeEdgeKind(value: string | undefined): value is HubKnowledgeEdgeKind {
+  return value === 'supersedes' || value === 'duplicates' || value === 'contradicts';
+}
+
 function resolveGlossaryGroupKey(state: HubState, input: string | undefined): HubResult<string> {
   const fallbackGroup = state.groups.has(DEFAULT_GROUP_KEY) ? DEFAULT_GROUP_KEY : state.groups.keys().next().value;
   const groupKey = input?.trim() || fallbackGroup;
 
   if (groupKey === undefined || !state.groups.has(groupKey)) {
+    return hubError(404, 'admin.group_not_found', 'The target group does not exist.');
+  }
+
+  return ok(groupKey);
+}
+
+function resolveKnowledgeEdgeGroupKey(state: HubState, input: string | undefined): HubResult<string | undefined> {
+  const groupKey = normalizeOptionalString(input);
+
+  if (groupKey !== undefined && !state.groups.has(groupKey)) {
     return hubError(404, 'admin.group_not_found', 'The target group does not exist.');
   }
 
