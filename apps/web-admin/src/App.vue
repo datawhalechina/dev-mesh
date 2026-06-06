@@ -18,6 +18,7 @@ import {
   fetchKnowledgeEdges,
   fetchMembers,
   fetchProjects,
+  fetchQualityReview,
   fetchReviewQueue,
   revokeInvite,
   updateGlossaryItem,
@@ -39,6 +40,9 @@ import type {
   ProjectAclRole,
   ProjectInput,
   ProjectSummary,
+  QualityReviewFilters,
+  QualityReviewItem,
+  QualityReviewResponse,
   ReviewQueueItem
 } from './types.js';
 
@@ -68,11 +72,16 @@ const glossary = ref<KnowledgeItem[]>([]);
 const knowledge = ref<KnowledgeItem[]>([]);
 const edgeKnowledge = ref<KnowledgeItem[]>([]);
 const knowledgeEdges = ref<KnowledgeEdge[]>([]);
+const qualityReview = ref<QualityReviewResponse | null>(null);
 const reviewQueue = ref<ReviewQueueItem[]>([]);
 const auditLogs = ref<AuditLog[]>([]);
 const knowledgeLayer = ref('');
 const knowledgeQuery = ref('');
 const knowledgeIncludeSuperseded = ref(false);
+const qualityLayer = ref('');
+const qualityMaxScore = ref(0.6);
+const qualityStaleDays = ref(180);
+const qualityIncludeSuperseded = ref(true);
 const glossaryQuery = ref('');
 const glossaryGroupKey = ref('');
 const glossaryProjectKey = ref('');
@@ -132,6 +141,7 @@ const navItems = [
   { key: 'projects', label: 'Projects', icon: Folder },
   { key: 'glossary', label: 'Glossary', icon: Memo },
   { key: 'knowledge', label: 'Knowledge', icon: Document },
+  { key: 'quality', label: 'Quality', icon: DataAnalysis },
   { key: 'edges', label: 'Edges', icon: Connection },
   { key: 'review', label: 'Review Queue', icon: Memo },
   { key: 'audit', label: 'Audit Log', icon: Lock }
@@ -149,6 +159,21 @@ const stats = computed(() => {
     { label: 'Knowledge', value: overview.value.counts.knowledgeItems, icon: Document }
   ];
 });
+
+const qualityStats = computed(() => {
+  if (qualityReview.value === null) {
+    return [];
+  }
+
+  return [
+    { label: 'Needs Review', value: qualityReview.value.summary.needsReview, icon: DataAnalysis },
+    { label: 'Low Quality', value: qualityReview.value.summary.lowQuality, icon: Document },
+    { label: 'Low Rating', value: qualityReview.value.summary.lowRating, icon: Memo },
+    { label: 'Stale', value: qualityReview.value.summary.stale, icon: Refresh }
+  ];
+});
+
+const qualityReviewItems = computed(() => qualityReview.value?.items ?? []);
 
 const projectAclMembers = computed(() => {
   if (selectedAclProject.value === null) {
@@ -186,6 +211,7 @@ async function refreshAll(): Promise<void> {
       knowledgeData,
       edgeKnowledgeData,
       edgeData,
+      qualityData,
       queueData,
       auditData
     ] = await Promise.all([
@@ -198,6 +224,7 @@ async function refreshAll(): Promise<void> {
       fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value, knowledgeIncludeSuperseded.value),
       fetchKnowledge('', '', true),
       fetchKnowledgeEdges(),
+      fetchQualityReview(createQualityReviewFilters()),
       fetchReviewQueue(),
       fetchAuditLogs()
     ]);
@@ -211,6 +238,7 @@ async function refreshAll(): Promise<void> {
     knowledge.value = knowledgeData;
     edgeKnowledge.value = edgeKnowledgeData;
     knowledgeEdges.value = edgeData;
+    qualityReview.value = qualityData;
     reviewQueue.value = queueData;
     auditLogs.value = auditData;
   } catch (error) {
@@ -226,6 +254,19 @@ async function reloadKnowledge(): Promise<void> {
 
   try {
     knowledge.value = await fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value, knowledgeIncludeSuperseded.value);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function reloadQualityReview(): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    qualityReview.value = await fetchQualityReview(createQualityReviewFilters());
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -531,6 +572,20 @@ async function submitEdge(): Promise<void> {
   }
 }
 
+function createQualityReviewFilters(): QualityReviewFilters {
+  const filters: QualityReviewFilters = {
+    maxQualityScore: qualityMaxScore.value,
+    staleDays: qualityStaleDays.value,
+    includeSuperseded: qualityIncludeSuperseded.value
+  };
+
+  if (qualityLayer.value) {
+    filters.layer = qualityLayer.value;
+  }
+
+  return filters;
+}
+
 function memberStatusType(status: MemberSummary['status']): 'success' | 'danger' {
   return status === 'active' ? 'success' : 'danger';
 }
@@ -561,6 +616,18 @@ function edgeKindType(kind: KnowledgeEdgeKind): 'success' | 'warning' | 'danger'
   }
 
   return kind === 'contradicts' ? 'danger' : 'success';
+}
+
+function qualityPriorityType(priority: QualityReviewItem['priority']): 'danger' | 'warning' | 'info' {
+  if (priority === 'high') {
+    return 'danger';
+  }
+
+  return priority === 'medium' ? 'warning' : 'info';
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
 }
 
 function projectAccessVisibility(project: ProjectSummary): 'group' | 'restricted' {
@@ -901,6 +968,74 @@ interface KnowledgeEdgeFormInput {
               <el-table-column label="Owner" width="150">
                 <template #default="{ row }">{{ row.createdBy.displayName }}</template>
               </el-table-column>
+            </el-table>
+          </section>
+
+          <section v-else-if="activeView === 'quality'" class="view">
+            <div class="toolbar">
+              <el-select v-model="qualityLayer" class="layer-select" placeholder="Layer" clearable>
+                <el-option label="raw" value="raw" />
+                <el-option label="extract" value="extract" />
+                <el-option label="canonical" value="canonical" />
+              </el-select>
+              <el-input-number
+                v-model="qualityMaxScore"
+                :max="1"
+                :min="0"
+                :precision="2"
+                :step="0.05"
+                controls-position="right"
+                placeholder="Max quality"
+              />
+              <el-input-number
+                v-model="qualityStaleDays"
+                :min="1"
+                :step="30"
+                controls-position="right"
+                placeholder="Stale days"
+              />
+              <el-switch v-model="qualityIncludeSuperseded" active-text="Include Superseded" />
+              <el-button @click="reloadQualityReview">Apply</el-button>
+            </div>
+            <div class="stats-grid">
+              <div v-for="stat in qualityStats" :key="stat.label" class="stat-panel">
+                <el-icon><component :is="stat.icon" /></el-icon>
+                <span>{{ stat.label }}</span>
+                <strong>{{ stat.value }}</strong>
+              </div>
+            </div>
+            <el-table :data="qualityReviewItems" empty-text="No quality review items">
+              <el-table-column prop="item.title" label="Title" min-width="260" />
+              <el-table-column label="Priority" width="110">
+                <template #default="{ row }">
+                  <el-tag :type="qualityPriorityType(row.priority)">{{ row.priority }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="Reasons" min-width="220">
+                <template #default="{ row }">
+                  <el-tag v-for="reason in row.reasons" :key="reason" class="reason-tag" type="warning">
+                    {{ reason }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="Quality" width="110">
+                <template #default="{ row }">{{ formatPercent(row.item.quality.qualityScore) }}</template>
+              </el-table-column>
+              <el-table-column label="Confidence" width="120">
+                <template #default="{ row }">{{ formatPercent(row.item.quality.confidence) }}</template>
+              </el-table-column>
+              <el-table-column label="Rating" width="110">
+                <template #default="{ row }">{{ formatPercent(row.item.quality.rating) }}</template>
+              </el-table-column>
+              <el-table-column label="Adoption" width="110">
+                <template #default="{ row }">{{ formatPercent(row.item.quality.adoptionScore) }}</template>
+              </el-table-column>
+              <el-table-column label="Status" width="130">
+                <template #default="{ row }">
+                  <el-tag :type="knowledgeStatusType(row.item.status)">{{ row.item.status }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="item.updatedAt" label="Updated" width="190" />
             </el-table>
           </section>
 

@@ -13,6 +13,8 @@ import type {
   ProjectAclInput,
   ProjectInput,
   ProjectSummary,
+  QualityReviewFilters,
+  QualityReviewResponse,
   ReviewQueueItem
 } from './types.js';
 
@@ -133,6 +135,29 @@ export async function createKnowledgeEdge(input: KnowledgeEdgeInput): Promise<Kn
   });
 }
 
+export async function fetchQualityReview(input: QualityReviewFilters = {}): Promise<QualityReviewResponse> {
+  const params = new URLSearchParams();
+
+  if (input.layer) {
+    params.set('layer', input.layer);
+  }
+
+  if (input.includeSuperseded !== undefined) {
+    params.set('includeSuperseded', String(input.includeSuperseded));
+  }
+
+  setNumberParam(params, 'maxQualityScore', input.maxQualityScore);
+  setNumberParam(params, 'maxConfidence', input.maxConfidence);
+  setNumberParam(params, 'maxRating', input.maxRating);
+  setNumberParam(params, 'maxAdoptionScore', input.maxAdoptionScore);
+  setNumberParam(params, 'staleDays', input.staleDays);
+  setNumberParam(params, 'limit', input.limit);
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+
+  return requestJson<QualityReviewResponse>(`/api/v1/admin/quality-review${suffix}`);
+}
+
 export async function fetchGlossary(query = '', groupKey = '', projectKey = ''): Promise<KnowledgeItem[]> {
   const params = new URLSearchParams();
 
@@ -178,6 +203,12 @@ export async function fetchAuditLogs(): Promise<AuditLog[]> {
   const response = await requestJson<{ auditLogs: AuditLog[] }>('/api/v1/admin/audit');
 
   return response.auditLogs;
+}
+
+function setNumberParam(params: URLSearchParams, key: string, value: number | undefined): void {
+  if (value !== undefined && Number.isFinite(value)) {
+    params.set(key, String(value));
+  }
 }
 
 async function requestJson<T>(url: string, init: ApiRequestInit = {}): Promise<T> {

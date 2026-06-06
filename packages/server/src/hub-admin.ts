@@ -203,6 +203,31 @@ export function listAdminKnowledgeEdges(
     .slice(0, limit);
 }
 
+export async function createAdminQualityReview(
+  core: DevMeshCore,
+  input: AdminQualityReviewQuery = {}
+): Promise<AdminQualityReviewResponse> {
+  const policy = normalizeQualityReviewPolicy(input);
+  const filter: KnowledgeFilter = {
+    includeSuperseded: policy.includeSuperseded
+  };
+
+  if (input.layer !== undefined) {
+    filter.layers = [input.layer];
+  }
+
+  const items = await core.listKnowledge(filter);
+  const reviewItems = items
+    .map((item) => createQualityReviewItem(item, policy))
+    .filter((item): item is AdminQualityReviewItem => item !== undefined)
+    .sort(compareQualityReviewItems);
+
+  return {
+    summary: createQualityReviewSummary(items, policy, reviewItems.length),
+    items: reviewItems.slice(0, policy.limit)
+  };
+}
+
 export async function listAdminGlossary(
   core: DevMeshCore,
   input: AdminGlossaryQuery = {}
@@ -762,6 +787,40 @@ export interface AdminKnowledgeEdgeQuery {
   limit?: number;
 }
 
+export interface AdminQualityReviewQuery {
+  layer?: KnowledgeLayer;
+  limit?: number;
+  includeSuperseded?: boolean;
+  maxQualityScore?: number;
+  maxConfidence?: number;
+  maxRating?: number;
+  maxAdoptionScore?: number;
+  staleDays?: number;
+}
+
+export interface AdminQualityReviewResponse {
+  summary: AdminQualityReviewSummary;
+  items: AdminQualityReviewItem[];
+}
+
+export interface AdminQualityReviewSummary {
+  totalKnowledge: number;
+  needsReview: number;
+  lowQuality: number;
+  lowConfidence: number;
+  lowRating: number;
+  lowAdoption: number;
+  stale: number;
+  nonActive: number;
+}
+
+export interface AdminQualityReviewItem {
+  item: KnowledgeItem;
+  reasons: string[];
+  priority: 'high' | 'medium' | 'low';
+  score: number;
+}
+
 export interface AdminGlossaryQuery {
   query?: string;
   groupKey?: string;
@@ -818,6 +877,134 @@ function createInviteToken(state: HubState): string {
 
 function createKnowledgeEdgeId(): string {
   return `edge_${randomUUID().replace(/-/g, '')}`;
+}
+
+function normalizeQualityReviewPolicy(input: AdminQualityReviewQuery): Required<Omit<AdminQualityReviewQuery, 'layer'>> {
+  return {
+    limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
+    includeSuperseded: input.includeSuperseded ?? true,
+    maxQualityScore: normalizeUnitThreshold(input.maxQualityScore, 0.6),
+    maxConfidence: normalizeUnitThreshold(input.maxConfidence, 0.55),
+    maxRating: normalizeUnitThreshold(input.maxRating, 0.4),
+    maxAdoptionScore: normalizeUnitThreshold(input.maxAdoptionScore, 0.2),
+    staleDays: Math.max(input.staleDays ?? 180, 1)
+  };
+}
+
+function normalizeUnitThreshold(value: number | undefined, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(value, 0), 1);
+}
+
+function createQualityReviewSummary(
+  items: KnowledgeItem[],
+  policy: Required<Omit<AdminQualityReviewQuery, 'layer'>>,
+  needsReview: number
+): AdminQualityReviewSummary {
+  return {
+    totalKnowledge: items.length,
+    needsReview,
+    lowQuality: items.filter((item) => item.quality.qualityScore <= policy.maxQualityScore).length,
+    lowConfidence: items.filter((item) => item.quality.confidence <= policy.maxConfidence).length,
+    lowRating: items.filter((item) => item.quality.rating <= policy.maxRating).length,
+    lowAdoption: items.filter((item) => item.quality.adoptionScore <= policy.maxAdoptionScore).length,
+    stale: items.filter((item) => isKnowledgeStale(item, policy.staleDays)).length,
+    nonActive: items.filter((item) => item.status !== 'active').length
+  };
+}
+
+function createQualityReviewItem(
+  item: KnowledgeItem,
+  policy: Required<Omit<AdminQualityReviewQuery, 'layer'>>
+): AdminQualityReviewItem | undefined {
+  const reasons = createQualityReviewReasons(item, policy);
+
+  if (!reasons.length) {
+    return undefined;
+  }
+
+  return {
+    item,
+    reasons,
+    priority: createQualityReviewPriority(item, reasons, policy),
+    score: createQualityReviewScore(item, reasons)
+  };
+}
+
+function createQualityReviewReasons(item: KnowledgeItem, policy: Required<Omit<AdminQualityReviewQuery, 'layer'>>): string[] {
+  const reasons: string[] = [];
+
+  if (item.status !== 'active') {
+    reasons.push(item.status);
+  }
+
+  if (item.quality.qualityScore <= policy.maxQualityScore) {
+    reasons.push('low quality');
+  }
+
+  if (item.quality.confidence <= policy.maxConfidence) {
+    reasons.push('low confidence');
+  }
+
+  if (item.quality.rating <= policy.maxRating) {
+    reasons.push('low rating');
+  }
+
+  if (item.quality.adoptionScore <= policy.maxAdoptionScore) {
+    reasons.push('low adoption');
+  }
+
+  if (isKnowledgeStale(item, policy.staleDays)) {
+    reasons.push('stale');
+  }
+
+  return reasons;
+}
+
+function createQualityReviewPriority(
+  item: KnowledgeItem,
+  reasons: string[],
+  policy: Required<Omit<AdminQualityReviewQuery, 'layer'>>
+): AdminQualityReviewItem['priority'] {
+  if (
+    item.status !== 'active' ||
+    item.quality.qualityScore <= policy.maxQualityScore * 0.75 ||
+    item.quality.rating <= policy.maxRating * 0.75
+  ) {
+    return 'high';
+  }
+
+  return reasons.length >= 2 ? 'medium' : 'low';
+}
+
+function createQualityReviewScore(item: KnowledgeItem, reasons: string[]): number {
+  return Number((reasons.length + (1 - item.quality.qualityScore)).toFixed(4));
+}
+
+function compareQualityReviewItems(a: AdminQualityReviewItem, b: AdminQualityReviewItem): number {
+  return (
+    qualityPriorityRank(b.priority) - qualityPriorityRank(a.priority) ||
+    b.score - a.score ||
+    a.item.quality.qualityScore - b.item.quality.qualityScore ||
+    a.item.updatedAt.localeCompare(b.item.updatedAt)
+  );
+}
+
+function qualityPriorityRank(priority: AdminQualityReviewItem['priority']): number {
+  if (priority === 'high') {
+    return 3;
+  }
+
+  return priority === 'medium' ? 2 : 1;
+}
+
+function isKnowledgeStale(item: KnowledgeItem, staleDays: number): boolean {
+  const updatedAt = Date.parse(item.updatedAt);
+
+  return !Number.isNaN(updatedAt) && Date.now() - updatedAt > staleDays * 24 * 60 * 60 * 1000;
 }
 
 function getInviteStatus(invite: HubInvite): AdminInviteSummary['status'] {

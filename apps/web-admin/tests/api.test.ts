@@ -9,6 +9,7 @@ import {
   fetchGlossary,
   fetchKnowledge,
   fetchKnowledgeEdges,
+  fetchQualityReview,
   revokeInvite,
   updateGlossaryItem,
   updateProjectAcl
@@ -157,6 +158,39 @@ describe('web-admin API client', () => {
           reason: 'Replaced by the latest canonical item.'
         })
       })
+    );
+  });
+
+  it('builds quality review filters', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        summary: {
+          totalKnowledge: 2,
+          needsReview: 1,
+          lowQuality: 1,
+          lowConfidence: 1,
+          lowRating: 0,
+          lowAdoption: 1,
+          stale: 0,
+          nonActive: 0
+        },
+        items: []
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchQualityReview({
+      layer: 'canonical',
+      includeSuperseded: true,
+      maxQualityScore: 0.55,
+      staleDays: 90,
+      limit: 25
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/admin/quality-review?layer=canonical&includeSuperseded=true&maxQualityScore=0.55&staleDays=90&limit=25',
+      expect.any(Object)
     );
   });
 

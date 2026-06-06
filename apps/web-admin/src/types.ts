@@ -76,6 +76,29 @@ export interface KnowledgeEdge {
   reason?: string;
 }
 
+export interface QualityReviewSummary {
+  totalKnowledge: number;
+  needsReview: number;
+  lowQuality: number;
+  lowConfidence: number;
+  lowRating: number;
+  lowAdoption: number;
+  stale: number;
+  nonActive: number;
+}
+
+export interface QualityReviewItem {
+  item: KnowledgeItem;
+  reasons: string[];
+  priority: 'high' | 'medium' | 'low';
+  score: number;
+}
+
+export interface QualityReviewResponse {
+  summary: QualityReviewSummary;
+  items: QualityReviewItem[];
+}
+
 export interface KnowledgeItem {
   id: string;
   layer: string;
@@ -180,4 +203,15 @@ export interface KnowledgeEdgeInput {
   toId: string;
   groupKey?: string;
   reason?: string;
+}
+
+export interface QualityReviewFilters {
+  layer?: string;
+  limit?: number;
+  includeSuperseded?: boolean;
+  maxQualityScore?: number;
+  maxConfidence?: number;
+  maxRating?: number;
+  maxAdoptionScore?: number;
+  staleDays?: number;
 }

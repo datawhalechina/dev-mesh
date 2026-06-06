@@ -649,6 +649,125 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('surfaces knowledge quality review candidates through admin APIs', async () => {
+    const core = createDevMeshCore();
+    const staleItem = await core.captureKnowledge({
+      type: 'decision',
+      layer: 'canonical',
+      title: 'quality-review stale canonical decision',
+      summary: 'Old low-confidence canonical knowledge should be revisited.',
+      confidence: 0.25,
+      createdAt: '2024-01-01T00:00:00.000Z'
+    });
+    const healthyItem = await core.captureKnowledge({
+      type: 'decision',
+      layer: 'canonical',
+      title: 'quality-review healthy canonical decision',
+      summary: 'High-confidence adopted canonical knowledge should not be flagged.',
+      confidence: 0.95
+    });
+    await core.rateKnowledge({
+      id: healthyItem.id,
+      rating: 0.95,
+      adoptionDelta: 0.8
+    });
+    const supersededItem = await core.captureKnowledge({
+      type: 'decision',
+      layer: 'canonical',
+      title: 'quality-review superseded canonical decision',
+      summary: 'Superseded canonical knowledge should remain visible to maintainers.',
+      confidence: 0.9
+    });
+    await core.repository.upsert({
+      ...supersededItem,
+      status: 'superseded'
+    });
+    const extractItem = await core.captureKnowledge({
+      type: 'note',
+      layer: 'extract',
+      title: 'quality-review low rating extract',
+      summary: 'Low-rated extracted knowledge should show up when extract is selected.',
+      confidence: 0.7
+    });
+    await core.rateKnowledge({
+      id: extractItem.id,
+      rating: 0.1
+    });
+    const { app, url } = await startHubServer({ core });
+
+    try {
+      const canonical = await requestJson(
+        `${url}/api/v1/admin/quality-review?layer=canonical&maxQualityScore=0.6&staleDays=30&limit=10`
+      );
+      const activeOnly = await requestJson(
+        `${url}/api/v1/admin/quality-review?layer=canonical&includeSuperseded=false&maxQualityScore=0.6&staleDays=30`
+      );
+      const extract = await requestJson(
+        `${url}/api/v1/admin/quality-review?layer=extract&maxRating=0.2&maxQualityScore=0.4`
+      );
+
+      expect(canonical.body.summary).toMatchObject({
+        totalKnowledge: 3,
+        needsReview: 2,
+        lowQuality: 2,
+        lowConfidence: 1,
+        stale: 1,
+        nonActive: 1
+      });
+      expect(canonical.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            item: expect.objectContaining({
+              id: staleItem.id,
+              title: 'quality-review stale canonical decision'
+            }),
+            reasons: expect.arrayContaining(['low quality', 'low confidence', 'low adoption', 'stale'])
+          }),
+          expect.objectContaining({
+            item: expect.objectContaining({
+              id: supersededItem.id,
+              status: 'superseded'
+            }),
+            reasons: expect.arrayContaining(['superseded'])
+          })
+        ])
+      );
+      expect(canonical.body.items).toEqual(
+        expect.not.arrayContaining([
+          expect.objectContaining({
+            item: expect.objectContaining({
+              id: healthyItem.id
+            })
+          })
+        ])
+      );
+      expect(activeOnly.body.summary).toMatchObject({
+        totalKnowledge: 2,
+        nonActive: 0
+      });
+      expect(activeOnly.body.items).toEqual(
+        expect.not.arrayContaining([
+          expect.objectContaining({
+            item: expect.objectContaining({
+              id: supersededItem.id
+            })
+          })
+        ])
+      );
+      expect(extract.body.items).toEqual([
+        expect.objectContaining({
+          item: expect.objectContaining({
+            id: extractItem.id,
+            layer: 'extract'
+          }),
+          reasons: expect.arrayContaining(['low rating'])
+        })
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('manages knowledge edges and keeps superseded items out of default search', async () => {
     const core = createDevMeshCore();
     const oldItem = await core.captureKnowledge({

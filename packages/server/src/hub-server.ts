@@ -22,6 +22,7 @@ import {
   createAdminKnowledgeEdge,
   createAdminOverview,
   createAdminProject,
+  createAdminQualityReview,
   disableAdminMember,
   listAdminAuditLogs,
   listAdminGlossary,
@@ -44,7 +45,8 @@ import {
   type AdminKnowledgeQuery,
   type AdminMemberDisableInput,
   type AdminProjectAclInput,
-  type AdminProjectInput
+  type AdminProjectInput,
+  type AdminQualityReviewQuery
 } from './hub-admin.js';
 import {
   authenticateHubToken,
@@ -432,6 +434,10 @@ function createHubRouter(
     sendHubResult(ctx, await createAdminKnowledgeEdge(hub, core, readBody<AdminKnowledgeEdgeInput>(ctx)));
   });
 
+  router.get('/api/v1/admin/quality-review', async (ctx) => {
+    ctx.body = await createAdminQualityReview(core, readAdminQualityReviewQuery(ctx));
+  });
+
   router.get('/api/v1/admin/review-queue', (ctx) => {
     ctx.body = listAdminReviewQueue();
   });
@@ -612,6 +618,12 @@ function readQueryBoolean(ctx: Context, key: string): boolean | undefined {
   return undefined;
 }
 
+function readQueryNumber(ctx: Context, key: string): number | undefined {
+  const value = Number.parseFloat(readQueryString(ctx, key) ?? '');
+
+  return Number.isFinite(value) ? value : undefined;
+}
+
 function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
   const query: AdminKnowledgeQuery = {};
   const search = readQueryString(ctx, 'query');
@@ -629,6 +641,52 @@ function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
 
   if (includeSuperseded !== undefined) {
     query.includeSuperseded = includeSuperseded;
+  }
+
+  if (Number.isFinite(limit) && limit > 0) {
+    query.limit = Math.min(limit, 100);
+  }
+
+  return query;
+}
+
+function readAdminQualityReviewQuery(ctx: Context): AdminQualityReviewQuery {
+  const query: AdminQualityReviewQuery = {};
+  const layer = readQueryString(ctx, 'layer');
+  const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
+  const maxQualityScore = readQueryNumber(ctx, 'maxQualityScore');
+  const maxConfidence = readQueryNumber(ctx, 'maxConfidence');
+  const maxRating = readQueryNumber(ctx, 'maxRating');
+  const maxAdoptionScore = readQueryNumber(ctx, 'maxAdoptionScore');
+  const staleDays = readQueryNumber(ctx, 'staleDays');
+  const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  if (layer === 'raw' || layer === 'extract' || layer === 'canonical') {
+    query.layer = layer;
+  }
+
+  if (includeSuperseded !== undefined) {
+    query.includeSuperseded = includeSuperseded;
+  }
+
+  if (maxQualityScore !== undefined) {
+    query.maxQualityScore = maxQualityScore;
+  }
+
+  if (maxConfidence !== undefined) {
+    query.maxConfidence = maxConfidence;
+  }
+
+  if (maxRating !== undefined) {
+    query.maxRating = maxRating;
+  }
+
+  if (maxAdoptionScore !== undefined) {
+    query.maxAdoptionScore = maxAdoptionScore;
+  }
+
+  if (staleDays !== undefined && staleDays > 0) {
+    query.staleDays = staleDays;
   }
 
   if (Number.isFinite(limit) && limit > 0) {
