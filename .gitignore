@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.tgz
+.dev-mesh/index/
+.dev-mesh/queue/
+.dev-mesh/secrets/
+.dev-mesh/sync/

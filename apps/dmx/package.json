@@ -1,0 +1,19 @@
+{
+  "name": "mcp-dev-mesh",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "dmx": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --clean",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mcp-dev-mesh/client": "workspace:*",
+    "@mcp-dev-mesh/core": "workspace:*",
+    "commander": "15.0.0"
+  }
+}

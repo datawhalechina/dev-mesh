@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@mcp-dev-mesh/adapters": ["packages/adapters/src/index.ts"],
+      "@mcp-dev-mesh/agent": ["packages/agent/src/index.ts"],
+      "@mcp-dev-mesh/client": ["packages/client/src/index.ts"],
+      "@mcp-dev-mesh/core": ["packages/core/src/index.ts"],
+      "@mcp-dev-mesh/extension-api": ["packages/extension-api/src/index.ts"],
+      "@mcp-dev-mesh/extractor": ["packages/extractor/src/index.ts"],
+      "@mcp-dev-mesh/local-store": ["packages/local-store/src/index.ts"],
+      "@mcp-dev-mesh/mcp-contracts": ["packages/mcp-contracts/src/index.ts"],
+      "@mcp-dev-mesh/protocol": ["packages/protocol/src/index.ts"],
+      "@mcp-dev-mesh/providers": ["packages/providers/src/index.ts"],
+      "@mcp-dev-mesh/quality": ["packages/quality/src/index.ts"],
+      "@mcp-dev-mesh/registry": ["packages/registry/src/index.ts"],
+      "@mcp-dev-mesh/search": ["packages/search/src/index.ts"],
+      "@mcp-dev-mesh/server": ["packages/server/src/index.ts"],
+      "@mcp-dev-mesh/shared": ["packages/shared/src/index.ts"],
+      "@mcp-dev-mesh/storage": ["packages/storage/src/index.ts"]
+    },
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  }
+}

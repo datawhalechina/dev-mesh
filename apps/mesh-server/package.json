@@ -1,0 +1,17 @@
+{
+  "name": "@mcp-dev-mesh/mesh-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --clean",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mcp-dev-mesh/core": "workspace:*",
+    "@mcp-dev-mesh/local-store": "workspace:*",
+    "@mcp-dev-mesh/server": "workspace:*",
+    "commander": "15.0.0"
+  }
+}
