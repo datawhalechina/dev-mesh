@@ -5,6 +5,14 @@ export type {
   GlobalToolStatus,
   InitGlobalConfigOptions
 } from './global-init.js';
+export { runDevMeshDoctor } from './doctor.js';
+export type {
+  DevMeshDoctorCategory,
+  DevMeshDoctorCheck,
+  DevMeshDoctorOptions,
+  DevMeshDoctorResult,
+  DevMeshDoctorStatus
+} from './doctor.js';
 export { joinServerGroup } from './join.js';
 export type { JoinedServerRecord, JoinServerOptions, JoinServerResult } from './join.js';
 export {

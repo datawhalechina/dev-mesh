@@ -1,36 +1,28 @@
 import type { Command } from 'commander';
-import { createDevMeshClientRuntime } from '@mcp-dev-mesh/client';
+import { runDevMeshDoctor, type DevMeshDoctorOptions } from '@mcp-dev-mesh/client';
 
 export function registerDoctorCommand(program: Command): void {
   program
     .command('doctor')
     .description('Run basic local diagnostics')
     .option('--root <path>', 'project root', process.cwd())
-    .action(async (options: { root: string }) => {
-      const runtime = createDevMeshClientRuntime({
+    .option('--global-root <path>', 'global Dev Mesh root')
+    .option('--mcp-url <url>', 'local MCP proxy URL')
+    .action(async (options: { root: string; globalRoot?: string; mcpUrl?: string }) => {
+      const doctorOptions: DevMeshDoctorOptions = {
         projectRoot: options.root
-      });
-      const status = await runtime.status();
+      };
 
-      console.log(
-        JSON.stringify(
-          {
-            checks: [
-              {
-                id: 'project-store',
-                status: 'ok',
-                message: `Project store is available at ${status.storeRoot}`
-              },
-              {
-                id: 'mode',
-                status: 'ok',
-                message: 'Running in local-only mode'
-              }
-            ]
-          },
-          null,
-          2
-        )
-      );
+      if (options.globalRoot !== undefined) {
+        doctorOptions.globalRoot = options.globalRoot;
+      }
+
+      if (options.mcpUrl !== undefined) {
+        doctorOptions.mcpUrl = options.mcpUrl;
+      }
+
+      const result = await runDevMeshDoctor(doctorOptions);
+
+      console.log(JSON.stringify(result, null, 2));
     });
 }

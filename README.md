@@ -229,6 +229,8 @@ pnpm --filter mcp-dev-mesh dev -- index rebuild --root .
 pnpm --filter mcp-dev-mesh dev -- doctor --root .
 ```
 
+`dmx doctor` 会检查本地 store、privacy 配置、sync 身份和内置 adapter 状态，并在风险项上给出 `fixHint`。
+
 ## `.dev-mesh/` 本地知识库
 
 执行 `dmx init` 或 runtime 初始化后，项目目录下会生成 `.dev-mesh/`：

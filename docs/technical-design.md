@@ -877,6 +877,7 @@ Press Enter to apply, Space to toggle, q to cancel.
 - `packages/client` 负责工具别名归一化、默认选择、内置 adapter dry-run 检查和全局配置写入；`apps/dmx` 只做 CLI 参数收集。
 - `~/.dev-mesh/config.toml` 已写入 `[tools]` 的 Codex / Claude Code / opencode 选择状态，`identity.json` 已记录 `selectedTools`、`localProxyUrl` 和每个 adapter 的 detected/configured/message。
 - `dmx join <server> --group <groupKey> --name <displayName>` 已支持 well-known discovery、invite token join、全局 `[[servers]]` / `[[groups]]` 写入和 join 后 `auto_sync` 开启；access token 只写入本机 `identity.json`，不写入 TOML。
+- `dmx doctor` 已提供 store、privacy、sync、adapter 四类诊断，输出结构化 `checks`、`summary` 和可执行 `fixHint`；诊断逻辑位于 `packages/client`，CLI 只负责参数映射和输出。
 - join 相关实现已按职责拆分：CLI 命令在 `apps/dmx/src/commands/join.ts`，client 编排在 `packages/client/src/join.ts`，HTTP discovery/join 在 `packages/client/src/join-http.ts`，全局配置落盘在 `packages/client/src/join-config.ts`，共享类型在 `packages/client/src/join-types.ts`。
 - 内置 adapter 当前仍是 scaffold，不会修改真实 Codex、Claude Code 或 opencode 配置；完整 TUI、scope 切换和真实 configure/remove/doctor 在阶段 2 后续任务中完成。
 
