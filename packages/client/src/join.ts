@@ -81,5 +81,9 @@ function createJoinedServerRecord(
     record.expiresAt = joined.expiresAt;
   }
 
+  if (joined.syncSigningSecret !== undefined) {
+    record.syncSigningSecret = joined.syncSigningSecret;
+  }
+
   return record;
 }

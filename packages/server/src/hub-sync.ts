@@ -1,4 +1,6 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { SyncEvent, SyncPullResponse, SyncPushRequest, SyncPushResponse } from '@mcp-dev-mesh/protocol';
+import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubResult, HubState, HubSyncEvent } from './hub-model.js';
 import { hubError, ok } from './hub-utils.js';
 
@@ -24,11 +26,19 @@ export function pushHubSyncEvents(
     const validation = normalizeSyncEvent(rawEvent);
 
     if (!validation.ok) {
+      auditSyncSignatureRejection(state, auth, validation.rejected.id, validation.rejected.reason);
       rejected.push(validation.rejected);
       continue;
     }
 
     const { event } = validation;
+    const signatureRejection = validateSyncEventSignature(auth, event);
+
+    if (signatureRejection !== undefined) {
+      auditSyncSignatureRejection(state, auth, event.id, signatureRejection.reason);
+      rejected.push(signatureRejection);
+      continue;
+    }
 
     if (existingIds.has(event.id)) {
       continue;
@@ -115,16 +125,88 @@ function normalizeSyncEvent(
     normalized.createdAt = event.createdAt;
   }
 
+  if (event.signature !== undefined) {
+    if (!isPlainRecord(event.signature)) {
+      return {
+        ok: false,
+        rejected: {
+          id: event.id,
+          reason: 'event.signature_invalid'
+        }
+      };
+    }
+
+    if (event.signature.algorithm !== 'hmac-sha256') {
+      return {
+        ok: false,
+        rejected: {
+          id: event.id,
+          reason: 'event.signature_unsupported'
+        }
+      };
+    }
+
+    if (typeof event.signature.value !== 'string' || !/^[a-f0-9]{64}$/i.test(event.signature.value)) {
+      return {
+        ok: false,
+        rejected: {
+          id: event.id,
+          reason: 'event.signature_invalid'
+        }
+      };
+    }
+
+    normalized.signature = {
+      algorithm: 'hmac-sha256',
+      value: event.signature.value.toLowerCase()
+    };
+
+    if (typeof event.signature.signedAt === 'string') {
+      normalized.signature.signedAt = event.signature.signedAt;
+    }
+
+    if (typeof event.signature.keyId === 'string') {
+      normalized.signature.keyId = event.signature.keyId;
+    }
+  }
+
   return {
     ok: true,
     event: normalized
   };
 }
 
+function validateSyncEventSignature(
+  auth: HubAuthContext,
+  event: SyncEvent
+): SyncPushResponse['rejected'][number] | undefined {
+  if (event.signature === undefined) {
+    return undefined;
+  }
+
+  if (event.signature.keyId !== undefined && event.signature.keyId !== auth.clientId) {
+    return {
+      id: event.id,
+      reason: 'event.signature_key_mismatch'
+    };
+  }
+
+  const expectedSignature = createSyncEventSignature(auth, event);
+
+  if (!isEqualSignature(expectedSignature, event.signature.value)) {
+    return {
+      id: event.id,
+      reason: 'event.signature_mismatch'
+    };
+  }
+
+  return undefined;
+}
+
 function createHubSyncEvent(auth: HubAuthContext, event: SyncEvent): HubSyncEvent {
   const createdAt = typeof event.createdAt === 'string' && event.createdAt.trim() ? event.createdAt : new Date().toISOString();
 
-  return {
+  const hubEvent: HubSyncEvent = {
     id: event.id,
     kind: event.kind,
     payload: event.payload,
@@ -133,15 +215,27 @@ function createHubSyncEvent(auth: HubAuthContext, event: SyncEvent): HubSyncEven
     groupKey: auth.groupKey,
     acceptedAt: new Date().toISOString()
   };
+
+  if (event.signature !== undefined) {
+    hubEvent.signature = event.signature;
+  }
+
+  return hubEvent;
 }
 
 function toProtocolSyncEvent(event: HubSyncEvent): SyncEvent {
-  return {
+  const protocolEvent: SyncEvent = {
     id: event.id,
     kind: event.kind,
     payload: event.payload,
     createdAt: event.createdAt
   };
+
+  if (event.signature !== undefined) {
+    protocolEvent.signature = event.signature;
+  }
+
+  return protocolEvent;
 }
 
 function createSyncCursor(groupKey: string, offset: number): string {
@@ -162,4 +256,72 @@ function readSyncCursorOffset(groupKey: string, cursor: string | undefined): num
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function createSyncEventSignature(auth: HubAuthContext, event: SyncEvent): string {
+  return createHmac('sha256', auth.syncSigningSecret)
+    .update(
+      stableStringify({
+        clientId: auth.clientId,
+        groupKey: auth.groupKey,
+        event: {
+          id: event.id,
+          kind: event.kind,
+          createdAt: event.createdAt ?? null,
+          payload: event.payload
+        },
+        signature: {
+          algorithm: event.signature?.algorithm ?? 'hmac-sha256',
+          keyId: event.signature?.keyId ?? null,
+          signedAt: event.signature?.signedAt ?? null
+        }
+      })
+    )
+    .digest('hex');
+}
+
+function isEqualSignature(expected: string, actual: string): boolean {
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  const actualBuffer = Buffer.from(actual, 'hex');
+
+  return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
+}
+
+function auditSyncSignatureRejection(
+  state: HubState,
+  auth: HubAuthContext,
+  eventId: string,
+  reason: string
+): void {
+  if (!reason.startsWith('event.signature_')) {
+    return;
+  }
+
+  appendHubAuditLog(state, {
+    actor: auth.memberId,
+    action: 'sync.event_signature_rejected',
+    targetType: 'sync_event',
+    targetId: eventId,
+    groupKey: auth.groupKey,
+    payload: {
+      clientId: auth.clientId,
+      reason
+    }
+  });
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value) ?? 'null';
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => (item === undefined ? 'null' : stableStringify(item))).join(',')}]`;
+  }
+
+  const entries = Object.entries(value)
+    .filter(([, entryValue]) => entryValue !== undefined)
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+
+  return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(',')}}`;
 }

@@ -88,13 +88,14 @@
 ## 阶段 5：分布式 Mesh
 
 - [x] group-scoped sync event log 和 cursor 增量拉取基础。
+- [x] signed sync event HMAC 校验和拒绝审计基础。
 - [ ] server-to-server federation。
 - [ ] signed event log。
 - [ ] tombstone sync。
 - [ ] offline-first conflict replay。
 - [ ] org-level knowledge sharing。
 - [ ] federation sync integration test。
-- [ ] signed event verification test。
+- [x] signed event verification test。
 
 ## 阶段验收标准
 

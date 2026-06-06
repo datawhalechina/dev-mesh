@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { JoinRequest, JoinResponse } from '@mcp-dev-mesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
 import { ACCESS_TOKEN_TTL_MS, type HubAuthContext, type HubResult, type HubState } from './hub-model.js';
@@ -54,6 +54,7 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
 
   const clientId = `client_${slugHandle(group.key)}_${handle}_${randomUUID().slice(0, 8)}`;
   const accessToken = `mesh_${randomUUID().replace(/-/g, '')}`;
+  const syncSigningSecret = `sync_${randomBytes(32).toString('base64url')}`;
   const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS).toISOString();
   const joinedAt = new Date().toISOString();
 
@@ -71,6 +72,7 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
     memberId,
     clientId,
     groupKey: group.key,
+    syncSigningSecret,
     expiresAt
   });
   invite.uses += 1;
@@ -90,6 +92,7 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
     clientId,
     groupKey: group.key,
     accessToken,
+    syncSigningSecret,
     expiresAt
   });
 }
@@ -119,6 +122,7 @@ export function authenticateHubToken(state: HubState, token: string | undefined)
   return ok({
     memberId: accessToken.memberId,
     clientId: accessToken.clientId,
-    groupKey: accessToken.groupKey
+    groupKey: accessToken.groupKey,
+    syncSigningSecret: accessToken.syncSigningSecret
   });
 }

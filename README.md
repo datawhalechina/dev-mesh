@@ -343,6 +343,7 @@ mesh_resolve_term
 - `POST /api/v1/join` 需要有效 `inviteToken`，成功后签发 group-scoped Bearer access token。
 - `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
 - sync push/pull 目前使用开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 不会重复追加，pull 只返回当前 group 的增量事件。
+- join 会签发开发期 `syncSigningSecret` 并只保存在本机 `identity.json`；带 `hmac-sha256` 签名的 sync event 会被校验，篡改或无效签名会被拒绝并写入 admin audit。
 - project list 和 project brief 默认只返回当前 token 所属 group 内且 ACL 允许的项目；跨 group 或未授权项目返回 404，避免泄露 project id。
 - 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
 - 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、持久化审计和更完整 ACL。
@@ -410,7 +411,7 @@ pnpm typecheck:examples
 
 ## 开发状态
 
-当前重点已推进到阶段 4 团队化：
+当前重点已推进到阶段 5 分布式 Mesh：
 
 - 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
 - 已完成 Git snapshot provider、filesystem snapshot provider 和 MCP tool call provider，能采集 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数、工具调用成功/失败信号，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
@@ -426,6 +427,7 @@ pnpm typecheck:examples
 - 已完成 quality review dashboard：按 qualityScore、confidence、rating、adoption、stale 和非 active 状态汇总待复审知识。
 - 已完成 task digest：按任务 key 聚合 task knowledge，展示最新状态、owner、标签、历史片段和状态汇总。
 - 已完成 group-scoped sync event log 基础：支持 push/pull cursor、重复 push 幂等和跨 group 隔离。
+- 已完成 signed sync event 校验基础：支持开发期 HMAC 签名验证、篡改事件拒绝和 audit 记录。
 - 下一步推进更完整的分布式同步能力。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。

@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -103,6 +104,7 @@ describe('hub server HTTP integration', () => {
         clientId: expect.stringMatching(/^client_frontend-team_xiaoyun_/),
         groupKey: 'frontend-team',
         accessToken: expect.stringMatching(/^mesh_/),
+        syncSigningSecret: expect.stringMatching(/^sync_/),
         expiresAt: expect.any(String)
       });
       expect(push.body).toMatchObject({
@@ -302,6 +304,108 @@ describe('hub server HTTP integration', () => {
           code: 'sync.client_mismatch'
         }
       });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('verifies signed sync events and audits tampered payloads', async () => {
+    const { app, url } = await startHubServer({
+      core: createDevMeshCore()
+    });
+
+    try {
+      const joined = await joinDefaultGroup(url);
+      const signedEvent = signSyncEvent({
+        clientId: joined.clientId,
+        groupKey: joined.groupKey,
+        secret: joined.syncSigningSecret,
+        signedAt: '2026-06-06T12:00:00.000Z',
+        event: {
+          id: 'evt_signed_1',
+          kind: 'knowledge.created',
+          payload: {
+            title: 'Signed sync event'
+          },
+          createdAt: '2026-06-06T11:59:00.000Z'
+        }
+      });
+      const accepted = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(joined.accessToken),
+        body: {
+          clientId: joined.clientId,
+          events: [signedEvent]
+        }
+      });
+      const tamperedEvent = {
+        ...signSyncEvent({
+          clientId: joined.clientId,
+          groupKey: joined.groupKey,
+          secret: joined.syncSigningSecret,
+          signedAt: '2026-06-06T12:05:00.000Z',
+          event: {
+            id: 'evt_tampered_1',
+            kind: 'knowledge.created',
+            payload: {
+              title: 'Original signed payload'
+            },
+            createdAt: '2026-06-06T12:04:00.000Z'
+          }
+        }),
+        payload: {
+          title: 'Tampered signed payload'
+        }
+      };
+      const rejected = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(joined.accessToken),
+        body: {
+          clientId: joined.clientId,
+          events: [tamperedEvent]
+        }
+      });
+      const pulled = await requestJson(`${url}/api/v1/sync/pull`, {
+        headers: authHeaders(joined.accessToken)
+      });
+      const audit = await requestJson(`${url}/api/v1/admin/audit?action=sync.event_signature_rejected`);
+
+      expect(accepted.body).toMatchObject({
+        accepted: 1,
+        rejected: [],
+        cursor: 'cur_default_1'
+      });
+      expect(rejected.body).toMatchObject({
+        accepted: 0,
+        rejected: [
+          {
+            id: 'evt_tampered_1',
+            reason: 'event.signature_mismatch'
+          }
+        ],
+        cursor: 'cur_default_1'
+      });
+      expect(pulled.body.events).toEqual([
+        expect.objectContaining({
+          id: 'evt_signed_1',
+          signature: expect.objectContaining({
+            algorithm: 'hmac-sha256',
+            value: signedEvent.signature.value,
+            signedAt: '2026-06-06T12:00:00.000Z'
+          })
+        })
+      ]);
+      expect(audit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'sync.event_signature_rejected',
+          targetId: 'evt_tampered_1',
+          groupKey: 'default',
+          payload: expect.objectContaining({
+            clientId: joined.clientId,
+            reason: 'event.signature_mismatch'
+          })
+        })
+      ]);
     } finally {
       await app.close();
     }
@@ -1504,6 +1608,65 @@ function readTextToolResult(result: unknown): string {
   return text;
 }
 
+function signSyncEvent(input: {
+  clientId: string;
+  groupKey: string;
+  secret: string;
+  signedAt?: string;
+  keyId?: string;
+  event: TestSyncEvent;
+}): SignedTestSyncEvent {
+  const signature = {
+    algorithm: 'hmac-sha256' as const,
+    value: '',
+    ...(input.signedAt === undefined ? {} : { signedAt: input.signedAt }),
+    ...(input.keyId === undefined ? {} : { keyId: input.keyId })
+  };
+  const value = createHmac('sha256', input.secret)
+    .update(
+      stableStringify({
+        clientId: input.clientId,
+        groupKey: input.groupKey,
+        event: {
+          id: input.event.id,
+          kind: input.event.kind,
+          createdAt: input.event.createdAt ?? null,
+          payload: input.event.payload
+        },
+        signature: {
+          algorithm: signature.algorithm,
+          keyId: signature.keyId ?? null,
+          signedAt: signature.signedAt ?? null
+        }
+      })
+    )
+    .digest('hex');
+
+  return {
+    ...input.event,
+    signature: {
+      ...signature,
+      value
+    }
+  };
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value) ?? 'null';
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => (item === undefined ? 'null' : stableStringify(item))).join(',')}]`;
+  }
+
+  const entries = Object.entries(value)
+    .filter(([, entryValue]) => entryValue !== undefined)
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+
+  return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(',')}}`;
+}
+
 function authHeaders(accessToken: string): { authorization: string } {
   return {
     authorization: `Bearer ${accessToken}`
@@ -1521,5 +1684,22 @@ interface JoinResponseBody {
   clientId: string;
   groupKey: string;
   accessToken: string;
+  syncSigningSecret: string;
   expiresAt: string;
+}
+
+interface TestSyncEvent {
+  id: string;
+  kind: string;
+  payload: Record<string, unknown>;
+  createdAt?: string;
+}
+
+interface SignedTestSyncEvent extends TestSyncEvent {
+  signature: {
+    algorithm: 'hmac-sha256';
+    value: string;
+    signedAt?: string;
+    keyId?: string;
+  };
 }

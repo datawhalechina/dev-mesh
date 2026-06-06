@@ -47,6 +47,7 @@ describe('joinServerGroup', () => {
           clientId: 'client_frontend-team_xiaoyun_abc123',
           groupKey: 'frontend-team',
           accessToken: 'mesh_secret_token',
+          syncSigningSecret: 'sync_secret_value',
           expiresAt: '2026-06-13T00:00:00.000Z'
         });
       }
@@ -110,6 +111,7 @@ describe('joinServerGroup', () => {
       expect(config).toContain('display_name = "Xiaoyun"');
       expect(config).toContain('handle = "xiaoyun"');
       expect(config).not.toContain('mesh_secret_token');
+      expect(config).not.toContain('sync_secret_value');
       expect(identity.joinedServers).toHaveLength(1);
       expect(identity.joinedServers[0]).toMatchObject({
         serverUrl: 'http://mesh.test',
@@ -117,7 +119,8 @@ describe('joinServerGroup', () => {
         groupKey: 'frontend-team',
         memberId: 'member_frontend-team_xiaoyun',
         clientId: 'client_frontend-team_xiaoyun_abc123',
-        accessToken: 'mesh_secret_token'
+        accessToken: 'mesh_secret_token',
+        syncSigningSecret: 'sync_secret_value'
       });
     } finally {
       await rm(globalRoot, { recursive: true, force: true });

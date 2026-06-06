@@ -17,6 +17,7 @@ export interface JoinedServerRecord {
   joinedAt: string;
   handle?: string;
   accessToken: string;
+  syncSigningSecret?: string;
   expiresAt?: string;
 }
 

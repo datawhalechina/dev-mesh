@@ -36,6 +36,7 @@ export interface JoinResponse {
   clientId: string;
   groupKey: string;
   accessToken: string;
+  syncSigningSecret?: string;
   expiresAt?: string;
 }
 
@@ -107,6 +108,14 @@ export interface SyncEvent {
   kind: string;
   payload: Record<string, unknown>;
   createdAt?: string;
+  signature?: SyncEventSignature;
+}
+
+export interface SyncEventSignature {
+  algorithm: 'hmac-sha256';
+  value: string;
+  signedAt?: string;
+  keyId?: string;
 }
 
 export interface SyncPushRequest {

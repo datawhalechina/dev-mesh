@@ -68,8 +68,9 @@ function createJoinedConfigBlocks(record: JoinedServerRecord): string {
     lines.push(`token_expires_at = "${escapeToml(record.expiresAt)}"`);
   }
 
-  // Keep access tokens out of TOML so config can be inspected or shared without
-  // exposing credentials. identity.json is the temporary local secret holder.
+  // Keep credentials out of TOML so config can be inspected or shared without
+  // exposing tokens or signing secrets. identity.json is the temporary local
+  // secret holder.
   lines.push(
     '',
     '[[groups]]',

@@ -39,6 +39,7 @@ export interface HubAuthContext {
   memberId: string;
   clientId: string;
   groupKey: string;
+  syncSigningSecret: string;
 }
 
 export interface HubError {
