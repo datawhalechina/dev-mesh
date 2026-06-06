@@ -1,4 +1,4 @@
-import type { ProjectAccess, ProjectSummary } from '@mcp-dev-mesh/protocol';
+import type { ProjectAccess, ProjectSummary, SyncEvent } from '@mcp-dev-mesh/protocol';
 
 export const DEFAULT_LOCAL_INVITE_TOKEN = 'devmesh-local-invite';
 export const DEFAULT_GROUP_KEY = 'default';
@@ -109,6 +109,13 @@ export interface HubKnowledgeEdge {
   reason?: string;
 }
 
+export interface HubSyncEvent extends SyncEvent {
+  createdAt: string;
+  clientId: string;
+  groupKey: string;
+  acceptedAt: string;
+}
+
 export interface HubState {
   groups: Map<string, HubGroup>;
   invites: Map<string, HubInvite>;
@@ -116,5 +123,6 @@ export interface HubState {
   tokens: Map<string, HubAccessToken>;
   projects: Map<string, ProjectSummary>;
   knowledgeEdges: HubKnowledgeEdge[];
+  syncEvents: Map<string, HubSyncEvent[]>;
   auditLogs: HubAuditLog[];
 }

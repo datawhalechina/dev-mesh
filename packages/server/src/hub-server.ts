@@ -64,6 +64,7 @@ import {
   type HubState,
   type HubStateOptions
 } from './hub-state.js';
+import { pullHubSyncEvents, pushHubSyncEvents } from './hub-sync.js';
 import { createMeshMcpServer } from './mcp.js';
 
 export interface MeshServerOptions {
@@ -205,22 +206,7 @@ function createHubRouter(
       return;
     }
 
-    const body = readBody<SyncPushRequest>(ctx);
-
-    if (body.clientId !== auth.value.clientId) {
-      sendHubError(ctx, {
-        statusCode: 403,
-        code: 'sync.client_mismatch',
-        message: 'clientId must match the authenticated client.'
-      });
-      return;
-    }
-
-    ctx.body = {
-      accepted: body.events.length,
-      rejected: [],
-      cursor: `cur_${auth.value.groupKey}_${Date.now().toString(36)}`
-    };
+    sendHubResult(ctx, pushHubSyncEvents(hub, auth.value, readBody<SyncPushRequest>(ctx)));
   });
 
   router.get('/api/v1/sync/pull', (ctx) => {
@@ -231,10 +217,7 @@ function createHubRouter(
       return;
     }
 
-    ctx.body = {
-      cursor: readQueryString(ctx, 'cursor') ?? `cur_${auth.value.groupKey}_${Date.now().toString(36)}`,
-      events: []
-    };
+    ctx.body = pullHubSyncEvents(hub, auth.value, readQueryString(ctx, 'cursor'));
   });
 
   router.get('/api/v1/projects', (ctx) => {

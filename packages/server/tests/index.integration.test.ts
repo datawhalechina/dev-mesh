@@ -81,7 +81,10 @@ describe('hub server HTTP integration', () => {
           ]
         }
       });
-      const pull = await requestJson(`${url}/api/v1/sync/pull?cursor=cur_1`, {
+      const pull = await requestJson(`${url}/api/v1/sync/pull`, {
+        headers: authHeaders(join.body.accessToken)
+      });
+      const nextPull = await requestJson(`${url}/api/v1/sync/pull?cursor=${encodeURIComponent(push.body.cursor)}`, {
         headers: authHeaders(join.body.accessToken)
       });
 
@@ -104,11 +107,200 @@ describe('hub server HTTP integration', () => {
       });
       expect(push.body).toMatchObject({
         accepted: 1,
-        rejected: []
+        rejected: [],
+        cursor: 'cur_frontend-team_1'
       });
       expect(pull.body).toMatchObject({
-        cursor: 'cur_1',
+        cursor: 'cur_frontend-team_1',
+        events: [
+          expect.objectContaining({
+            id: 'evt_1',
+            kind: 'knowledge.created',
+            payload: {},
+            createdAt: expect.any(String)
+          })
+        ]
+      });
+      expect(nextPull.body).toMatchObject({
+        cursor: 'cur_frontend-team_1',
         events: []
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('stores group-scoped sync events with incremental cursors and idempotent retries', async () => {
+    const { app, url } = await startHubServer({
+      core: createDevMeshCore(),
+      hub: {
+        groups: [
+          {
+            key: 'frontend-team',
+            displayName: 'Frontend Team'
+          },
+          {
+            key: 'backend-team',
+            displayName: 'Backend Team'
+          }
+        ],
+        invites: [
+          {
+            token: 'inv_frontend',
+            groupKey: 'frontend-team'
+          },
+          {
+            token: 'inv_backend',
+            groupKey: 'backend-team'
+          }
+        ]
+      }
+    });
+
+    try {
+      const frontendJoin = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_frontend',
+          displayName: 'Xiaoyun',
+          handle: 'xiaoyun'
+        }
+      });
+      const backendJoin = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_backend',
+          displayName: 'Ayuan',
+          handle: 'ayuan'
+        }
+      });
+      const firstPush = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(frontendJoin.body.accessToken),
+        body: {
+          clientId: frontendJoin.body.clientId,
+          events: [
+            {
+              id: 'evt_frontend_1',
+              kind: 'knowledge.created',
+              payload: {
+                title: 'Frontend event one'
+              },
+              createdAt: '2026-06-06T00:00:00.000Z'
+            },
+            {
+              id: 'evt_frontend_2',
+              kind: 'knowledge.updated',
+              payload: {
+                title: 'Frontend event two'
+              }
+            },
+            {
+              id: 'evt_invalid_payload',
+              kind: 'knowledge.created',
+              payload: []
+            }
+          ]
+        }
+      });
+      const frontendInitialPull = await requestJson(`${url}/api/v1/sync/pull`, {
+        headers: authHeaders(frontendJoin.body.accessToken)
+      });
+      const backendPull = await requestJson(`${url}/api/v1/sync/pull`, {
+        headers: authHeaders(backendJoin.body.accessToken)
+      });
+      const retryPush = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(frontendJoin.body.accessToken),
+        body: {
+          clientId: frontendJoin.body.clientId,
+          events: [
+            {
+              id: 'evt_frontend_2',
+              kind: 'knowledge.updated',
+              payload: {
+                title: 'Frontend event two retry'
+              }
+            },
+            {
+              id: 'evt_frontend_3',
+              kind: 'knowledge.deleted',
+              payload: {
+                tombstone: true
+              }
+            }
+          ]
+        }
+      });
+      const frontendIncrementalPull = await requestJson(
+        `${url}/api/v1/sync/pull?cursor=${encodeURIComponent(firstPush.body.cursor)}`,
+        {
+          headers: authHeaders(frontendJoin.body.accessToken)
+        }
+      );
+      const rejectedClient = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(frontendJoin.body.accessToken),
+        body: {
+          clientId: backendJoin.body.clientId,
+          events: []
+        }
+      });
+
+      expect(firstPush.body).toMatchObject({
+        accepted: 2,
+        rejected: [
+          {
+            id: 'evt_invalid_payload',
+            reason: 'event.payload_invalid'
+          }
+        ],
+        cursor: 'cur_frontend-team_2'
+      });
+      expect(frontendInitialPull.body.events).toEqual([
+        expect.objectContaining({
+          id: 'evt_frontend_1',
+          kind: 'knowledge.created',
+          payload: {
+            title: 'Frontend event one'
+          },
+          createdAt: '2026-06-06T00:00:00.000Z'
+        }),
+        expect.objectContaining({
+          id: 'evt_frontend_2',
+          kind: 'knowledge.updated',
+          payload: {
+            title: 'Frontend event two'
+          },
+          createdAt: expect.any(String)
+        })
+      ]);
+      expect(backendPull.body).toMatchObject({
+        cursor: 'cur_backend-team_0',
+        events: []
+      });
+      expect(retryPush.body).toMatchObject({
+        accepted: 1,
+        rejected: [],
+        cursor: 'cur_frontend-team_3'
+      });
+      expect(frontendIncrementalPull.body).toMatchObject({
+        cursor: 'cur_frontend-team_3',
+        events: [
+          expect.objectContaining({
+            id: 'evt_frontend_3',
+            kind: 'knowledge.deleted',
+            payload: {
+              tombstone: true
+            }
+          })
+        ]
+      });
+      expect(rejectedClient.status).toBe(403);
+      expect(rejectedClient.body).toMatchObject({
+        error: {
+          code: 'sync.client_mismatch'
+        }
       });
     } finally {
       await app.close();

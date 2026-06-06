@@ -342,6 +342,7 @@ mesh_resolve_term
 - `GET /api/v1/groups` 返回可加入的 group 摘要。
 - `POST /api/v1/join` 需要有效 `inviteToken`，成功后签发 group-scoped Bearer access token。
 - `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
+- sync push/pull 目前使用开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 不会重复追加，pull 只返回当前 group 的增量事件。
 - project list 和 project brief 默认只返回当前 token 所属 group 内且 ACL 允许的项目；跨 group 或未授权项目返回 404，避免泄露 project id。
 - 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
 - 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、持久化审计和更完整 ACL。
@@ -424,6 +425,7 @@ pnpm typecheck:examples
 - 已完成 knowledge edge 管理：支持 supersede / duplicate / contradict edge，supersede 后默认检索仅返回 active 项，可通过 `includeSuperseded=true` 查看旧项。
 - 已完成 quality review dashboard：按 qualityScore、confidence、rating、adoption、stale 和非 active 状态汇总待复审知识。
 - 已完成 task digest：按任务 key 聚合 task knowledge，展示最新状态、owner、标签、历史片段和状态汇总。
+- 已完成 group-scoped sync event log 基础：支持 push/pull cursor、重复 push 幂等和跨 group 隔离。
 - 下一步推进更完整的分布式同步能力。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。

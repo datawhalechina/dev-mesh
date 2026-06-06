@@ -87,6 +87,7 @@
 
 ## 阶段 5：分布式 Mesh
 
+- [x] group-scoped sync event log 和 cursor 增量拉取基础。
 - [ ] server-to-server federation。
 - [ ] signed event log。
 - [ ] tombstone sync。
