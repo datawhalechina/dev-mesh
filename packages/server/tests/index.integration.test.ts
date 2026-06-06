@@ -768,6 +768,123 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('summarizes task progress through admin task digest APIs', async () => {
+    const core = createDevMeshCore();
+    await core.captureKnowledge({
+      type: 'task',
+      layer: 'extract',
+      title: 'Implement task digest',
+      summary: '[todo] Sketch the task digest API.',
+      tags: ['task', 'digest'],
+      para: {
+        category: 'projects',
+        key: 'TASK-123'
+      },
+      createdBy: {
+        displayName: 'Xiaoyun'
+      },
+      createdAt: '2026-06-05T08:00:00.000Z'
+    });
+    const blocked = await core.captureKnowledge({
+      type: 'task',
+      layer: 'extract',
+      title: 'Implement task digest',
+      summary: '[blocked] Waiting for admin API review.',
+      tags: ['task', 'admin'],
+      para: {
+        category: 'projects',
+        key: 'TASK-123'
+      },
+      createdBy: {
+        displayName: 'Ayuan'
+      },
+      createdAt: '2026-06-06T08:00:00.000Z'
+    });
+    await core.captureKnowledge({
+      type: 'task',
+      layer: 'extract',
+      title: 'Ship glossary admin',
+      summary: '[done] Glossary admin is already shipped.',
+      tags: ['task', 'glossary'],
+      para: {
+        category: 'projects',
+        key: 'TASK-456'
+      },
+      createdBy: {
+        displayName: 'Xiaoyun'
+      },
+      createdAt: '2026-06-04T08:00:00.000Z'
+    });
+    await core.captureKnowledge({
+      type: 'task',
+      layer: 'extract',
+      title: 'Review active queue',
+      summary: '[in_progress] Review queue state is being checked.',
+      tags: ['task', 'review'],
+      source: {
+        kind: 'task',
+        metadata: {
+          taskKey: 'TASK-789',
+          status: 'in_progress'
+        }
+      },
+      createdBy: {
+        displayName: 'Ming'
+      },
+      createdAt: '2026-06-06T07:00:00.000Z'
+    });
+    const { app, url } = await startHubServer({ core });
+
+    try {
+      const digest = await requestJson(`${url}/api/v1/admin/task-digest`);
+      const blockedOnly = await requestJson(`${url}/api/v1/admin/task-digest?status=blocked`);
+      const doneIncluded = await requestJson(`${url}/api/v1/admin/task-digest?includeDone=true`);
+      const taskKey = await requestJson(`${url}/api/v1/admin/task-digest?projectKey=TASK-123`);
+
+      expect(digest.body.summary).toMatchObject({
+        totalTasks: 2,
+        blocked: 1,
+        inProgress: 1,
+        done: 0
+      });
+      expect(digest.body.entries[0]).toMatchObject({
+        taskKey: 'TASK-123',
+        title: 'Implement task digest',
+        status: 'blocked',
+        latestSummary: 'Waiting for admin API review.',
+        owners: ['Ayuan', 'Xiaoyun'],
+        tags: ['admin', 'digest', 'task'],
+        itemCount: 2,
+        items: [
+          expect.objectContaining({
+            id: blocked.id
+          }),
+          expect.objectContaining({
+            summary: '[todo] Sketch the task digest API.'
+          })
+        ]
+      });
+      expect(blockedOnly.body.entries).toEqual([
+        expect.objectContaining({
+          taskKey: 'TASK-123',
+          status: 'blocked'
+        })
+      ]);
+      expect(doneIncluded.body.summary).toMatchObject({
+        totalTasks: 3,
+        done: 1
+      });
+      expect(taskKey.body.entries).toEqual([
+        expect.objectContaining({
+          taskKey: 'TASK-123',
+          status: 'blocked'
+        })
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('manages knowledge edges and keeps superseded items out of default search', async () => {
     const core = createDevMeshCore();
     const oldItem = await core.captureKnowledge({

@@ -228,6 +228,28 @@ export async function createAdminQualityReview(
   };
 }
 
+export async function createAdminTaskDigest(
+  core: DevMeshCore,
+  input: AdminTaskDigestQuery = {}
+): Promise<AdminTaskDigestResponse> {
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
+  const items = await core.listKnowledge({
+    types: ['task'],
+    includeSuperseded: input.includeSuperseded ?? true
+  });
+  const entries = [...groupTaskDigestEntries(items, input).values()]
+    .map(createTaskDigestEntry)
+    .filter((entry) => input.projectKey === undefined || entry.taskKey === input.projectKey)
+    .filter((entry) => input.status === undefined || entry.status === input.status)
+    .filter((entry) => input.includeDone || entry.status !== 'done')
+    .sort(compareTaskDigestEntries);
+
+  return {
+    summary: createTaskDigestSummary(entries),
+    entries: entries.slice(0, limit)
+  };
+}
+
 export async function listAdminGlossary(
   core: DevMeshCore,
   input: AdminGlossaryQuery = {}
@@ -821,6 +843,42 @@ export interface AdminQualityReviewItem {
   score: number;
 }
 
+export type AdminTaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done' | 'unknown';
+
+export interface AdminTaskDigestQuery {
+  projectKey?: string;
+  status?: AdminTaskStatus;
+  limit?: number;
+  includeDone?: boolean;
+  includeSuperseded?: boolean;
+}
+
+export interface AdminTaskDigestResponse {
+  summary: AdminTaskDigestSummary;
+  entries: AdminTaskDigestEntry[];
+}
+
+export interface AdminTaskDigestSummary {
+  totalTasks: number;
+  todo: number;
+  inProgress: number;
+  blocked: number;
+  done: number;
+  unknown: number;
+}
+
+export interface AdminTaskDigestEntry {
+  taskKey: string;
+  title: string;
+  status: AdminTaskStatus;
+  latestSummary: string;
+  latestUpdatedAt: string;
+  owners: string[];
+  tags: string[];
+  itemCount: number;
+  items: KnowledgeItem[];
+}
+
 export interface AdminGlossaryQuery {
   query?: string;
   groupKey?: string;
@@ -1005,6 +1063,160 @@ function isKnowledgeStale(item: KnowledgeItem, staleDays: number): boolean {
   const updatedAt = Date.parse(item.updatedAt);
 
   return !Number.isNaN(updatedAt) && Date.now() - updatedAt > staleDays * 24 * 60 * 60 * 1000;
+}
+
+function groupTaskDigestEntries(
+  items: KnowledgeItem[],
+  input: AdminTaskDigestQuery
+): Map<string, TaskDigestWorkingEntry> {
+  const entries = new Map<string, TaskDigestWorkingEntry>();
+
+  for (const item of items) {
+    const taskKey = readTaskKey(item);
+
+    if (input.projectKey !== undefined && taskKey !== input.projectKey) {
+      continue;
+    }
+
+    const existing = entries.get(taskKey);
+
+    if (existing === undefined) {
+      entries.set(taskKey, {
+        taskKey,
+        items: [item]
+      });
+      continue;
+    }
+
+    existing.items.push(item);
+  }
+
+  return entries;
+}
+
+function createTaskDigestEntry(entry: TaskDigestWorkingEntry): AdminTaskDigestEntry {
+  const items = entry.items.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const latest = items[0];
+
+  if (latest === undefined) {
+    throw new Error('Task digest entries require at least one knowledge item.');
+  }
+
+  const status = readTaskStatus(latest);
+
+  return {
+    taskKey: entry.taskKey,
+    title: latest.title,
+    status,
+    latestSummary: stripTaskStatusPrefix(latest.summary),
+    latestUpdatedAt: latest.updatedAt,
+    owners: readTaskOwners(items),
+    tags: readTaskTags(items),
+    itemCount: items.length,
+    items: items.slice(0, 5)
+  };
+}
+
+function createTaskDigestSummary(entries: AdminTaskDigestEntry[]): AdminTaskDigestSummary {
+  return {
+    totalTasks: entries.length,
+    todo: entries.filter((entry) => entry.status === 'todo').length,
+    inProgress: entries.filter((entry) => entry.status === 'in_progress').length,
+    blocked: entries.filter((entry) => entry.status === 'blocked').length,
+    done: entries.filter((entry) => entry.status === 'done').length,
+    unknown: entries.filter((entry) => entry.status === 'unknown').length
+  };
+}
+
+function compareTaskDigestEntries(a: AdminTaskDigestEntry, b: AdminTaskDigestEntry): number {
+  return (
+    taskStatusRank(b.status) - taskStatusRank(a.status) ||
+    b.latestUpdatedAt.localeCompare(a.latestUpdatedAt) ||
+    a.taskKey.localeCompare(b.taskKey)
+  );
+}
+
+function taskStatusRank(status: AdminTaskStatus): number {
+  if (status === 'blocked') {
+    return 5;
+  }
+
+  if (status === 'in_progress') {
+    return 4;
+  }
+
+  if (status === 'todo') {
+    return 3;
+  }
+
+  return status === 'unknown' ? 2 : 1;
+}
+
+function readTaskKey(item: KnowledgeItem): string {
+  const metadataTaskKey = readMetadataStringValue(item, 'taskKey');
+
+  if (metadataTaskKey !== undefined) {
+    return metadataTaskKey;
+  }
+
+  if (item.para.category === 'projects') {
+    return item.para.key;
+  }
+
+  return 'current';
+}
+
+function readTaskStatus(item: KnowledgeItem): AdminTaskStatus {
+  const metadataStatus = readMetadataStringValue(item, 'status') ?? readMetadataStringValue(item, 'taskStatus');
+
+  if (isTaskStatus(metadataStatus)) {
+    return metadataStatus;
+  }
+
+  const match = /^\[([^\]]+)\]\s*/.exec(item.summary.trim());
+  const summaryStatus = match?.[1];
+
+  return isTaskStatus(summaryStatus) ? summaryStatus : 'unknown';
+}
+
+function stripTaskStatusPrefix(summary: string): string {
+  return summary.replace(/^\[[^\]]+\]\s*/, '');
+}
+
+function readTaskOwners(items: KnowledgeItem[]): string[] {
+  return [
+    ...new Set(
+      items
+        .map((item) => item.createdBy.displayName.trim())
+        .filter(Boolean)
+    )
+  ].sort((a, b) => a.localeCompare(b));
+}
+
+function readTaskTags(items: KnowledgeItem[]): string[] {
+  return [
+    ...new Set(
+      items
+        .flatMap((item) => item.tags)
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    )
+  ].sort((a, b) => a.localeCompare(b));
+}
+
+function readMetadataStringValue(item: KnowledgeItem, key: string): string | undefined {
+  const value = item.source.metadata?.[key];
+
+  return typeof value === 'string' ? value : undefined;
+}
+
+function isTaskStatus(value: string | undefined): value is AdminTaskStatus {
+  return value === 'todo' || value === 'in_progress' || value === 'blocked' || value === 'done' || value === 'unknown';
+}
+
+interface TaskDigestWorkingEntry {
+  taskKey: string;
+  items: KnowledgeItem[];
 }
 
 function getInviteStatus(invite: HubInvite): AdminInviteSummary['status'] {

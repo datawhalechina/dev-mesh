@@ -379,6 +379,7 @@ GET  /api/v1/admin/knowledge
 GET  /api/v1/admin/knowledge-edges
 POST /api/v1/admin/knowledge-edges
 GET  /api/v1/admin/quality-review
+GET  /api/v1/admin/task-digest
 GET  /api/v1/admin/review-queue
 GET  /api/v1/admin/audit
 ```
@@ -431,7 +432,7 @@ GET  /api/v1/admin/audit
 - `/api/v1/join` 要求 `inviteToken`，token 绑定一个 group；请求里的 `groupKey` 必须与 invite 绑定的 group 一致。
 - join 成功后返回 group-scoped Bearer token；后续 sync 和 projects API 必须携带 `Authorization: Bearer <token>`。
 - `/api/v1/projects` 和 `/api/v1/projects/:id/brief` 只返回当前 token 所属 group 且 ACL 允许访问的项目；访问其他 group 或未授权项目返回 404，避免泄露 project id。
-- Admin API 支持创建或撤销 invite、禁用 member、创建 group/project、配置 project ACL、管理 canonical glossary term、创建 supersede / duplicate / contradict edge、查询 quality review dashboard，并把这些写操作追加到 audit log；被禁用 member 的既有 Bearer token 会被拒绝。
+- Admin API 支持创建或撤销 invite、禁用 member、创建 group/project、配置 project ACL、管理 canonical glossary term、创建 supersede / duplicate / contradict edge、查询 quality review dashboard 和 task digest，并把这些写操作追加到 audit log；被禁用 member 的既有 Bearer token 会被拒绝。
 - 内存状态只用于当前 skeleton 和集成测试。生产实现应替换为 PostgreSQL-backed repository、短期 invite、token rotation、持久化 audit log 和更完整的 ACL。
 
 #### Server HTTP 框架选择
@@ -2577,7 +2578,7 @@ CI 门禁：
 - glossary 管理（已支持 admin API、web-admin 创建/编辑和 `mesh_resolve_term` 复用）
 - supersede / duplicate / contradict edges（已支持 admin API、web-admin 创建和默认 active 检索测试）
 - quality review dashboard（已支持 admin API、web-admin summary/table 和集成测试）
-- task digest
+- task digest（已支持 admin API、web-admin summary/table 和集成测试）
 - review queue 管理页面
 - ACL/audit/glossary management integration test
 - supersede / duplicate / contradict edge conflict test

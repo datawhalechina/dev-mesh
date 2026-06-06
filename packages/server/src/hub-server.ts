@@ -23,6 +23,7 @@ import {
   createAdminOverview,
   createAdminProject,
   createAdminQualityReview,
+  createAdminTaskDigest,
   disableAdminMember,
   listAdminAuditLogs,
   listAdminGlossary,
@@ -46,7 +47,8 @@ import {
   type AdminMemberDisableInput,
   type AdminProjectAclInput,
   type AdminProjectInput,
-  type AdminQualityReviewQuery
+  type AdminQualityReviewQuery,
+  type AdminTaskDigestQuery
 } from './hub-admin.js';
 import {
   authenticateHubToken,
@@ -438,6 +440,10 @@ function createHubRouter(
     ctx.body = await createAdminQualityReview(core, readAdminQualityReviewQuery(ctx));
   });
 
+  router.get('/api/v1/admin/task-digest', async (ctx) => {
+    ctx.body = await createAdminTaskDigest(core, readAdminTaskDigestQuery(ctx));
+  });
+
   router.get('/api/v1/admin/review-queue', (ctx) => {
     ctx.body = listAdminReviewQueue();
   });
@@ -687,6 +693,37 @@ function readAdminQualityReviewQuery(ctx: Context): AdminQualityReviewQuery {
 
   if (staleDays !== undefined && staleDays > 0) {
     query.staleDays = staleDays;
+  }
+
+  if (Number.isFinite(limit) && limit > 0) {
+    query.limit = Math.min(limit, 100);
+  }
+
+  return query;
+}
+
+function readAdminTaskDigestQuery(ctx: Context): AdminTaskDigestQuery {
+  const query: AdminTaskDigestQuery = {};
+  const projectKey = readQueryString(ctx, 'projectKey');
+  const status = readQueryString(ctx, 'status');
+  const includeDone = readQueryBoolean(ctx, 'includeDone');
+  const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
+  const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  if (projectKey !== undefined) {
+    query.projectKey = projectKey;
+  }
+
+  if (status === 'todo' || status === 'in_progress' || status === 'blocked' || status === 'done' || status === 'unknown') {
+    query.status = status;
+  }
+
+  if (includeDone !== undefined) {
+    query.includeDone = includeDone;
+  }
+
+  if (includeSuperseded !== undefined) {
+    query.includeSuperseded = includeSuperseded;
   }
 
   if (Number.isFinite(limit) && limit > 0) {

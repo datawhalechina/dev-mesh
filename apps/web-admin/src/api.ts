@@ -15,7 +15,9 @@ import type {
   ProjectSummary,
   QualityReviewFilters,
   QualityReviewResponse,
-  ReviewQueueItem
+  ReviewQueueItem,
+  TaskDigestFilters,
+  TaskDigestResponse
 } from './types.js';
 
 export async function fetchAdminOverview(): Promise<AdminOverview> {
@@ -156,6 +158,32 @@ export async function fetchQualityReview(input: QualityReviewFilters = {}): Prom
   const suffix = params.toString() ? `?${params.toString()}` : '';
 
   return requestJson<QualityReviewResponse>(`/api/v1/admin/quality-review${suffix}`);
+}
+
+export async function fetchTaskDigest(input: TaskDigestFilters = {}): Promise<TaskDigestResponse> {
+  const params = new URLSearchParams();
+
+  if (input.projectKey?.trim()) {
+    params.set('projectKey', input.projectKey.trim());
+  }
+
+  if (input.status) {
+    params.set('status', input.status);
+  }
+
+  if (input.includeDone !== undefined) {
+    params.set('includeDone', String(input.includeDone));
+  }
+
+  if (input.includeSuperseded !== undefined) {
+    params.set('includeSuperseded', String(input.includeSuperseded));
+  }
+
+  setNumberParam(params, 'limit', input.limit);
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+
+  return requestJson<TaskDigestResponse>(`/api/v1/admin/task-digest${suffix}`);
 }
 
 export async function fetchGlossary(query = '', groupKey = '', projectKey = ''): Promise<KnowledgeItem[]> {

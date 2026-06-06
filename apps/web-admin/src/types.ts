@@ -54,6 +54,7 @@ export type ProjectAclVisibility = 'group' | 'restricted';
 export type ProjectAclRole = 'owner' | 'maintainer' | 'member' | 'readonly';
 export type KnowledgeStatus = 'active' | 'superseded' | 'tombstone';
 export type KnowledgeEdgeKind = 'supersedes' | 'duplicates' | 'contradicts';
+export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done' | 'unknown';
 
 export interface ProjectAclMember {
   memberId: string;
@@ -97,6 +98,32 @@ export interface QualityReviewItem {
 export interface QualityReviewResponse {
   summary: QualityReviewSummary;
   items: QualityReviewItem[];
+}
+
+export interface TaskDigestSummary {
+  totalTasks: number;
+  todo: number;
+  inProgress: number;
+  blocked: number;
+  done: number;
+  unknown: number;
+}
+
+export interface TaskDigestEntry {
+  taskKey: string;
+  title: string;
+  status: TaskStatus;
+  latestSummary: string;
+  latestUpdatedAt: string;
+  owners: string[];
+  tags: string[];
+  itemCount: number;
+  items: KnowledgeItem[];
+}
+
+export interface TaskDigestResponse {
+  summary: TaskDigestSummary;
+  entries: TaskDigestEntry[];
 }
 
 export interface KnowledgeItem {
@@ -214,4 +241,12 @@ export interface QualityReviewFilters {
   maxRating?: number;
   maxAdoptionScore?: number;
   staleDays?: number;
+}
+
+export interface TaskDigestFilters {
+  projectKey?: string;
+  status?: TaskStatus | '';
+  limit?: number;
+  includeDone?: boolean;
+  includeSuperseded?: boolean;
 }

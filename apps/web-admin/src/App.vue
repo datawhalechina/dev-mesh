@@ -20,6 +20,7 @@ import {
   fetchProjects,
   fetchQualityReview,
   fetchReviewQueue,
+  fetchTaskDigest,
   revokeInvite,
   updateGlossaryItem,
   updateProjectAcl
@@ -43,7 +44,10 @@ import type {
   QualityReviewFilters,
   QualityReviewItem,
   QualityReviewResponse,
-  ReviewQueueItem
+  ReviewQueueItem,
+  TaskDigestFilters,
+  TaskDigestResponse,
+  TaskStatus
 } from './types.js';
 
 const icons = ElementPlusIcons as unknown as Record<string, Component>;
@@ -73,6 +77,7 @@ const knowledge = ref<KnowledgeItem[]>([]);
 const edgeKnowledge = ref<KnowledgeItem[]>([]);
 const knowledgeEdges = ref<KnowledgeEdge[]>([]);
 const qualityReview = ref<QualityReviewResponse | null>(null);
+const taskDigest = ref<TaskDigestResponse | null>(null);
 const reviewQueue = ref<ReviewQueueItem[]>([]);
 const auditLogs = ref<AuditLog[]>([]);
 const knowledgeLayer = ref('');
@@ -82,6 +87,10 @@ const qualityLayer = ref('');
 const qualityMaxScore = ref(0.6);
 const qualityStaleDays = ref(180);
 const qualityIncludeSuperseded = ref(true);
+const taskDigestProjectKey = ref('');
+const taskDigestStatus = ref<TaskStatus | ''>('');
+const taskDigestIncludeDone = ref(false);
+const taskDigestIncludeSuperseded = ref(true);
 const glossaryQuery = ref('');
 const glossaryGroupKey = ref('');
 const glossaryProjectKey = ref('');
@@ -143,6 +152,7 @@ const navItems = [
   { key: 'knowledge', label: 'Knowledge', icon: Document },
   { key: 'quality', label: 'Quality', icon: DataAnalysis },
   { key: 'edges', label: 'Edges', icon: Connection },
+  { key: 'digest', label: 'Task Digest', icon: Memo },
   { key: 'review', label: 'Review Queue', icon: Memo },
   { key: 'audit', label: 'Audit Log', icon: Lock }
 ];
@@ -174,6 +184,21 @@ const qualityStats = computed(() => {
 });
 
 const qualityReviewItems = computed(() => qualityReview.value?.items ?? []);
+
+const taskDigestStats = computed(() => {
+  if (taskDigest.value === null) {
+    return [];
+  }
+
+  return [
+    { label: 'Open Tasks', value: taskDigest.value.summary.totalTasks - taskDigest.value.summary.done, icon: Memo },
+    { label: 'In Progress', value: taskDigest.value.summary.inProgress, icon: DataAnalysis },
+    { label: 'Blocked', value: taskDigest.value.summary.blocked, icon: Lock },
+    { label: 'Done', value: taskDigest.value.summary.done, icon: CircleCheck }
+  ];
+});
+
+const taskDigestEntries = computed(() => taskDigest.value?.entries ?? []);
 
 const projectAclMembers = computed(() => {
   if (selectedAclProject.value === null) {
@@ -212,6 +237,7 @@ async function refreshAll(): Promise<void> {
       edgeKnowledgeData,
       edgeData,
       qualityData,
+      taskDigestData,
       queueData,
       auditData
     ] = await Promise.all([
@@ -225,6 +251,7 @@ async function refreshAll(): Promise<void> {
       fetchKnowledge('', '', true),
       fetchKnowledgeEdges(),
       fetchQualityReview(createQualityReviewFilters()),
+      fetchTaskDigest(createTaskDigestFilters()),
       fetchReviewQueue(),
       fetchAuditLogs()
     ]);
@@ -239,6 +266,7 @@ async function refreshAll(): Promise<void> {
     edgeKnowledge.value = edgeKnowledgeData;
     knowledgeEdges.value = edgeData;
     qualityReview.value = qualityData;
+    taskDigest.value = taskDigestData;
     reviewQueue.value = queueData;
     auditLogs.value = auditData;
   } catch (error) {
@@ -267,6 +295,19 @@ async function reloadQualityReview(): Promise<void> {
 
   try {
     qualityReview.value = await fetchQualityReview(createQualityReviewFilters());
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function reloadTaskDigest(): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    taskDigest.value = await fetchTaskDigest(createTaskDigestFilters());
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -586,6 +627,24 @@ function createQualityReviewFilters(): QualityReviewFilters {
   return filters;
 }
 
+function createTaskDigestFilters(): TaskDigestFilters {
+  const filters: TaskDigestFilters = {
+    includeDone: taskDigestIncludeDone.value,
+    includeSuperseded: taskDigestIncludeSuperseded.value
+  };
+  const projectKey = taskDigestProjectKey.value.trim();
+
+  if (projectKey) {
+    filters.projectKey = projectKey;
+  }
+
+  if (taskDigestStatus.value) {
+    filters.status = taskDigestStatus.value;
+  }
+
+  return filters;
+}
+
 function memberStatusType(status: MemberSummary['status']): 'success' | 'danger' {
   return status === 'active' ? 'success' : 'danger';
 }
@@ -616,6 +675,18 @@ function edgeKindType(kind: KnowledgeEdgeKind): 'success' | 'warning' | 'danger'
   }
 
   return kind === 'contradicts' ? 'danger' : 'success';
+}
+
+function taskStatusType(status: TaskStatus): 'success' | 'info' | 'warning' | 'danger' {
+  if (status === 'done') {
+    return 'success';
+  }
+
+  if (status === 'blocked') {
+    return 'danger';
+  }
+
+  return status === 'in_progress' ? 'warning' : 'info';
 }
 
 function qualityPriorityType(priority: QualityReviewItem['priority']): 'danger' | 'warning' | 'info' {
@@ -1058,6 +1129,55 @@ interface KnowledgeEdgeFormInput {
               <el-table-column prop="groupKey" label="Group" width="150" />
               <el-table-column prop="reason" label="Reason" min-width="220" />
               <el-table-column prop="createdAt" label="Created" width="190" />
+            </el-table>
+          </section>
+
+          <section v-else-if="activeView === 'digest'" class="view">
+            <div class="toolbar">
+              <el-input
+                v-model="taskDigestProjectKey"
+                class="query-input"
+                clearable
+                placeholder="Task key"
+                @keyup.enter="reloadTaskDigest"
+              />
+              <el-select v-model="taskDigestStatus" class="layer-select" placeholder="Status" clearable>
+                <el-option label="todo" value="todo" />
+                <el-option label="in_progress" value="in_progress" />
+                <el-option label="blocked" value="blocked" />
+                <el-option label="done" value="done" />
+                <el-option label="unknown" value="unknown" />
+              </el-select>
+              <el-switch v-model="taskDigestIncludeDone" active-text="Include Done" />
+              <el-switch v-model="taskDigestIncludeSuperseded" active-text="Include Superseded" />
+              <el-button @click="reloadTaskDigest">Apply</el-button>
+            </div>
+            <div class="stats-grid">
+              <div v-for="stat in taskDigestStats" :key="stat.label" class="stat-panel">
+                <el-icon><component :is="stat.icon" /></el-icon>
+                <span>{{ stat.label }}</span>
+                <strong>{{ stat.value }}</strong>
+              </div>
+            </div>
+            <el-table :data="taskDigestEntries" empty-text="No task digest entries">
+              <el-table-column prop="taskKey" label="Task" min-width="160" />
+              <el-table-column prop="title" label="Title" min-width="230" />
+              <el-table-column label="Status" width="130">
+                <template #default="{ row }">
+                  <el-tag :type="taskStatusType(row.status)">{{ row.status }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="latestSummary" label="Latest Summary" min-width="320" />
+              <el-table-column label="Owners" min-width="180">
+                <template #default="{ row }">{{ row.owners.join(', ') }}</template>
+              </el-table-column>
+              <el-table-column label="Tags" min-width="180">
+                <template #default="{ row }">
+                  <el-tag v-for="tag in row.tags" :key="tag" class="reason-tag" type="info">{{ tag }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="itemCount" label="Items" width="90" />
+              <el-table-column prop="latestUpdatedAt" label="Updated" width="190" />
             </el-table>
           </section>
 

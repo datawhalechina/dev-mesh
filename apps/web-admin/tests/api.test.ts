@@ -10,6 +10,7 @@ import {
   fetchKnowledge,
   fetchKnowledgeEdges,
   fetchQualityReview,
+  fetchTaskDigest,
   revokeInvite,
   updateGlossaryItem,
   updateProjectAcl
@@ -190,6 +191,37 @@ describe('web-admin API client', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/admin/quality-review?layer=canonical&includeSuperseded=true&maxQualityScore=0.55&staleDays=90&limit=25',
+      expect.any(Object)
+    );
+  });
+
+  it('builds task digest filters', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        summary: {
+          totalTasks: 1,
+          todo: 0,
+          inProgress: 0,
+          blocked: 1,
+          done: 0,
+          unknown: 0
+        },
+        entries: []
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchTaskDigest({
+      projectKey: 'TASK-123',
+      status: 'blocked',
+      includeDone: true,
+      includeSuperseded: false,
+      limit: 20
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/admin/task-digest?projectKey=TASK-123&status=blocked&includeDone=true&includeSuperseded=false&limit=20',
       expect.any(Object)
     );
   });

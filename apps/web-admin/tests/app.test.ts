@@ -15,6 +15,7 @@ describe('web-admin app structure', () => {
     expect(source).toContain("key: 'knowledge'");
     expect(source).toContain("key: 'quality'");
     expect(source).toContain("key: 'edges'");
+    expect(source).toContain("key: 'digest'");
     expect(source).toContain("key: 'review'");
     expect(source).toContain("key: 'audit'");
     expect(source).toContain('submitGroup');
@@ -29,6 +30,8 @@ describe('web-admin app structure', () => {
     expect(source).toContain('Include Superseded');
     expect(source).toContain('reloadQualityReview');
     expect(source).toContain('qualityStats');
+    expect(source).toContain('reloadTaskDigest');
+    expect(source).toContain('taskDigestStats');
     expect(source).toContain('disableMemberRow');
     expect(source).toContain('revokeInviteRow');
   });

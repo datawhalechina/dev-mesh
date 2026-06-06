@@ -80,7 +80,7 @@
 - [x] glossary 管理。
 - [x] supersede / duplicate / contradict edge。
 - [x] quality review dashboard。
-- [ ] task digest。
+- [x] task digest。
 - [x] 管理后台 API integration test、前端 API 单元测试和页面结构 smoke test。
 - [x] glossary management integration test。
 - [x] conflict edge 检索和默认 active 项测试。
