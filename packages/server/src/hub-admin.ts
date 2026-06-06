@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type {
+  CaptureKnowledgeInput,
   DevMeshCore,
   KnowledgeFilter,
   KnowledgeItem,
@@ -8,6 +9,7 @@ import type {
 } from '@mcp-dev-mesh/core';
 import type { ProjectAclMember, ProjectAclRole, ProjectAclVisibility, ProjectSummary } from '@mcp-dev-mesh/protocol';
 import {
+  DEFAULT_GROUP_KEY,
   type HubGroup,
   type HubInvite,
   type HubResult,
@@ -68,6 +70,16 @@ export interface AdminInviteInput {
 
 export interface AdminMemberDisableInput {
   reason?: string;
+}
+
+export interface AdminGlossaryInput {
+  term?: string;
+  definition?: string;
+  content?: string;
+  groupKey?: string;
+  projectKey?: string;
+  aliases?: string[];
+  tags?: string[];
 }
 
 export async function createAdminOverview(
@@ -157,6 +169,26 @@ export async function listAdminKnowledge(
   const items = await core.listKnowledge(filter);
 
   return items.slice(0, limit);
+}
+
+export async function listAdminGlossary(
+  core: DevMeshCore,
+  input: AdminGlossaryQuery = {}
+): Promise<KnowledgeItem[]> {
+  const limit = input.limit ?? 50;
+  const items = input.query?.trim()
+    ? await core.searchKnowledge({
+        query: input.query,
+        layers: ['canonical'],
+        types: ['glossary'],
+        limit
+      })
+    : await core.listKnowledge({
+        layers: ['canonical'],
+        types: ['glossary']
+      });
+
+  return items.filter((item) => matchesGlossaryQuery(item, input)).slice(0, limit);
 }
 
 export function createAdminGroup(state: HubState, input: AdminGroupInput): HubResult<HubGroup> {
@@ -294,6 +326,137 @@ export function updateAdminProjectAcl(
   });
 
   return ok(withNormalizedAccess(project));
+}
+
+export async function createAdminGlossary(
+  state: HubState,
+  core: DevMeshCore,
+  input: AdminGlossaryInput
+): Promise<HubResult<KnowledgeItem>> {
+  const term = input.term?.trim();
+  const definition = input.definition?.trim();
+
+  if (!term) {
+    return hubError(400, 'admin.glossary_term_required', 'Glossary term is required.');
+  }
+
+  if (!definition) {
+    return hubError(400, 'admin.glossary_definition_required', 'Glossary definition is required.');
+  }
+
+  const groupKey = resolveGlossaryGroupKey(state, input.groupKey);
+
+  if (!groupKey.ok) {
+    return groupKey;
+  }
+
+  const projectKey = normalizeOptionalString(input.projectKey);
+  const capture: CaptureKnowledgeInput = {
+    type: 'glossary',
+    layer: 'canonical',
+    title: term,
+    summary: definition,
+    content: input.content?.trim() || definition,
+    entryKey: createGlossaryEntryKey(term, projectKey),
+    para: {
+      category: 'resources',
+      key: projectKey === undefined ? 'glossary' : `glossary/${projectKey}`
+    },
+    tags: normalizeGlossaryTags(input.tags),
+    source: {
+      kind: 'admin',
+      metadata: createGlossaryMetadata(groupKey.value, projectKey, input.aliases)
+    },
+    createdBy: {
+      displayName: 'admin'
+    },
+    visibility: 'team',
+    confidence: 0.85
+  };
+  const item = await core.captureKnowledge(capture);
+
+  appendHubAuditLog(state, {
+    actor: 'admin',
+    action: 'glossary.created',
+    targetType: 'knowledge',
+    targetId: item.id,
+    groupKey: groupKey.value,
+    payload: {
+      term,
+      projectKey
+    }
+  });
+
+  return ok(item);
+}
+
+export async function updateAdminGlossary(
+  state: HubState,
+  core: DevMeshCore,
+  id: string,
+  input: AdminGlossaryInput
+): Promise<HubResult<KnowledgeItem>> {
+  const existing = await core.getKnowledge(id);
+
+  if (existing === undefined || existing.type !== 'glossary') {
+    return hubError(404, 'admin.glossary_not_found', 'Glossary item was not found.');
+  }
+
+  const term = input.term?.trim() || existing.title;
+  const definition = input.definition?.trim() || existing.summary;
+  const groupKey = resolveGlossaryGroupKey(state, input.groupKey ?? readGlossaryMetadata(existing, 'groupKey'));
+
+  if (!groupKey.ok) {
+    return groupKey;
+  }
+
+  const projectKey =
+    input.projectKey === undefined ? readGlossaryMetadata(existing, 'projectKey') : normalizeOptionalString(input.projectKey);
+  const updated: KnowledgeItem = {
+    ...existing,
+    title: term,
+    summary: definition,
+    entryKey: createGlossaryEntryKey(term, projectKey),
+    para: {
+      category: 'resources',
+      key: projectKey === undefined ? 'glossary' : `glossary/${projectKey}`
+    },
+    tags: input.tags === undefined ? existing.tags : normalizeGlossaryTags(input.tags),
+    source: {
+      ...existing.source,
+      kind: existing.source.kind || 'admin',
+      metadata: {
+        ...(existing.source.metadata ?? {}),
+        ...createGlossaryMetadata(groupKey.value, projectKey, input.aliases ?? readGlossaryAliases(existing))
+      }
+    },
+    updatedAt: new Date().toISOString()
+  };
+
+  if (input.content !== undefined) {
+    const content = input.content.trim();
+
+    if (content) {
+      updated.content = content;
+    } else {
+      delete updated.content;
+    }
+  }
+
+  await core.repository.upsert(updated);
+  appendHubAuditLog(state, {
+    actor: 'admin',
+    action: 'glossary.updated',
+    targetType: 'knowledge',
+    targetId: updated.id,
+    groupKey: groupKey.value,
+    payload: {
+      term,
+      projectKey
+    }
+  });
+
+  return ok(updated);
 }
 
 export function createAdminInvite(state: HubState, input: AdminInviteInput): HubResult<AdminInviteSummary> {
@@ -467,6 +630,13 @@ export interface AdminKnowledgeQuery {
   limit?: number;
 }
 
+export interface AdminGlossaryQuery {
+  query?: string;
+  groupKey?: string;
+  projectKey?: string;
+  limit?: number;
+}
+
 export interface AdminAuditLog {
   id: string;
   actor: string;
@@ -567,4 +737,80 @@ function normalizeAclMembers(
 
 function isProjectAclRole(value: string): value is ProjectAclRole {
   return value === 'owner' || value === 'maintainer' || value === 'member' || value === 'readonly';
+}
+
+function resolveGlossaryGroupKey(state: HubState, input: string | undefined): HubResult<string> {
+  const fallbackGroup = state.groups.has(DEFAULT_GROUP_KEY) ? DEFAULT_GROUP_KEY : state.groups.keys().next().value;
+  const groupKey = input?.trim() || fallbackGroup;
+
+  if (groupKey === undefined || !state.groups.has(groupKey)) {
+    return hubError(404, 'admin.group_not_found', 'The target group does not exist.');
+  }
+
+  return ok(groupKey);
+}
+
+function normalizeOptionalString(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+
+  return normalized ? normalized : undefined;
+}
+
+function normalizeGlossaryTags(tags: string[] | undefined): string[] {
+  return [...new Set(['glossary', ...(tags ?? []).map((tag) => tag.trim()).filter(Boolean)])];
+}
+
+function createGlossaryEntryKey(term: string, projectKey: string | undefined): string {
+  const scope = slugHandle(projectKey ?? 'team') || 'team';
+  const slug = slugHandle(term) || 'term';
+
+  return `resources/glossary/${scope}/${slug}`;
+}
+
+function createGlossaryMetadata(
+  groupKey: string,
+  projectKey: string | undefined,
+  aliases: string[] | undefined
+): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {
+    groupKey
+  };
+  const normalizedAliases = aliases?.map((alias) => alias.trim()).filter(Boolean);
+
+  if (projectKey !== undefined) {
+    metadata.projectKey = projectKey;
+  }
+
+  if (normalizedAliases !== undefined) {
+    metadata.aliases = [...new Set(normalizedAliases)];
+  }
+
+  return metadata;
+}
+
+function matchesGlossaryQuery(item: KnowledgeItem, input: AdminGlossaryQuery): boolean {
+  const groupKey = readGlossaryMetadata(item, 'groupKey');
+  const projectKey = readGlossaryMetadata(item, 'projectKey');
+
+  if (input.groupKey !== undefined && groupKey !== input.groupKey) {
+    return false;
+  }
+
+  if (input.projectKey !== undefined && projectKey !== input.projectKey) {
+    return false;
+  }
+
+  return true;
+}
+
+function readGlossaryMetadata(item: KnowledgeItem, key: string): string | undefined {
+  const value = item.source.metadata?.[key];
+
+  return typeof value === 'string' ? value : undefined;
+}
+
+function readGlossaryAliases(item: KnowledgeItem): string[] | undefined {
+  const aliases = item.source.metadata?.aliases;
+
+  return Array.isArray(aliases) ? aliases.filter((alias): alias is string => typeof alias === 'string') : undefined;
 }

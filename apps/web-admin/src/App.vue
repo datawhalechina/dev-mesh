@@ -3,12 +3,14 @@ import * as ElementPlusIcons from '@element-plus/icons-vue';
 import type { Component } from 'vue';
 import { computed, onMounted, reactive, ref } from 'vue';
 import {
+  createGlossaryItem,
   createInvite,
   createGroup,
   createProject,
   disableMember,
   fetchAdminOverview,
   fetchAuditLogs,
+  fetchGlossary,
   fetchGroups,
   fetchInvites,
   fetchKnowledge,
@@ -16,11 +18,13 @@ import {
   fetchProjects,
   fetchReviewQueue,
   revokeInvite,
+  updateGlossaryItem,
   updateProjectAcl
 } from './api.js';
 import type {
   AdminOverview,
   AuditLog,
+  GlossaryInput,
   GroupInput,
   GroupSummary,
   InviteInput,
@@ -55,16 +59,22 @@ const groups = ref<GroupSummary[]>([]);
 const members = ref<MemberSummary[]>([]);
 const invites = ref<InviteSummary[]>([]);
 const projects = ref<ProjectSummary[]>([]);
+const glossary = ref<KnowledgeItem[]>([]);
 const knowledge = ref<KnowledgeItem[]>([]);
 const reviewQueue = ref<ReviewQueueItem[]>([]);
 const auditLogs = ref<AuditLog[]>([]);
 const knowledgeLayer = ref('');
 const knowledgeQuery = ref('');
+const glossaryQuery = ref('');
+const glossaryGroupKey = ref('');
+const glossaryProjectKey = ref('');
 const groupDialogOpen = ref(false);
 const inviteDialogOpen = ref(false);
 const projectDialogOpen = ref(false);
 const projectAclDialogOpen = ref(false);
+const glossaryDialogOpen = ref(false);
 const selectedAclProject = ref<ProjectSummary | null>(null);
+const editingGlossaryId = ref<string | null>(null);
 const groupForm = reactive<GroupInput>({
   key: '',
   displayName: '',
@@ -88,6 +98,15 @@ const projectAclForm = reactive<ProjectAclFormInput>({
   memberIds: [],
   role: 'member'
 });
+const glossaryForm = reactive<GlossaryFormInput>({
+  groupKey: '',
+  projectKey: '',
+  term: '',
+  definition: '',
+  content: '',
+  aliases: '',
+  tags: ''
+});
 
 const navItems = [
   { key: 'overview', label: 'Overview', icon: DataAnalysis },
@@ -95,6 +114,7 @@ const navItems = [
   { key: 'members', label: 'Members', icon: User },
   { key: 'invites', label: 'Invites', icon: Lock },
   { key: 'projects', label: 'Projects', icon: Folder },
+  { key: 'glossary', label: 'Glossary', icon: Memo },
   { key: 'knowledge', label: 'Knowledge', icon: Document },
   { key: 'review', label: 'Review Queue', icon: Memo },
   { key: 'audit', label: 'Audit Log', icon: Lock }
@@ -130,22 +150,25 @@ async function refreshAll(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    const [overviewData, groupData, memberData, inviteData, projectData, knowledgeData, queueData, auditData] = await Promise.all([
-      fetchAdminOverview(),
-      fetchGroups(),
-      fetchMembers(),
-      fetchInvites(),
-      fetchProjects(),
-      fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value),
-      fetchReviewQueue(),
-      fetchAuditLogs()
-    ]);
+    const [overviewData, groupData, memberData, inviteData, projectData, glossaryData, knowledgeData, queueData, auditData] =
+      await Promise.all([
+        fetchAdminOverview(),
+        fetchGroups(),
+        fetchMembers(),
+        fetchInvites(),
+        fetchProjects(),
+        fetchGlossary(glossaryQuery.value, glossaryGroupKey.value, glossaryProjectKey.value),
+        fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value),
+        fetchReviewQueue(),
+        fetchAuditLogs()
+      ]);
 
     overview.value = overviewData;
     groups.value = groupData;
     members.value = memberData;
     invites.value = inviteData;
     projects.value = projectData;
+    glossary.value = glossaryData;
     knowledge.value = knowledgeData;
     reviewQueue.value = queueData;
     auditLogs.value = auditData;
@@ -162,6 +185,19 @@ async function reloadKnowledge(): Promise<void> {
 
   try {
     knowledge.value = await fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function reloadGlossary(): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    glossary.value = await fetchGlossary(glossaryQuery.value, glossaryGroupKey.value, glossaryProjectKey.value);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -326,6 +362,80 @@ async function submitProjectAcl(): Promise<void> {
   }
 }
 
+function openGlossaryDialog(row?: KnowledgeItem): void {
+  editingGlossaryId.value = row?.id ?? null;
+  Object.assign(glossaryForm, {
+    groupKey: readMetadataString(row, 'groupKey') ?? groups.value[0]?.key ?? '',
+    projectKey: readMetadataString(row, 'projectKey') ?? '',
+    term: row?.title ?? '',
+    definition: row?.summary ?? '',
+    content: row?.content ?? '',
+    aliases: glossaryAliases(row).join(', '),
+    tags: row?.tags.filter((tag) => tag !== 'glossary').join(', ') ?? ''
+  });
+  glossaryDialogOpen.value = true;
+}
+
+async function submitGlossary(): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    const payload: GlossaryInput = {
+      term: glossaryForm.term,
+      definition: glossaryForm.definition
+    };
+    const groupKey = glossaryForm.groupKey.trim();
+    const projectKey = glossaryForm.projectKey.trim();
+    const content = glossaryForm.content.trim();
+    const aliases = parseList(glossaryForm.aliases);
+    const tags = parseList(glossaryForm.tags);
+
+    if (groupKey) {
+      payload.groupKey = groupKey;
+    }
+
+    if (projectKey) {
+      payload.projectKey = projectKey;
+    }
+
+    if (content) {
+      payload.content = content;
+    }
+
+    if (aliases.length) {
+      payload.aliases = aliases;
+    }
+
+    if (tags.length) {
+      payload.tags = tags;
+    }
+
+    if (editingGlossaryId.value === null) {
+      await createGlossaryItem(payload);
+    } else {
+      await updateGlossaryItem(editingGlossaryId.value, payload);
+    }
+
+    glossaryDialogOpen.value = false;
+    editingGlossaryId.value = null;
+    Object.assign(glossaryForm, {
+      groupKey: '',
+      projectKey: '',
+      term: '',
+      definition: '',
+      content: '',
+      aliases: '',
+      tags: ''
+    });
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
 function memberStatusType(status: MemberSummary['status']): 'success' | 'danger' {
   return status === 'active' ? 'success' : 'danger';
 }
@@ -360,6 +470,37 @@ function memberLabel(memberId: string): string {
   return member === undefined ? memberId : `${member.displayName} (${member.handle})`;
 }
 
+function glossaryScope(row: KnowledgeItem): string {
+  return readMetadataString(row, 'projectKey') ?? row.para.key;
+}
+
+function glossaryAliases(row: KnowledgeItem | undefined): string[] {
+  const aliases = row?.source.metadata?.aliases;
+
+  return Array.isArray(aliases) ? aliases.filter((alias): alias is string => typeof alias === 'string') : [];
+}
+
+function glossaryTags(row: KnowledgeItem): string {
+  return row.tags.filter((tag) => tag !== 'glossary').join(', ');
+}
+
+function readMetadataString(row: KnowledgeItem | undefined, key: string): string | undefined {
+  const value = row?.source.metadata?.[key];
+
+  return typeof value === 'string' ? value : undefined;
+}
+
+function parseList(value: string): string[] {
+  return [
+    ...new Set(
+      value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  ];
+}
+
 interface InviteFormInput {
   groupKey: string;
   token: string;
@@ -371,6 +512,16 @@ interface ProjectAclFormInput {
   visibility: 'group' | 'restricted';
   memberIds: string[];
   role: ProjectAclRole;
+}
+
+interface GlossaryFormInput {
+  groupKey: string;
+  projectKey: string;
+  term: string;
+  definition: string;
+  content: string;
+  aliases: string;
+  tags: string;
 }
 </script>
 
@@ -540,6 +691,49 @@ interface ProjectAclFormInput {
             </el-table>
           </section>
 
+          <section v-else-if="activeView === 'glossary'" class="view">
+            <div class="toolbar">
+              <el-button :icon="Plus" type="primary" @click="openGlossaryDialog()">New Term</el-button>
+              <el-select v-model="glossaryGroupKey" class="layer-select" placeholder="Group" clearable @change="reloadGlossary">
+                <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+              </el-select>
+              <el-input
+                v-model="glossaryProjectKey"
+                class="query-input"
+                clearable
+                placeholder="Project key"
+                @keyup.enter="reloadGlossary"
+              />
+              <el-input
+                v-model="glossaryQuery"
+                :prefix-icon="Search"
+                class="query-input"
+                clearable
+                placeholder="Search terms"
+                @keyup.enter="reloadGlossary"
+              />
+              <el-button @click="reloadGlossary">Apply</el-button>
+            </div>
+            <el-table :data="glossary" empty-text="No glossary terms">
+              <el-table-column prop="title" label="Term" min-width="180" />
+              <el-table-column prop="summary" label="Definition" min-width="320" />
+              <el-table-column label="Scope" min-width="160">
+                <template #default="{ row }">{{ glossaryScope(row) }}</template>
+              </el-table-column>
+              <el-table-column label="Aliases" min-width="180">
+                <template #default="{ row }">{{ glossaryAliases(row).join(', ') }}</template>
+              </el-table-column>
+              <el-table-column label="Tags" min-width="160">
+                <template #default="{ row }">{{ glossaryTags(row) }}</template>
+              </el-table-column>
+              <el-table-column label="Actions" width="100" fixed="right">
+                <template #default="{ row }">
+                  <el-button size="small" @click="openGlossaryDialog(row)">Edit</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </section>
+
           <section v-else-if="activeView === 'knowledge'" class="view">
             <div class="toolbar">
               <el-select v-model="knowledgeLayer" class="layer-select" placeholder="Layer" clearable @change="reloadKnowledge">
@@ -670,6 +864,38 @@ interface ProjectAclFormInput {
       <template #footer>
         <el-button @click="projectDialogOpen = false">Cancel</el-button>
         <el-button type="primary" @click="submitProject">Create</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="glossaryDialogOpen" title="Glossary Term" width="560px">
+      <el-form label-position="top">
+        <el-form-item label="Group">
+          <el-select v-model="glossaryForm.groupKey" filterable>
+            <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Project Key">
+          <el-input v-model="glossaryForm.projectKey" />
+        </el-form-item>
+        <el-form-item label="Term">
+          <el-input v-model="glossaryForm.term" />
+        </el-form-item>
+        <el-form-item label="Definition">
+          <el-input v-model="glossaryForm.definition" type="textarea" />
+        </el-form-item>
+        <el-form-item label="Content">
+          <el-input v-model="glossaryForm.content" type="textarea" />
+        </el-form-item>
+        <el-form-item label="Aliases">
+          <el-input v-model="glossaryForm.aliases" />
+        </el-form-item>
+        <el-form-item label="Tags">
+          <el-input v-model="glossaryForm.tags" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="glossaryDialogOpen = false">Cancel</el-button>
+        <el-button type="primary" @click="submitGlossary">Save</el-button>
       </template>
     </el-dialog>
 

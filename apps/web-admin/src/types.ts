@@ -69,14 +69,21 @@ export interface KnowledgeItem {
   type: string;
   title: string;
   summary: string;
+  content?: string;
   para: {
     category: string;
     key: string;
+  };
+  tags: string[];
+  source: {
+    kind: string;
+    metadata?: Record<string, unknown>;
   };
   createdBy: {
     displayName: string;
     handle?: string;
   };
+  createdAt: string;
   updatedAt: string;
   quality: {
     qualityScore: number;
@@ -141,4 +148,14 @@ export interface InviteInput {
 export interface ProjectAclInput {
   visibility: ProjectAclVisibility;
   members: ProjectAclMember[];
+}
+
+export interface GlossaryInput {
+  term: string;
+  definition: string;
+  content?: string;
+  groupKey?: string;
+  projectKey?: string;
+  aliases?: string[];
+  tags?: string[];
 }

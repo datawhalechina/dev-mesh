@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  createGlossaryItem,
   createGroup,
   createInvite,
   disableMember,
   fetchAdminOverview,
+  fetchGlossary,
   fetchKnowledge,
   revokeInvite,
+  updateGlossaryItem,
   updateProjectAcl
 } from '../src/api.js';
 
@@ -187,6 +190,68 @@ describe('web-admin API client', () => {
               role: 'maintainer'
             }
           ]
+        })
+      })
+    );
+  });
+
+  it('manages glossary terms through the admin API', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        id: 'can_mesh_client',
+        title: 'Mesh Client',
+        summary: 'Local proxy and capture runtime.'
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchGlossary('mesh client', 'default', 'frontend-dashboard');
+    await createGlossaryItem({
+      groupKey: 'default',
+      projectKey: 'frontend-dashboard',
+      term: 'Mesh Client',
+      definition: 'Local proxy and capture runtime.',
+      aliases: ['local proxy'],
+      tags: ['client']
+    });
+    await updateGlossaryItem('can_mesh_client', {
+      groupKey: 'default',
+      projectKey: 'frontend-dashboard',
+      term: 'Mesh Client',
+      definition: 'Local MCP proxy and capture runtime.'
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/admin/glossary?query=mesh+client&groupKey=default&projectKey=frontend-dashboard',
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/admin/glossary',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          groupKey: 'default',
+          projectKey: 'frontend-dashboard',
+          term: 'Mesh Client',
+          definition: 'Local proxy and capture runtime.',
+          aliases: ['local proxy'],
+          tags: ['client']
+        })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/admin/glossary/can_mesh_client',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({
+          groupKey: 'default',
+          projectKey: 'frontend-dashboard',
+          term: 'Mesh Client',
+          definition: 'Local MCP proxy and capture runtime.'
         })
       })
     );

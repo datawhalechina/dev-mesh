@@ -565,6 +565,90 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('manages project glossary items through admin APIs', async () => {
+    const { app, url } = await startHubServer({
+      core: createDevMeshCore()
+    });
+
+    try {
+      const created = await requestJson(`${url}/api/v1/admin/glossary`, {
+        method: 'POST',
+        body: {
+          groupKey: 'default',
+          projectKey: 'frontend-dashboard',
+          term: 'Mesh Client',
+          definition: 'The local proxy and capture runtime that runs on a developer machine.',
+          aliases: ['local proxy'],
+          tags: ['client']
+        }
+      });
+      const listed = await requestJson(`${url}/api/v1/admin/glossary?projectKey=frontend-dashboard`);
+      const updated = await requestJson(`${url}/api/v1/admin/glossary/${created.body.id}`, {
+        method: 'PUT',
+        body: {
+          groupKey: 'default',
+          projectKey: 'frontend-dashboard',
+          term: 'Mesh Client',
+          definition: 'The local MCP proxy, capture runtime, and sync client on a developer machine.',
+          aliases: ['local proxy', 'sync client']
+        }
+      });
+      const searched = await requestJson(`${url}/api/v1/admin/glossary?query=sync%20client`);
+      const audit = await requestJson(`${url}/api/v1/admin/audit?action=glossary.updated`);
+
+      expect(created.status).toBe(200);
+      expect(created.body).toMatchObject({
+        type: 'glossary',
+        layer: 'canonical',
+        title: 'Mesh Client',
+        summary: 'The local proxy and capture runtime that runs on a developer machine.',
+        para: {
+          category: 'resources',
+          key: 'glossary/frontend-dashboard'
+        },
+        tags: expect.arrayContaining(['glossary', 'client']),
+        source: {
+          kind: 'admin',
+          metadata: {
+            groupKey: 'default',
+            projectKey: 'frontend-dashboard',
+            aliases: ['local proxy']
+          }
+        }
+      });
+      expect(listed.body.items).toEqual([
+        expect.objectContaining({
+          id: created.body.id,
+          title: 'Mesh Client'
+        })
+      ]);
+      expect(updated.body).toMatchObject({
+        id: created.body.id,
+        summary: 'The local MCP proxy, capture runtime, and sync client on a developer machine.',
+        source: {
+          metadata: {
+            aliases: ['local proxy', 'sync client']
+          }
+        }
+      });
+      expect(searched.body.items).toEqual([
+        expect.objectContaining({
+          id: created.body.id,
+          summary: expect.stringContaining('sync client')
+        })
+      ]);
+      expect(audit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'glossary.updated',
+          targetId: created.body.id,
+          groupKey: 'default'
+        })
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('returns a project brief from canonical knowledge', async () => {
     const core = createDevMeshCore();
     await core.captureKnowledge({

@@ -17,19 +17,24 @@ import {
 } from '@mcp-dev-mesh/protocol';
 import {
   createAdminGroup,
+  createAdminGlossary,
   createAdminInvite,
   createAdminOverview,
   createAdminProject,
   disableAdminMember,
   listAdminAuditLogs,
+  listAdminGlossary,
   listAdminInvites,
   listAdminKnowledge,
   listAdminMembers,
   listAdminProjects,
   listAdminReviewQueue,
   revokeAdminInvite,
+  updateAdminGlossary,
   updateAdminProjectAcl,
   type AdminAuditQuery,
+  type AdminGlossaryInput,
+  type AdminGlossaryQuery,
   type AdminGroupInput,
   type AdminInviteInput,
   type AdminKnowledgeQuery,
@@ -382,6 +387,31 @@ function createHubRouter(
     sendHubResult(ctx, updateAdminProjectAcl(hub, groupKey, projectId, readBody<AdminProjectAclInput>(ctx)));
   });
 
+  router.get('/api/v1/admin/glossary', async (ctx) => {
+    ctx.body = {
+      items: await listAdminGlossary(core, readAdminGlossaryQuery(ctx))
+    };
+  });
+
+  router.post('/api/v1/admin/glossary', async (ctx) => {
+    sendHubResult(ctx, await createAdminGlossary(hub, core, readBody<AdminGlossaryInput>(ctx)));
+  });
+
+  router.put('/api/v1/admin/glossary/:id', async (ctx) => {
+    const id = ctx.params.id;
+
+    if (id === undefined) {
+      sendHubError(ctx, {
+        statusCode: 400,
+        code: 'admin.glossary_id_required',
+        message: 'Glossary id is required.'
+      });
+      return;
+    }
+
+    sendHubResult(ctx, await updateAdminGlossary(hub, core, id, readBody<AdminGlossaryInput>(ctx)));
+  });
+
   router.get('/api/v1/admin/knowledge', async (ctx) => {
     ctx.body = {
       items: await listAdminKnowledge(core, readAdminKnowledgeQuery(ctx))
@@ -566,6 +596,32 @@ function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
 
   if (layer === 'raw' || layer === 'extract' || layer === 'canonical') {
     query.layer = layer;
+  }
+
+  if (Number.isFinite(limit) && limit > 0) {
+    query.limit = Math.min(limit, 100);
+  }
+
+  return query;
+}
+
+function readAdminGlossaryQuery(ctx: Context): AdminGlossaryQuery {
+  const query: AdminGlossaryQuery = {};
+  const search = readQueryString(ctx, 'query');
+  const groupKey = readQueryString(ctx, 'groupKey');
+  const projectKey = readQueryString(ctx, 'projectKey');
+  const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  if (search !== undefined) {
+    query.query = search;
+  }
+
+  if (groupKey !== undefined) {
+    query.groupKey = groupKey;
+  }
+
+  if (projectKey !== undefined) {
+    query.projectKey = projectKey;
   }
 
   if (Number.isFinite(limit) && limit > 0) {

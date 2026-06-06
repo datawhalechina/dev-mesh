@@ -1,6 +1,7 @@
 import type {
   AdminOverview,
   AuditLog,
+  GlossaryInput,
   GroupInput,
   GroupSummary,
   InviteInput,
@@ -100,6 +101,41 @@ export async function fetchKnowledge(layer = '', query = ''): Promise<KnowledgeI
   const response = await requestJson<{ items: KnowledgeItem[] }>(`/api/v1/admin/knowledge${suffix}`);
 
   return response.items;
+}
+
+export async function fetchGlossary(query = '', groupKey = '', projectKey = ''): Promise<KnowledgeItem[]> {
+  const params = new URLSearchParams();
+
+  if (query.trim()) {
+    params.set('query', query.trim());
+  }
+
+  if (groupKey) {
+    params.set('groupKey', groupKey);
+  }
+
+  if (projectKey.trim()) {
+    params.set('projectKey', projectKey.trim());
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const response = await requestJson<{ items: KnowledgeItem[] }>(`/api/v1/admin/glossary${suffix}`);
+
+  return response.items;
+}
+
+export async function createGlossaryItem(input: GlossaryInput): Promise<KnowledgeItem> {
+  return requestJson<KnowledgeItem>('/api/v1/admin/glossary', {
+    method: 'POST',
+    body: input
+  });
+}
+
+export async function updateGlossaryItem(id: string, input: GlossaryInput): Promise<KnowledgeItem> {
+  return requestJson<KnowledgeItem>(`/api/v1/admin/glossary/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: input
+  });
 }
 
 export async function fetchReviewQueue(): Promise<ReviewQueueItem[]> {

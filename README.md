@@ -310,6 +310,9 @@ DELETE /api/v1/admin/invites/:token
 GET  /api/v1/admin/projects
 POST /api/v1/admin/projects
 PUT  /api/v1/admin/projects/:groupKey/:id/acl
+GET  /api/v1/admin/glossary
+POST /api/v1/admin/glossary
+PUT  /api/v1/admin/glossary/:id
 GET  /api/v1/admin/knowledge
 GET  /api/v1/admin/review-queue
 GET  /api/v1/admin/audit
@@ -338,7 +341,7 @@ mesh_resolve_term
 - project list 和 project brief 默认只返回当前 token 所属 group 内且 ACL 允许的项目；跨 group 或未授权项目返回 404，避免泄露 project id。
 - 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
 - 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、持久化审计和更完整 ACL。
-- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、knowledge、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、配置 project ACL。
+- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、glossary、knowledge、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、配置 project ACL、创建和编辑 glossary term。
 
 ## 测试策略
 
@@ -413,7 +416,8 @@ pnpm typecheck:examples
 - 已完成 member-specific experience search 和内置 hybrid search backend，支持 keyword、deterministic embedding mock、recency、quality 和 adoption ranking。
 - 已完成 web-admin 的 member 禁用、invite 创建/撤销，以及 Hub admin audit log 写入和查询。
 - 已完成 project ACL 管理：支持 group/restricted visibility、成员角色配置、项目列表和 brief ACL 过滤。
-- 下一步推进 glossary 管理、quality review、conflict edge 和更完整的分布式同步能力。
+- 已完成 glossary 管理：支持 admin API 和 web-admin 创建、查询、编辑 canonical glossary term，并复用 `mesh_resolve_term` 检索。
+- 下一步推进 quality review、conflict edge 和更完整的分布式同步能力。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。
 

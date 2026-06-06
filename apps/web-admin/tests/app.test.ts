@@ -11,6 +11,7 @@ describe('web-admin app structure', () => {
     expect(source).toContain("key: 'members'");
     expect(source).toContain("key: 'invites'");
     expect(source).toContain("key: 'projects'");
+    expect(source).toContain("key: 'glossary'");
     expect(source).toContain("key: 'knowledge'");
     expect(source).toContain("key: 'review'");
     expect(source).toContain("key: 'audit'");
@@ -19,6 +20,8 @@ describe('web-admin app structure', () => {
     expect(source).toContain('submitProject');
     expect(source).toContain('openProjectAcl');
     expect(source).toContain('submitProjectAcl');
+    expect(source).toContain('openGlossaryDialog');
+    expect(source).toContain('submitGlossary');
     expect(source).toContain('disableMemberRow');
     expect(source).toContain('revokeInviteRow');
   });
