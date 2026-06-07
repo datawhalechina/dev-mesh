@@ -7,7 +7,6 @@ export default defineConfig({
   cleanUrls: true,
   head: [
     ['link', { rel: 'icon', href: '/img/logo.svg', type: 'image/svg+xml' }],
-    ['meta', { property: 'og:image', content: '/img/context-mesh-hero.png' }],
   ],
   themeConfig: {
     logo: '/img/logo.svg',

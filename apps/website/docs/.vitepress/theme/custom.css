@@ -16,13 +16,12 @@
 }
 
 .mesh-hero {
-  min-height: min(72vh, 720px);
+  min-height: min(58vh, 560px);
   display: flex;
   align-items: center;
-  background:
-    linear-gradient(90deg, rgba(9, 19, 16, 0.9), rgba(9, 19, 16, 0.6) 48%, rgba(9, 19, 16, 0.22)),
-    url('/img/context-mesh-hero.png') center / cover no-repeat;
-  color: #fff8ea;
+  border-bottom: 1px solid #e4ded2;
+  background: #fffaf1;
+  color: #18221c;
 }
 
 .mesh-hero__inner,
@@ -45,19 +44,19 @@
 }
 
 .mesh-hero h1 {
-  max-width: 760px;
+  max-width: 820px;
   margin: 0;
-  color: #fff8ea;
-  font-size: 6.4rem;
-  line-height: 0.96;
+  color: #18221c;
+  font-size: 5.4rem;
+  line-height: 1;
   letter-spacing: 0;
 }
 
 .mesh-hero__lead {
-  max-width: 680px;
+  max-width: 720px;
   margin: 24px 0 0;
-  color: #f7efe2;
-  font-size: 1.35rem;
+  color: #435149;
+  font-size: 1.25rem;
   line-height: 1.65;
 }
 
@@ -91,14 +90,14 @@
 }
 
 .mesh-button--secondary {
-  border-color: #fff8ea;
-  background: #fff8ea;
+  border-color: #c9d3ca;
+  background: #ffffff;
   color: #18221c;
 }
 
 .mesh-button--secondary:hover {
-  border-color: #f0dcc0;
-  background: #f0dcc0;
+  border-color: #b6c2b8;
+  background: #f3f7f0;
   color: #18221c;
 }
 
@@ -208,8 +207,7 @@
 
 @media (max-width: 880px) {
   .mesh-hero {
-    min-height: 680px;
-    background-position: 62% center;
+    min-height: 560px;
   }
 
   .mesh-hero__inner {
@@ -217,7 +215,7 @@
   }
 
   .mesh-hero h1 {
-    font-size: 4.2rem;
+    font-size: 4rem;
   }
 
   .mesh-hero__lead {
@@ -236,7 +234,7 @@
 
 @media (max-width: 520px) {
   .mesh-hero {
-    min-height: 620px;
+    min-height: 520px;
   }
 
   .mesh-hero h1 {
