@@ -1,6 +1,8 @@
 ---
 layout: page
 title: MCP Dev Mesh
+sidebar: false
+aside: false
 ---
 
 <main class="mesh-home">
