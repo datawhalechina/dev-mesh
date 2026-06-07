@@ -50,7 +50,8 @@ describe('hub federation sync', () => {
           kind: 'knowledge.deleted',
           payload: {
             knowledgeId: 'kn_frontend_1',
-            tombstone: true
+            tombstone: true,
+            reason: 'Removed stale frontend guidance'
           },
           createdAt: '2026-06-07T01:01:00.000Z'
         }
@@ -155,7 +156,8 @@ describe('hub federation sync', () => {
         kind: 'knowledge.deleted',
         payload: {
           knowledgeId: 'kn_frontend_1',
-          tombstone: true
+          tombstone: true,
+          reason: 'Removed stale frontend guidance'
         }
       }),
       expect.objectContaining({
@@ -189,6 +191,18 @@ describe('hub federation sync', () => {
             previousCursor: 'cur_frontend-team_2',
             pulled: 1,
             accepted: 1
+          })
+        }),
+        expect.objectContaining({
+          action: 'sync.tombstone_accepted',
+          actor: 'peer_server_a',
+          targetType: 'knowledge',
+          targetId: 'kn_frontend_1',
+          groupKey: 'frontend-team',
+          payload: expect.objectContaining({
+            eventId: 'evt_frontend_tombstone',
+            clientId: frontendAuth.clientId,
+            reason: 'Removed stale frontend guidance'
           })
         })
       ])

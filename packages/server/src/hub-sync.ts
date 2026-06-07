@@ -13,6 +13,7 @@ export interface HubSyncEventMergeInput {
   groupKey: string;
   events: HubSyncEvent[];
   acceptedAt?: string;
+  actor?: string;
 }
 
 export interface HubSyncEventMergeResult {
@@ -61,9 +62,15 @@ export function pushHubSyncEvents(
       continue;
     }
 
-    groupEvents.push(createHubSyncEvent(auth, event));
+    const hubEvent = createHubSyncEvent(auth, event);
+    groupEvents.push(hubEvent);
     existingIds.add(event.id);
     accepted += 1;
+    auditSyncTombstoneAccepted(state, {
+      actor: auth.memberId,
+      groupKey: auth.groupKey,
+      event: hubEvent
+    });
   }
 
   return ok({
@@ -127,6 +134,11 @@ export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeIn
     groupEvents.push(merged);
     existingIds.add(merged.id);
     accepted += 1;
+    auditSyncTombstoneAccepted(state, {
+      actor: input.actor ?? merged.clientId,
+      groupKey: input.groupKey,
+      event: merged
+    });
   }
 
   return {
@@ -177,6 +189,15 @@ function normalizeSyncEvent(
         id: event.id,
         reason: 'event.payload_invalid'
       }
+    };
+  }
+
+  const payloadRejection = validateSyncEventPayload(event.id, event.kind, event.payload);
+
+  if (payloadRejection !== undefined) {
+    return {
+      ok: false,
+      rejected: payloadRejection
     };
   }
 
@@ -341,6 +362,74 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function validateSyncEventPayload(
+  eventId: string,
+  kind: string,
+  payload: Record<string, unknown>
+): SyncPushResponse['rejected'][number] | undefined {
+  if (kind !== 'knowledge.deleted') {
+    return undefined;
+  }
+
+  if (typeof payload.knowledgeId !== 'string' || !payload.knowledgeId.trim()) {
+    return {
+      id: eventId,
+      reason: 'event.tombstone_knowledge_id_required'
+    };
+  }
+
+  if (payload.tombstone !== true) {
+    return {
+      id: eventId,
+      reason: 'event.tombstone_flag_required'
+    };
+  }
+
+  if (payload.reason !== undefined && typeof payload.reason !== 'string') {
+    return {
+      id: eventId,
+      reason: 'event.tombstone_reason_invalid'
+    };
+  }
+
+  if (payload.deletedAt !== undefined && typeof payload.deletedAt !== 'string') {
+    return {
+      id: eventId,
+      reason: 'event.tombstone_deleted_at_invalid'
+    };
+  }
+
+  return undefined;
+}
+
+function readKnowledgeTombstonePayload(
+  event: HubSyncEvent
+): { knowledgeId: string; reason?: string; deletedAt?: string } | undefined {
+  if (event.kind !== 'knowledge.deleted') {
+    return undefined;
+  }
+
+  const knowledgeId = event.payload.knowledgeId;
+
+  if (typeof knowledgeId !== 'string' || !knowledgeId.trim() || event.payload.tombstone !== true) {
+    return undefined;
+  }
+
+  const tombstone: { knowledgeId: string; reason?: string; deletedAt?: string } = {
+    knowledgeId
+  };
+
+  if (typeof event.payload.reason === 'string') {
+    tombstone.reason = event.payload.reason;
+  }
+
+  if (typeof event.payload.deletedAt === 'string') {
+    tombstone.deletedAt = event.payload.deletedAt;
+  }
+
+  return tombstone;
+}
+
 function createSyncEventSignature(auth: HubAuthContext, event: SyncEvent): string {
   return createHmac('sha256', auth.syncSigningSecret)
     .update(
@@ -390,6 +479,43 @@ function auditSyncSignatureRejection(
       clientId: auth.clientId,
       reason
     }
+  });
+}
+
+function auditSyncTombstoneAccepted(
+  state: HubState,
+  input: {
+    actor: string;
+    groupKey: string;
+    event: HubSyncEvent;
+  }
+): void {
+  const tombstone = readKnowledgeTombstonePayload(input.event);
+
+  if (tombstone === undefined) {
+    return;
+  }
+
+  const payload: Record<string, unknown> = {
+    eventId: input.event.id,
+    clientId: input.event.clientId
+  };
+
+  if (tombstone.reason !== undefined) {
+    payload.reason = tombstone.reason;
+  }
+
+  if (tombstone.deletedAt !== undefined) {
+    payload.deletedAt = tombstone.deletedAt;
+  }
+
+  appendHubAuditLog(state, {
+    actor: input.actor,
+    action: 'sync.tombstone_accepted',
+    targetType: 'knowledge',
+    targetId: tombstone.knowledgeId,
+    groupKey: input.groupKey,
+    payload
   });
 }
 

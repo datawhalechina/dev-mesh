@@ -55,7 +55,8 @@ export function federateHubSyncEvents(
   const page = pullHubSyncEventLog(source, groupKey, previousCursor, limit.value);
   const merge = mergeHubSyncEventLog(target, {
     groupKey,
-    events: page.events
+    events: page.events,
+    actor: peerId
   });
   const response: HubFederationSyncResponse = {
     peerId,

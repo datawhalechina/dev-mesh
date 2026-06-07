@@ -228,6 +228,25 @@ describe('hub server HTTP integration', () => {
               id: 'evt_frontend_3',
               kind: 'knowledge.deleted',
               payload: {
+                knowledgeId: 'kn_frontend_3',
+                tombstone: true,
+                reason: 'Superseded by canonical context',
+                deletedAt: '2026-06-06T01:00:00.000Z'
+              }
+            }
+          ]
+        }
+      });
+      const invalidTombstonePush = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(frontendJoin.body.accessToken),
+        body: {
+          clientId: frontendJoin.body.clientId,
+          events: [
+            {
+              id: 'evt_invalid_tombstone',
+              kind: 'knowledge.deleted',
+              payload: {
                 tombstone: true
               }
             }
@@ -240,6 +259,7 @@ describe('hub server HTTP integration', () => {
           headers: authHeaders(frontendJoin.body.accessToken)
         }
       );
+      const tombstoneAudit = await requestJson(`${url}/api/v1/admin/audit?action=sync.tombstone_accepted`);
       const rejectedClient = await requestJson(`${url}/api/v1/sync/push`, {
         method: 'POST',
         headers: authHeaders(frontendJoin.body.accessToken),
@@ -286,6 +306,16 @@ describe('hub server HTTP integration', () => {
         rejected: [],
         cursor: 'cur_frontend-team_3'
       });
+      expect(invalidTombstonePush.body).toMatchObject({
+        accepted: 0,
+        rejected: [
+          {
+            id: 'evt_invalid_tombstone',
+            reason: 'event.tombstone_knowledge_id_required'
+          }
+        ],
+        cursor: 'cur_frontend-team_3'
+      });
       expect(frontendIncrementalPull.body).toMatchObject({
         cursor: 'cur_frontend-team_3',
         events: [
@@ -293,11 +323,28 @@ describe('hub server HTTP integration', () => {
             id: 'evt_frontend_3',
             kind: 'knowledge.deleted',
             payload: {
-              tombstone: true
+              knowledgeId: 'kn_frontend_3',
+              tombstone: true,
+              reason: 'Superseded by canonical context',
+              deletedAt: '2026-06-06T01:00:00.000Z'
             }
           })
         ]
       });
+      expect(tombstoneAudit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'sync.tombstone_accepted',
+          targetType: 'knowledge',
+          targetId: 'kn_frontend_3',
+          groupKey: 'frontend-team',
+          payload: expect.objectContaining({
+            eventId: 'evt_frontend_3',
+            clientId: frontendJoin.body.clientId,
+            reason: 'Superseded by canonical context',
+            deletedAt: '2026-06-06T01:00:00.000Z'
+          })
+        })
+      ]);
       expect(rejectedClient.status).toBe(403);
       expect(rejectedClient.body).toMatchObject({
         error: {
