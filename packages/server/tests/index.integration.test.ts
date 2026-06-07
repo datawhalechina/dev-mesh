@@ -7,8 +7,13 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createDevMeshCore, type DevMeshCore } from '@mcp-dev-mesh/core';
 import { JsonlKnowledgeRepository } from '@mcp-dev-mesh/local-store';
-import { DEFAULT_LOCAL_INVITE_TOKEN } from '../src/hub-state.js';
-import { createHubServer, type KoaHubServer, type MeshServerOptions } from '../src/index.js';
+import { createHubState, DEFAULT_LOCAL_INVITE_TOKEN } from '../src/hub-state.js';
+import {
+  createHubServer,
+  federateHubSyncEventsFromHttpPeer,
+  type KoaHubServer,
+  type MeshServerOptions
+} from '../src/index.js';
 
 describe('hub server HTTP integration', () => {
   it('serves health and well-known metadata with Koa', async () => {
@@ -454,6 +459,154 @@ describe('hub server HTTP integration', () => {
           })
         })
       ]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('federates sync events from an HTTP peer event log', async () => {
+    const { app, url } = await startHubServer({
+      core: createDevMeshCore()
+    });
+    const target = createHubState();
+
+    try {
+      const joined = await joinDefaultGroup(url);
+      const push = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(joined.accessToken),
+        body: {
+          clientId: joined.clientId,
+          events: [
+            {
+              id: 'evt_http_federation_1',
+              kind: 'knowledge.created',
+              payload: {
+                title: 'HTTP federation event one'
+              },
+              createdAt: '2026-06-07T04:00:00.000Z'
+            },
+            {
+              id: 'evt_http_federation_2',
+              kind: 'knowledge.updated',
+              payload: {
+                title: 'HTTP federation event two'
+              },
+              createdAt: '2026-06-07T04:01:00.000Z'
+            }
+          ]
+        }
+      });
+      const forbidden = await requestJson(`${url}/api/v1/federation/sync-events?groupKey=other-team`, {
+        headers: authHeaders(joined.accessToken)
+      });
+      const firstSync = await federateHubSyncEventsFromHttpPeer(target, {
+        peerId: 'peer_http_source',
+        peerBaseUrl: url,
+        accessToken: joined.accessToken,
+        groupKey: joined.groupKey,
+        limit: 1
+      });
+      const secondSync = await federateHubSyncEventsFromHttpPeer(target, {
+        peerId: 'peer_http_source',
+        peerBaseUrl: url,
+        accessToken: joined.accessToken,
+        groupKey: joined.groupKey
+      });
+      const emptySync = await federateHubSyncEventsFromHttpPeer(target, {
+        peerId: 'peer_http_source',
+        peerBaseUrl: url,
+        accessToken: joined.accessToken,
+        groupKey: joined.groupKey
+      });
+      const targetEvents = target.syncEvents.get(joined.groupKey) ?? [];
+
+      expect(push.body).toMatchObject({
+        accepted: 2,
+        rejected: [],
+        cursor: 'cur_default_2'
+      });
+      expect(forbidden.status).toBe(403);
+      expect(forbidden.body).toMatchObject({
+        error: {
+          code: 'federation.group_mismatch'
+        }
+      });
+      expect(firstSync).toMatchObject({
+        ok: true,
+        value: {
+          peerId: 'peer_http_source',
+          groupKey: joined.groupKey,
+          cursor: 'cur_default_1',
+          pulled: 1,
+          accepted: 1,
+          skipped: 0
+        }
+      });
+      expect(secondSync).toMatchObject({
+        ok: true,
+        value: {
+          previousCursor: 'cur_default_1',
+          cursor: 'cur_default_2',
+          pulled: 1,
+          accepted: 1,
+          skipped: 0
+        }
+      });
+      expect(emptySync).toMatchObject({
+        ok: true,
+        value: {
+          previousCursor: 'cur_default_2',
+          cursor: 'cur_default_2',
+          pulled: 0,
+          accepted: 0,
+          skipped: 0
+        }
+      });
+      expect(targetEvents).toEqual([
+        expect.objectContaining({
+          id: 'evt_http_federation_1',
+          clientId: joined.clientId,
+          groupKey: joined.groupKey,
+          log: expect.objectContaining({
+            sequence: 1,
+            hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+          })
+        }),
+        expect.objectContaining({
+          id: 'evt_http_federation_2',
+          clientId: joined.clientId,
+          groupKey: joined.groupKey,
+          log: expect.objectContaining({
+            sequence: 2,
+            previousHash: targetEvents[0]?.log?.hash,
+            hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+          })
+        })
+      ]);
+      expect(target.auditLogs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: 'federation.synced',
+            actor: 'peer_http_source',
+            groupKey: joined.groupKey,
+            payload: expect.objectContaining({
+              pulled: 1,
+              accepted: 1
+            })
+          }),
+          expect.objectContaining({
+            action: 'federation.synced',
+            actor: 'peer_http_source',
+            groupKey: joined.groupKey,
+            payload: expect.objectContaining({
+              previousCursor: 'cur_default_1',
+              pulled: 1,
+              accepted: 1
+            })
+          })
+        ])
+      );
     } finally {
       await app.close();
     }

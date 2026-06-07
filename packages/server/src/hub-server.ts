@@ -64,7 +64,7 @@ import {
   type HubState,
   type HubStateOptions
 } from './hub-state.js';
-import { pullHubSyncEvents, pushHubSyncEvents, replayHubSyncTombstones } from './hub-sync.js';
+import { pullHubSyncEventLog, pullHubSyncEvents, pushHubSyncEvents, replayHubSyncTombstones } from './hub-sync.js';
 import { createMeshMcpServer } from './mcp.js';
 
 export interface MeshServerOptions {
@@ -227,6 +227,33 @@ function createHubRouter(
     }
 
     ctx.body = pullHubSyncEvents(hub, auth.value, readQueryString(ctx, 'cursor'));
+  });
+
+  router.get('/api/v1/federation/sync-events', (ctx) => {
+    const auth = requireHubAuth(hub, ctx.headers);
+
+    if (!auth.ok) {
+      sendHubError(ctx, auth.error);
+      return;
+    }
+
+    const groupKey = readQueryString(ctx, 'groupKey') ?? auth.value.groupKey;
+
+    if (groupKey !== auth.value.groupKey) {
+      sendHubError(ctx, {
+        statusCode: 403,
+        code: 'federation.group_mismatch',
+        message: 'Federation sync-events can only read the authenticated group.'
+      });
+      return;
+    }
+
+    ctx.body = pullHubSyncEventLog(
+      hub,
+      groupKey,
+      readQueryString(ctx, 'cursor'),
+      readFederationEventLogLimit(ctx)
+    );
   });
 
   router.get('/api/v1/projects', (ctx) => {
@@ -620,6 +647,12 @@ function readQueryNumber(ctx: Context, key: string): number | undefined {
   const value = Number.parseFloat(readQueryString(ctx, key) ?? '');
 
   return Number.isFinite(value) ? value : undefined;
+}
+
+function readFederationEventLogLimit(ctx: Context): number | undefined {
+  const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  return Number.isFinite(limit) && limit > 0 ? Math.min(limit, 1000) : undefined;
 }
 
 function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {

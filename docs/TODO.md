@@ -92,7 +92,7 @@
 - [x] 库级 server-to-server federation 增量复制和 cursor 基础。
 - [x] tombstone sync 事件校验和审计基础。
 - [x] signed event log 链式摘要 metadata 基础。
-- [ ] server-to-server federation。
+- [x] server-to-server federation。
 - [x] signed event log。
 - [x] tombstone sync。
 - [ ] offline-first conflict replay。
