@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -69,6 +69,75 @@ describe('mesh-server e2e smoke', () => {
       });
     } finally {
       await stopProcess(server);
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it('loads deployment settings from an env file', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-env-e2e-'));
+    const port = await getFreePort();
+    const envFile = join(projectRoot, 'mesh-server.env');
+    const hubStatePath = join(projectRoot, 'hub-state.json');
+    const baseUrl = `http://127.0.0.1:${port}`;
+    await writeFile(
+      envFile,
+      [
+        'DEV_MESH_HOST=127.0.0.1',
+        `DEV_MESH_PORT=${port}`,
+        `DEV_MESH_BASE_URL=${baseUrl}`,
+        `DEV_MESH_PROJECT_ROOT=${projectRoot}`,
+        `DEV_MESH_HUB_STATE_PATH=${hubStatePath}`
+      ].join('\n'),
+      'utf8'
+    );
+    let joined: JoinResponseBody | undefined;
+
+    try {
+      const first = await startMeshServerProcess(['--env-file', envFile]);
+
+      try {
+        joined = await requestJson<JoinResponseBody>(`${baseUrl}/api/v1/join`, {
+          method: 'POST',
+          body: {
+            inviteToken: 'devmesh-local-invite',
+            displayName: 'Env Deploy',
+            handle: 'env-deploy'
+          }
+        });
+        await requestJson(`${baseUrl}/api/v1/projects`, {
+          method: 'POST',
+          headers: authHeaders(joined.body.accessToken),
+          body: {
+            id: 'env-file-project',
+            name: 'Env File Project'
+          }
+        });
+      } finally {
+        await stopProcess(first);
+      }
+
+      if (joined === undefined) {
+        throw new Error('Expected env-file join to complete before restart.');
+      }
+
+      const second = await startMeshServerProcess(['--env-file', envFile]);
+
+      try {
+        const projects = await requestJson(`${baseUrl}/api/v1/projects`, {
+          headers: authHeaders(joined.body.accessToken)
+        });
+
+        expect(projects.status).toBe(200);
+        expect(projects.body.projects).toEqual([
+          expect.objectContaining({
+            id: 'env-file-project',
+            createdByMemberId: joined.body.memberId
+          })
+        ]);
+      } finally {
+        await stopProcess(second);
+      }
+    } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
   }, 30000);
@@ -180,23 +249,39 @@ function readSseJson(text: string): JsonRpcResponse {
 }
 
 async function startMeshServer(projectRoot: string, port: number): Promise<MeshServerProcess> {
+  return startMeshServerProcess(['--host', '127.0.0.1', '--port', String(port), '--project-root', projectRoot]);
+}
+
+async function startMeshServerProcess(args: string[]): Promise<MeshServerProcess> {
   const tsxCli = join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
   const entry = join(repoRoot, 'apps', 'mesh-server', 'src', 'index.ts');
   const child = spawn(
     process.execPath,
-    [tsxCli, entry, '--host', '127.0.0.1', '--port', String(port), '--project-root', projectRoot],
+    [tsxCli, entry, ...args],
     {
       cwd: repoRoot,
-      env: {
-        ...process.env,
-        CI: '1'
-      },
+      env: createChildEnv(),
       stdio: ['ignore', 'pipe', 'pipe']
     }
   );
 
   await waitForServer(child);
   return child;
+}
+
+function createChildEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    CI: '1'
+  };
+
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('DEV_MESH_')) {
+      delete env[key];
+    }
+  }
+
+  return env;
 }
 
 function waitForServer(child: MeshServerProcess): Promise<void> {
@@ -266,6 +351,33 @@ function getFreePort(): Promise<number> {
   });
 }
 
+async function requestJson<T = any>(url: string, init: RequestJsonInit = {}): Promise<{ status: number; body: T }> {
+  const headers = new Headers(init.headers);
+  const request: RequestInit = {
+    ...init,
+    headers
+  };
+
+  if (init.body !== undefined) {
+    headers.set('content-type', 'application/json');
+    request.body = JSON.stringify(init.body);
+  }
+
+  const response = await fetch(url, request);
+  const text = await response.text();
+
+  return {
+    status: response.status,
+    body: text ? (JSON.parse(text) as T) : ({} as T)
+  };
+}
+
+function authHeaders(accessToken: string): { authorization: string } {
+  return {
+    authorization: `Bearer ${accessToken}`
+  };
+}
+
 interface McpPostResult {
   status: number;
   sessionId?: string;
@@ -277,4 +389,17 @@ interface JsonRpcResponse {
   id?: number;
   result?: any;
   error?: unknown;
+}
+
+interface JoinResponseBody {
+  memberId: string;
+  clientId: string;
+  groupKey: string;
+  accessToken: string;
+  syncSigningSecret: string;
+  expiresAt: string;
+}
+
+interface RequestJsonInit extends Omit<RequestInit, 'body'> {
+  body?: unknown;
 }

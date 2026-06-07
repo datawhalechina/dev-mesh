@@ -437,6 +437,7 @@ GET  /api/v1/admin/audit
 - Admin API 支持创建或撤销 invite、禁用 member、按 member 轮换 access token、创建 group/project、配置 project ACL、管理 canonical glossary term、创建 supersede / duplicate / contradict edge、查询 quality review dashboard 和 task digest，并把这些写操作追加到 audit log；admin 创建 invite 未显式提供 `expiresAt` 时默认 24 小时后过期，显式 `expiresAt` / `maxUses` 仍会写入 audit；被禁用 member 的既有 Bearer token 会被拒绝。
 - `MeshServerOptions.hubStatePath` 可把开发期 HubState 持久化到 JSON 文件；`MeshServerOptions.hubStateStore` 可接入自定义持久化 store。`packages/storage` 提供 `migratePostgresHubStateStore` 和 `createPostgresHubStateStore`，使用 PostgreSQL JSONB snapshot 跨重启恢复 groups、invites、members、tokens、projects、sync cursor 和 audit log。
 - 内存 / JSON file 状态适合开发和 smoke test；PostgreSQL Hub state store 适合生产化部署边界，后续可继续演进为更细粒度的 normalized repository。
+- `apps/mesh-server` 启动入口支持 CLI 参数、进程环境变量和 `--env-file`。CLI 参数优先于 `DEV_MESH_*` 环境变量，环境变量优先于 env file；配置 `DEV_MESH_POSTGRES_URL` 时会自动迁移 PostgreSQL knowledge repository，并在未配置 `DEV_MESH_HUB_STATE_PATH` 时接入 PostgreSQL Hub state store。
 
 #### Server HTTP 框架选择
 

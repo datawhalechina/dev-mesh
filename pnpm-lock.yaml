@@ -65,9 +65,19 @@ importers:
       '@mcp-dev-mesh/server':
         specifier: workspace:*
         version: link:../../packages/server
+      '@mcp-dev-mesh/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       commander:
         specifier: 15.0.0
         version: 15.0.0
+      pg:
+        specifier: ^8.21.0
+        version: 8.21.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
 
   apps/web-admin:
     dependencies:

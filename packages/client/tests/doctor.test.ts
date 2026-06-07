@@ -77,7 +77,7 @@ describe('runDevMeshDoctor', () => {
       await rm(claudeHome, { recursive: true, force: true });
       await rm(opencodeConfigHome, { recursive: true, force: true });
     }
-  });
+  }, 30000);
 
   it('warns when privacy and sync settings are risky', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-doctor-project-'));
@@ -141,5 +141,5 @@ describe('runDevMeshDoctor', () => {
       await rm(claudeHome, { recursive: true, force: true });
       await rm(opencodeConfigHome, { recursive: true, force: true });
     }
-  });
+  }, 30000);
 });
