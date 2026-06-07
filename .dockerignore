@@ -1,0 +1,16 @@
+.git/
+.github/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+coverage/
+*.tsbuildinfo
+*.tgz
+.dev-mesh/index/
+.dev-mesh/queue/
+.dev-mesh/secrets/
+.dev-mesh/sync/
+apps/website/docs/.vitepress/cache/
+apps/website/docs/.vitepress/dist/
+apps/website/docs/.vitepress/.temp/

@@ -1,0 +1,35 @@
+name: Docker Images
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: mcp-dev-mesh-server
+            dockerfile: apps/mesh-server/Dockerfile
+          - image: mcp-dev-mesh-web-admin
+            dockerfile: apps/web-admin/Dockerfile
+          - image: mcp-dev-mesh-website
+            dockerfile: apps/website/Dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          tags: ${{ matrix.image }}:${{ github.ref_name }}
+          push: false

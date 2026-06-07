@@ -411,6 +411,12 @@ DEV_MESH_LOGGER=true
 
 未配置 `DEV_MESH_POSTGRES_URL` 时，knowledge repository 使用本地 JSONL，Hub state 可通过 `DEV_MESH_HUB_STATE_PATH` 使用 JSON file persistence；配置 `DEV_MESH_POSTGRES_URL` 后，server 会自动迁移并使用 PostgreSQL knowledge repository，且在未设置 `DEV_MESH_HUB_STATE_PATH` 时使用 PostgreSQL Hub state store。
 
+Alpha 发布骨架见 [docs/release.md](docs/release.md)。本地容器栈可通过以下命令启动：
+
+```bash
+docker compose -f deploy/docker-compose.yml up --build
+```
+
 ## 开发规范
 
 后续开发遵循 [docs/development-guide.md](./docs/development-guide.md)：代码组织以包职责和依赖方向为核心，避免过度耦合和过早抽象；实现保持简洁清晰，复杂边界、持久化格式、安全策略和跨包例外需要写清楚注释。

@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: devmesh
+      POSTGRES_USER: devmesh
+      POSTGRES_PASSWORD: devmesh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devmesh -d devmesh"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - devmesh-postgres:/var/lib/postgresql/data
+
+  mesh-server:
+    build:
+      context: ..
+      dockerfile: apps/mesh-server/Dockerfile
+    environment:
+      DEV_MESH_HOST: 0.0.0.0
+      DEV_MESH_PORT: 8721
+      DEV_MESH_BASE_URL: http://127.0.0.1:8721
+      DEV_MESH_PROJECT_ROOT: /data/devmesh
+      DEV_MESH_POSTGRES_URL: postgres://devmesh:devmesh@postgres:5432/devmesh
+      DEV_MESH_POSTGRES_KNOWLEDGE_TABLE: dev_mesh_knowledge_items
+      DEV_MESH_POSTGRES_HUB_STATE_TABLE: dev_mesh_hub_state
+      DEV_MESH_LOGGER: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8721:8721"
+    volumes:
+      - devmesh-server-data:/data/devmesh
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8721/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  web-admin:
+    build:
+      context: ..
+      dockerfile: apps/web-admin/Dockerfile
+    depends_on:
+      mesh-server:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+
+  website:
+    build:
+      context: ..
+      dockerfile: apps/website/Dockerfile
+    ports:
+      - "3000:80"
+
+volumes:
+  devmesh-postgres:
+  devmesh-server-data:
