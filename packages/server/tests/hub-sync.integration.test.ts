@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { createDevMeshCore } from '@mcp-dev-mesh/core';
 import type { SyncEvent, SyncEventSignature } from '@mcp-dev-mesh/protocol';
 import {
   createHubState,
@@ -7,7 +8,7 @@ import {
   joinHubGroup,
   type HubAuthContext
 } from '../src/hub-state.js';
-import { pushHubSyncEvents, verifyHubSyncEventLog } from '../src/hub-sync.js';
+import { pushHubSyncEvents, replayHubSyncConflicts, verifyHubSyncEventLog } from '../src/hub-sync.js';
 
 describe('hub sync event log verification', () => {
   it('verifies log hash chains and signed event payloads', () => {
@@ -130,6 +131,161 @@ describe('hub sync event log verification', () => {
         })
       ])
     );
+  });
+});
+
+describe('hub sync conflict replay', () => {
+  it('replays offline update conflicts as idempotent contradict edges', async () => {
+    const core = createDevMeshCore();
+    const state = createHubState();
+    const base = await core.captureKnowledge({
+      id: 'kn_conflict_base',
+      type: 'decision',
+      title: 'Offline conflict base',
+      summary: 'The base item is updated by two offline clients.'
+    });
+    const localRevision = await core.captureKnowledge({
+      id: 'kn_conflict_revision_local',
+      type: 'decision',
+      title: 'Offline conflict local revision',
+      summary: 'The local client kept the SQLite-backed workflow.'
+    });
+    const remoteRevision = await core.captureKnowledge({
+      id: 'kn_conflict_revision_remote',
+      type: 'decision',
+      title: 'Offline conflict remote revision',
+      summary: 'The remote client switched to a server-backed workflow.'
+    });
+    const localJoined = joinHubGroup(state, {
+      inviteToken: DEFAULT_LOCAL_INVITE_TOKEN,
+      displayName: 'Local Writer',
+      handle: 'local-writer'
+    });
+    const remoteJoined = joinHubGroup(state, {
+      inviteToken: DEFAULT_LOCAL_INVITE_TOKEN,
+      displayName: 'Remote Writer',
+      handle: 'remote-writer'
+    });
+
+    expect(localJoined.ok).toBe(true);
+    expect(remoteJoined.ok).toBe(true);
+
+    if (!localJoined.ok || !remoteJoined.ok) {
+      throw new Error('Expected both writers to join.');
+    }
+
+    const localAuth = createAuth(localJoined.value);
+    const remoteAuth = createAuth(remoteJoined.value);
+    const firstPush = pushHubSyncEvents(state, localAuth, {
+      clientId: localAuth.clientId,
+      events: [
+        {
+          id: 'evt_conflict_local',
+          kind: 'knowledge.updated',
+          payload: {
+            knowledgeId: base.id,
+            revisionId: localRevision.id,
+            conflict: true,
+            reason: 'Diverged while offline'
+          },
+          createdAt: '2026-06-07T05:00:00.000Z'
+        }
+      ]
+    });
+
+    expect(firstPush).toMatchObject({
+      ok: true,
+      value: {
+        accepted: 1,
+        rejected: [],
+        cursor: 'cur_default_1'
+      }
+    });
+
+    if (!firstPush.ok) {
+      throw new Error('Expected first conflict event to be accepted.');
+    }
+
+    const secondPush = pushHubSyncEvents(state, remoteAuth, {
+      clientId: remoteAuth.clientId,
+      events: [
+        {
+          id: 'evt_conflict_remote',
+          kind: 'knowledge.updated',
+          payload: {
+            knowledgeId: base.id,
+            revisionId: remoteRevision.id,
+            conflict: true,
+            reason: 'Diverged while offline'
+          },
+          createdAt: '2026-06-07T05:01:00.000Z'
+        }
+      ]
+    });
+
+    expect(secondPush).toMatchObject({
+      ok: true,
+      value: {
+        accepted: 1,
+        rejected: [],
+        cursor: 'cur_default_2'
+      }
+    });
+
+    const replay = await replayHubSyncConflicts(state, core, {
+      groupKey: localAuth.groupKey,
+      cursor: firstPush.value.cursor,
+      actor: 'sync-replayer'
+    });
+    const retry = await replayHubSyncConflicts(state, core, {
+      groupKey: localAuth.groupKey,
+      cursor: firstPush.value.cursor,
+      actor: 'sync-replayer'
+    });
+    const conflictAudits = state.auditLogs.filter((log) => log.action === 'sync.conflict_replayed');
+
+    expect(replay).toEqual({
+      scanned: 1,
+      conflicts: 1,
+      edgesCreated: 1,
+      skipped: 0,
+      cursor: 'cur_default_2'
+    });
+    expect(retry).toEqual({
+      scanned: 1,
+      conflicts: 1,
+      edgesCreated: 0,
+      skipped: 1,
+      cursor: 'cur_default_2'
+    });
+    expect(state.knowledgeEdges).toEqual([
+      expect.objectContaining({
+        id: expect.stringMatching(/^edge_sync_conflict_[a-f0-9]{24}$/),
+        kind: 'contradicts',
+        fromId: localRevision.id,
+        toId: remoteRevision.id,
+        createdBy: 'sync-replayer',
+        groupKey: localAuth.groupKey,
+        reason: 'Diverged while offline'
+      })
+    ]);
+    expect(conflictAudits).toEqual([
+      expect.objectContaining({
+        actor: 'sync-replayer',
+        action: 'sync.conflict_replayed',
+        targetType: 'knowledge-edge',
+        targetId: state.knowledgeEdges[0]?.id,
+        groupKey: localAuth.groupKey,
+        payload: expect.objectContaining({
+          knowledgeId: base.id,
+          fromId: localRevision.id,
+          toId: remoteRevision.id,
+          eventIds: ['evt_conflict_local', 'evt_conflict_remote'],
+          clientIds: [localAuth.clientId, remoteAuth.clientId],
+          reason: 'Diverged while offline'
+        })
+      })
+    ]);
   });
 });
 

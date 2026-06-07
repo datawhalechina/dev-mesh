@@ -344,6 +344,7 @@ mesh_resolve_term
 - `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
 - sync push/pull 目前使用开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 不会重复追加，pull 只返回当前 group 的增量事件。
 - `knowledge.deleted` sync event 需要携带 `{ knowledgeId, tombstone: true }`，有效 tombstone 会按 knowledge id 写入 admin audit，并在 replay 时把目标 knowledge 标记为 `tombstone`；缺少 tombstone 语义的删除事件会被拒绝。
+- `knowledge.updated` sync event 可携带 `{ knowledgeId, revisionId, conflict: true, reason? }` 表示离线分支；恢复连接后 replay 会为同一 base knowledge 的不同 revision 创建幂等 `contradicts` edge，并写入 `sync.conflict_replayed` audit。
 - 服务端接受的 sync event 会附加 `log.sequence` / `log.hash` / `log.previousHash` 元数据，用于开发期 append-only event log 的 tamper-evident 链式校验基础。
 - join 会签发开发期 `syncSigningSecret` 并只保存在本机 `identity.json`；带 `hmac-sha256` 签名的 sync event 会被校验，篡改或无效签名会被拒绝并写入 admin audit。
 - `packages/server` 暴露 `federateHubSyncEvents` 和 `federateHubSyncEventsFromHttpPeer`：可在两个 HubState 之间或通过 HTTP peer event-log endpoint 按 peer/group cursor 增量复制 sync event，重复复制幂等跳过，并写入 federation audit。
@@ -434,6 +435,7 @@ pnpm typecheck:examples
 - 已完成 server-to-server federation：支持 HubState 之间和 HTTP peer event-log endpoint 的 group/cursor 增量复制、重复复制幂等、tombstone event 传播和 audit 记录。
 - 已完成 tombstone sync：`knowledge.deleted` 必须指向 knowledge id，push / federation merge 会写入 tombstone audit，并可 replay 到 repository 的 `tombstone` 状态。
 - 已完成 signed event log 验证基础：服务端为 group sync log 生成 sequence、hash 和 previousHash，并可复验 hash chain、HMAC 签名和写入 verification failure audit。
+- 已完成 offline-first conflict replay：`knowledge.updated` 离线分支恢复后会按 base knowledge 合并检测冲突，使用 `contradicts` edge 表达并保留 replay audit。
 - 下一步推进更完整的分布式同步能力。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。

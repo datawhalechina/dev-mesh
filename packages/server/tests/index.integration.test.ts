@@ -464,6 +464,145 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('replays offline sync conflicts into admin knowledge edges', async () => {
+    const core = createDevMeshCore();
+    const base = await core.captureKnowledge({
+      id: 'kn_http_conflict_base',
+      type: 'decision',
+      title: 'HTTP offline conflict base',
+      summary: 'Two clients update this base decision while disconnected.'
+    });
+    const localRevision = await core.captureKnowledge({
+      id: 'kn_http_conflict_revision_local',
+      type: 'decision',
+      title: 'HTTP offline conflict local revision',
+      summary: 'The local branch keeps the existing sync flow.'
+    });
+    const remoteRevision = await core.captureKnowledge({
+      id: 'kn_http_conflict_revision_remote',
+      type: 'decision',
+      title: 'HTTP offline conflict remote revision',
+      summary: 'The remote branch changes the sync flow.'
+    });
+    const { app, url } = await startHubServer({
+      core
+    });
+
+    try {
+      const localJoin = await joinDefaultGroup(url);
+      const remoteJoin = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: DEFAULT_LOCAL_INVITE_TOKEN,
+          displayName: 'Ayuan',
+          handle: 'ayuan'
+        }
+      });
+      const localPush = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(localJoin.accessToken),
+        body: {
+          clientId: localJoin.clientId,
+          events: [
+            {
+              id: 'evt_http_conflict_local',
+              kind: 'knowledge.updated',
+              payload: {
+                knowledgeId: base.id,
+                revisionId: localRevision.id,
+                conflict: true,
+                reason: 'Offline edits diverged'
+              },
+              createdAt: '2026-06-07T06:00:00.000Z'
+            }
+          ]
+        }
+      });
+      const remotePush = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(remoteJoin.body.accessToken),
+        body: {
+          clientId: remoteJoin.body.clientId,
+          events: [
+            {
+              id: 'evt_http_conflict_remote',
+              kind: 'knowledge.updated',
+              payload: {
+                knowledgeId: base.id,
+                revisionId: remoteRevision.id,
+                conflict: true,
+                reason: 'Offline edits diverged'
+              },
+              createdAt: '2026-06-07T06:01:00.000Z'
+            }
+          ]
+        }
+      });
+      const retryPush = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(remoteJoin.body.accessToken),
+        body: {
+          clientId: remoteJoin.body.clientId,
+          events: [
+            {
+              id: 'evt_http_conflict_remote',
+              kind: 'knowledge.updated',
+              payload: {
+                knowledgeId: base.id,
+                revisionId: remoteRevision.id,
+                conflict: true,
+                reason: 'Offline edits diverged'
+              }
+            }
+          ]
+        }
+      });
+      const edges = await requestJson(`${url}/api/v1/admin/knowledge-edges?kind=contradicts&groupKey=default`);
+      const audit = await requestJson(`${url}/api/v1/admin/audit?action=sync.conflict_replayed`);
+
+      expect(localPush.body).toMatchObject({
+        accepted: 1,
+        rejected: [],
+        cursor: 'cur_default_1'
+      });
+      expect(remotePush.body).toMatchObject({
+        accepted: 1,
+        rejected: [],
+        cursor: 'cur_default_2'
+      });
+      expect(retryPush.body).toMatchObject({
+        accepted: 0,
+        rejected: [],
+        cursor: 'cur_default_2'
+      });
+      expect(edges.body.edges).toEqual([
+        expect.objectContaining({
+          kind: 'contradicts',
+          fromId: localRevision.id,
+          toId: remoteRevision.id,
+          createdBy: remoteJoin.body.memberId,
+          groupKey: 'default',
+          reason: 'Offline edits diverged'
+        })
+      ]);
+      expect(audit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'sync.conflict_replayed',
+          targetType: 'knowledge-edge',
+          targetId: edges.body.edges[0].id,
+          groupKey: 'default',
+          payload: expect.objectContaining({
+            knowledgeId: base.id,
+            eventIds: ['evt_http_conflict_local', 'evt_http_conflict_remote'],
+            clientIds: [localJoin.clientId, remoteJoin.body.clientId]
+          })
+        })
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('federates sync events from an HTTP peer event log', async () => {
     const { app, url } = await startHubServer({
       core: createDevMeshCore()

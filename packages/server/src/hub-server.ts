@@ -64,7 +64,13 @@ import {
   type HubState,
   type HubStateOptions
 } from './hub-state.js';
-import { pullHubSyncEventLog, pullHubSyncEvents, pushHubSyncEvents, replayHubSyncTombstones } from './hub-sync.js';
+import {
+  pullHubSyncEventLog,
+  pullHubSyncEvents,
+  pushHubSyncEvents,
+  replayHubSyncConflicts,
+  replayHubSyncTombstones
+} from './hub-sync.js';
 import { createMeshMcpServer } from './mcp.js';
 
 export interface MeshServerOptions {
@@ -210,6 +216,10 @@ function createHubRouter(
 
     if (result.ok && result.value.accepted > 0) {
       await replayHubSyncTombstones(hub, core, {
+        groupKey: auth.value.groupKey,
+        actor: auth.value.memberId
+      });
+      await replayHubSyncConflicts(hub, core, {
         groupKey: auth.value.groupKey,
         actor: auth.value.memberId
       });

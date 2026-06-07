@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { DevMeshCore, KnowledgeItem } from '@mcp-dev-mesh/core';
 import type { SyncEvent, SyncPullResponse, SyncPushRequest, SyncPushResponse } from '@mcp-dev-mesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
-import type { HubAuthContext, HubResult, HubState, HubSyncEvent } from './hub-model.js';
+import type { HubAuthContext, HubKnowledgeEdge, HubResult, HubState, HubSyncEvent } from './hub-model.js';
 import { hubError, ok } from './hub-utils.js';
 
 export interface HubSyncEventLogPage {
@@ -51,6 +51,27 @@ export interface HubSyncTombstoneReplayResult {
   skipped: number;
   missing: number;
   cursor: string;
+}
+
+export interface HubSyncConflictReplayInput {
+  groupKey: string;
+  cursor?: string;
+  actor?: string;
+}
+
+export interface HubSyncConflictReplayResult {
+  scanned: number;
+  conflicts: number;
+  edgesCreated: number;
+  skipped: number;
+  cursor: string;
+}
+
+interface KnowledgeConflictRevision {
+  knowledgeId: string;
+  revisionId: string;
+  event: HubSyncEvent;
+  reason?: string;
 }
 
 export function pushHubSyncEvents(
@@ -225,6 +246,89 @@ export async function replayHubSyncTombstones(
     applied,
     skipped,
     missing,
+    cursor: page.cursor
+  };
+}
+
+export async function replayHubSyncConflicts(
+  state: HubState,
+  core: DevMeshCore,
+  input: HubSyncConflictReplayInput
+): Promise<HubSyncConflictReplayResult> {
+  const page = pullHubSyncEventLog(state, input.groupKey, input.cursor);
+  const revisionsByKnowledgeId = collectKnowledgeConflictRevisions(state, input.groupKey);
+  const processedPairs = new Set<string>();
+  const knownKnowledge = new Map<string, boolean>();
+  let conflicts = 0;
+  let edgesCreated = 0;
+  let skipped = 0;
+
+  for (const event of page.events) {
+    const revision = readKnowledgeConflictRevision(event);
+
+    if (revision === undefined) {
+      skipped += 1;
+      continue;
+    }
+
+    const contenders = revisionsByKnowledgeId
+      .get(revision.knowledgeId)
+      ?.filter((candidate) => candidate.revisionId !== revision.revisionId);
+
+    if (contenders === undefined || contenders.length === 0) {
+      skipped += 1;
+      continue;
+    }
+
+    for (const contender of contenders) {
+      const [left, right] = orderKnowledgeConflictPair(revision, contender);
+      const pairKey = createKnowledgeConflictPairKey(input.groupKey, left, right);
+
+      if (processedPairs.has(pairKey)) {
+        continue;
+      }
+
+      processedPairs.add(pairKey);
+      conflicts += 1;
+
+      if (hasKnowledgeConflictEdge(state, input.groupKey, left.revisionId, right.revisionId)) {
+        skipped += 1;
+        continue;
+      }
+
+      const [leftExists, rightExists] = await Promise.all([
+        hasKnowledgeItem(core, knownKnowledge, left.revisionId),
+        hasKnowledgeItem(core, knownKnowledge, right.revisionId)
+      ]);
+
+      if (!leftExists || !rightExists) {
+        skipped += 1;
+        continue;
+      }
+
+      const edge = createHubSyncConflictEdge({
+        groupKey: input.groupKey,
+        actor: input.actor ?? revision.event.clientId,
+        left,
+        right
+      });
+      state.knowledgeEdges.push(edge);
+      edgesCreated += 1;
+      auditSyncConflictReplayed(state, {
+        actor: input.actor ?? revision.event.clientId,
+        groupKey: input.groupKey,
+        edge,
+        left,
+        right
+      });
+    }
+  }
+
+  return {
+    scanned: page.events.length,
+    conflicts,
+    edgesCreated,
+    skipped,
     cursor: page.cursor
   };
 }
@@ -586,6 +690,10 @@ function validateSyncEventPayload(
   kind: string,
   payload: Record<string, unknown>
 ): SyncPushResponse['rejected'][number] | undefined {
+  if (kind === 'knowledge.updated') {
+    return validateKnowledgeConflictPayload(eventId, payload);
+  }
+
   if (kind !== 'knowledge.deleted') {
     return undefined;
   }
@@ -621,6 +729,59 @@ function validateSyncEventPayload(
   return undefined;
 }
 
+function validateKnowledgeConflictPayload(
+  eventId: string,
+  payload: Record<string, unknown>
+): SyncPushResponse['rejected'][number] | undefined {
+  if (payload.conflict !== true) {
+    return undefined;
+  }
+
+  if (typeof payload.knowledgeId !== 'string' || !payload.knowledgeId.trim()) {
+    return {
+      id: eventId,
+      reason: 'event.conflict_knowledge_id_required'
+    };
+  }
+
+  if (typeof payload.revisionId !== 'string' || !payload.revisionId.trim()) {
+    return {
+      id: eventId,
+      reason: 'event.conflict_revision_id_required'
+    };
+  }
+
+  if (payload.knowledgeId.trim() === payload.revisionId.trim()) {
+    return {
+      id: eventId,
+      reason: 'event.conflict_revision_self_reference'
+    };
+  }
+
+  if (payload.reason !== undefined && typeof payload.reason !== 'string') {
+    return {
+      id: eventId,
+      reason: 'event.conflict_reason_invalid'
+    };
+  }
+
+  if (payload.baseEventId !== undefined && typeof payload.baseEventId !== 'string') {
+    return {
+      id: eventId,
+      reason: 'event.conflict_base_event_id_invalid'
+    };
+  }
+
+  if (payload.baseVersion !== undefined && typeof payload.baseVersion !== 'string') {
+    return {
+      id: eventId,
+      reason: 'event.conflict_base_version_invalid'
+    };
+  }
+
+  return undefined;
+}
+
 function readKnowledgeTombstonePayload(
   event: HubSyncEvent
 ): { knowledgeId: string; reason?: string; deletedAt?: string } | undefined {
@@ -647,6 +808,138 @@ function readKnowledgeTombstonePayload(
   }
 
   return tombstone;
+}
+
+function collectKnowledgeConflictRevisions(
+  state: HubState,
+  groupKey: string
+): Map<string, KnowledgeConflictRevision[]> {
+  const revisions = new Map<string, KnowledgeConflictRevision[]>();
+  const events = pullHubSyncEventLog(state, groupKey, undefined).events;
+
+  for (const event of events) {
+    const revision = readKnowledgeConflictRevision(event);
+
+    if (revision === undefined) {
+      continue;
+    }
+
+    const existing = revisions.get(revision.knowledgeId);
+
+    if (existing === undefined) {
+      revisions.set(revision.knowledgeId, [revision]);
+      continue;
+    }
+
+    if (!existing.some((candidate) => candidate.revisionId === revision.revisionId)) {
+      existing.push(revision);
+    }
+  }
+
+  return revisions;
+}
+
+function readKnowledgeConflictRevision(event: HubSyncEvent): KnowledgeConflictRevision | undefined {
+  if (event.kind !== 'knowledge.updated' || event.payload.conflict === false) {
+    return undefined;
+  }
+
+  const knowledgeId = readPayloadString(event.payload, 'knowledgeId');
+  const revisionId = readPayloadString(event.payload, 'revisionId');
+
+  if (knowledgeId === undefined || revisionId === undefined || knowledgeId === revisionId) {
+    return undefined;
+  }
+
+  const revision: KnowledgeConflictRevision = {
+    knowledgeId,
+    revisionId,
+    event
+  };
+  const reason = readPayloadString(event.payload, 'reason');
+
+  if (reason !== undefined) {
+    revision.reason = reason;
+  }
+
+  return revision;
+}
+
+function readPayloadString(payload: Record<string, unknown>, key: string): string | undefined {
+  const value = payload[key];
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+
+  return normalized ? normalized : undefined;
+}
+
+function orderKnowledgeConflictPair(
+  left: KnowledgeConflictRevision,
+  right: KnowledgeConflictRevision
+): [KnowledgeConflictRevision, KnowledgeConflictRevision] {
+  return left.revisionId.localeCompare(right.revisionId) <= 0 ? [left, right] : [right, left];
+}
+
+function createKnowledgeConflictPairKey(
+  groupKey: string,
+  left: KnowledgeConflictRevision,
+  right: KnowledgeConflictRevision
+): string {
+  return `${groupKey}:${left.knowledgeId}:${left.revisionId}:${right.revisionId}`;
+}
+
+function hasKnowledgeConflictEdge(state: HubState, groupKey: string, leftId: string, rightId: string): boolean {
+  return state.knowledgeEdges.some(
+    (edge) =>
+      edge.kind === 'contradicts' &&
+      edge.groupKey === groupKey &&
+      ((edge.fromId === leftId && edge.toId === rightId) || (edge.fromId === rightId && edge.toId === leftId))
+  );
+}
+
+async function hasKnowledgeItem(core: DevMeshCore, cache: Map<string, boolean>, id: string): Promise<boolean> {
+  const cached = cache.get(id);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const exists = (await core.getKnowledge(id)) !== undefined;
+  cache.set(id, exists);
+
+  return exists;
+}
+
+function createHubSyncConflictEdge(input: {
+  groupKey: string;
+  actor: string;
+  left: KnowledgeConflictRevision;
+  right: KnowledgeConflictRevision;
+}): HubKnowledgeEdge {
+  const reason =
+    input.left.reason ?? input.right.reason ?? `Offline update conflict for knowledge ${input.left.knowledgeId}`;
+
+  return {
+    id: createSyncConflictEdgeId(input.groupKey, input.left.knowledgeId, input.left.revisionId, input.right.revisionId),
+    kind: 'contradicts',
+    fromId: input.left.revisionId,
+    toId: input.right.revisionId,
+    createdBy: input.actor,
+    createdAt: new Date().toISOString(),
+    groupKey: input.groupKey,
+    reason
+  };
+}
+
+function createSyncConflictEdgeId(groupKey: string, knowledgeId: string, leftId: string, rightId: string): string {
+  return `edge_sync_conflict_${createHash('sha256')
+    .update(`${groupKey}:${knowledgeId}:${leftId}:${rightId}`)
+    .digest('hex')
+    .slice(0, 24)}`;
 }
 
 function createTombstoneKnowledgeItem(item: KnowledgeItem, updatedAt: string): KnowledgeItem {
@@ -835,6 +1128,39 @@ function auditSyncTombstoneReplayed(
     action: 'sync.tombstone_replayed',
     targetType: 'knowledge',
     targetId: input.tombstone.knowledgeId,
+    groupKey: input.groupKey,
+    payload
+  });
+}
+
+function auditSyncConflictReplayed(
+  state: HubState,
+  input: {
+    actor: string;
+    groupKey: string;
+    edge: HubKnowledgeEdge;
+    left: KnowledgeConflictRevision;
+    right: KnowledgeConflictRevision;
+  }
+): void {
+  const reason = input.edge.reason;
+  const payload: Record<string, unknown> = {
+    knowledgeId: input.left.knowledgeId,
+    fromId: input.edge.fromId,
+    toId: input.edge.toId,
+    eventIds: [input.left.event.id, input.right.event.id],
+    clientIds: [input.left.event.clientId, input.right.event.clientId]
+  };
+
+  if (reason !== undefined) {
+    payload.reason = reason;
+  }
+
+  appendHubAuditLog(state, {
+    actor: input.actor,
+    action: 'sync.conflict_replayed',
+    targetType: 'knowledge-edge',
+    targetId: input.edge.id,
     groupKey: input.groupKey,
     payload
   });

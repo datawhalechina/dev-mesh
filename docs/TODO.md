@@ -95,7 +95,7 @@
 - [x] server-to-server federation。
 - [x] signed event log。
 - [x] tombstone sync。
-- [ ] offline-first conflict replay。
+- [x] offline-first conflict replay。
 - [ ] org-level knowledge sharing。
 - [x] federation sync integration test。
 - [x] signed event verification test。
@@ -145,7 +145,7 @@
 
 - server-to-server federation 能增量同步 events、tombstone 和 cursor，重复同步幂等。
 - signed event log 能验证签名、拒绝篡改事件，并保留审计原因。
-- offline-first conflict replay 能在断网恢复后合并事件，冲突通过 edge 或 review 表达。
+- offline-first conflict replay 能在断网恢复后合并事件，冲突通过 edge 表达并写入 replay audit。
 - federation、签名验证和离线冲突都具备集成测试或可重复 smoke 测试。
 
 ## 发布前检查
