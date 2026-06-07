@@ -58,6 +58,7 @@ import {
   joinHubGroup,
   listHubGroups,
   listHubProjects,
+  rotateHubAccessToken,
   type HubAuthContext,
   type HubError,
   type HubResult,
@@ -203,6 +204,10 @@ function createHubRouter(
 
   router.post('/api/v1/join', (ctx) => {
     sendHubResult(ctx, joinHubGroup(hub, readBody<JoinRequest>(ctx)));
+  });
+
+  router.post('/api/v1/auth/rotate', (ctx) => {
+    sendHubResult(ctx, rotateHubAccessToken(hub, readBearerToken(ctx.headers)));
   });
 
   router.post('/api/v1/sync/push', async (ctx) => {

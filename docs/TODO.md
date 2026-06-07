@@ -100,6 +100,13 @@
 - [x] federation sync integration test。
 - [x] signed event verification test。
 
+## 阶段 6：生产化准备
+
+- [x] access token rotation 和 audit。
+- [ ] 短期 invite 默认策略。
+- [ ] 持久化 Hub 状态和 audit log。
+- [ ] 更完整 ACL 和 token rotation 管理界面。
+
 ## 阶段验收标准
 
 ### 阶段 0 验收标准
@@ -148,6 +155,13 @@
 - offline-first conflict replay 能在断网恢复后合并事件，冲突通过 edge 表达并写入 replay audit。
 - org-level knowledge sharing 能在保持 group/project ACL 隔离的同时，把 org-visible canonical knowledge 纳入已授权 project brief。
 - federation、签名验证和离线冲突都具备集成测试或可重复 smoke 测试。
+
+### 阶段 6 验收标准
+
+- access token rotation 会撤销旧 token、保留 client identity、避免 audit 泄露 token 明文，并有 HTTP integration test。
+- invite 默认策略支持短期有效期和使用次数限制，过期和耗尽状态可审计。
+- Hub groups、invites、members、tokens、projects、sync cursor 和 audit log 能替换为持久化实现。
+- 管理后台能查看关键安全生命周期事件，并保持所有写操作通过 server API。
 
 ## 发布前检查
 

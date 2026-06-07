@@ -14,7 +14,7 @@ export type {
   HubStateOptions
 } from './hub-model.js';
 export { createHubState } from './hub-seed.js';
-export { authenticateHubToken, joinHubGroup } from './hub-auth.js';
+export { authenticateHubToken, joinHubGroup, rotateHubAccessToken } from './hub-auth.js';
 export {
   createHubProject,
   getHubProject,

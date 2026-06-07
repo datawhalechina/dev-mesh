@@ -53,9 +53,9 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
   }
 
   const clientId = `client_${slugHandle(group.key)}_${handle}_${randomUUID().slice(0, 8)}`;
-  const accessToken = `mesh_${randomUUID().replace(/-/g, '')}`;
-  const syncSigningSecret = `sync_${randomBytes(32).toString('base64url')}`;
-  const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS).toISOString();
+  const accessToken = createHubAccessToken();
+  const syncSigningSecret = createHubSyncSigningSecret();
+  const expiresAt = createHubAccessTokenExpiry();
   const joinedAt = new Date().toISOString();
 
   state.members.set(memberId, {
@@ -97,6 +97,50 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
   });
 }
 
+export function rotateHubAccessToken(state: HubState, token: string | undefined): HubResult<JoinResponse> {
+  const auth = authenticateHubToken(state, token);
+
+  if (!auth.ok) {
+    return auth;
+  }
+
+  const previousToken = token === undefined ? undefined : state.tokens.get(token);
+
+  if (previousToken === undefined) {
+    return hubError(401, 'auth.invalid_token', 'Bearer access token is invalid or expired.');
+  }
+
+  const accessToken = createHubAccessToken();
+  const expiresAt = createHubAccessTokenExpiry();
+  state.tokens.delete(previousToken.token);
+  state.tokens.set(accessToken, {
+    ...previousToken,
+    token: accessToken,
+    expiresAt
+  });
+  appendHubAuditLog(state, {
+    actor: auth.value.memberId,
+    action: 'auth.token_rotated',
+    targetType: 'member',
+    targetId: auth.value.memberId,
+    groupKey: auth.value.groupKey,
+    payload: {
+      clientId: auth.value.clientId,
+      previousExpiresAt: previousToken.expiresAt,
+      expiresAt
+    }
+  });
+
+  return ok({
+    memberId: auth.value.memberId,
+    clientId: auth.value.clientId,
+    groupKey: auth.value.groupKey,
+    accessToken,
+    syncSigningSecret: auth.value.syncSigningSecret,
+    expiresAt
+  });
+}
+
 /**
  * Validates a bearer token issued by joinHubGroup. The returned auth context is
  * intentionally small so route handlers can pass it around without exposing the
@@ -125,4 +169,16 @@ export function authenticateHubToken(state: HubState, token: string | undefined)
     groupKey: accessToken.groupKey,
     syncSigningSecret: accessToken.syncSigningSecret
   });
+}
+
+function createHubAccessToken(): string {
+  return `mesh_${randomUUID().replace(/-/g, '')}`;
+}
+
+function createHubSyncSigningSecret(): string {
+  return `sync_${randomBytes(32).toString('base64url')}`;
+}
+
+function createHubAccessTokenExpiry(): string {
+  return new Date(Date.now() + ACCESS_TOKEN_TTL_MS).toISOString();
 }

@@ -1003,6 +1003,74 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('rotates bearer access tokens and revokes the previous token', async () => {
+    const { app, url } = await startHubServer({
+      core: createDevMeshCore()
+    });
+
+    try {
+      const joined = await joinDefaultGroup(url);
+      const rotated = await requestJson<JoinResponseBody>(`${url}/api/v1/auth/rotate`, {
+        method: 'POST',
+        headers: authHeaders(joined.accessToken)
+      });
+      const oldTokenProjects = await requestJson(`${url}/api/v1/projects`, {
+        headers: authHeaders(joined.accessToken)
+      });
+      const newTokenProject = await requestJson(`${url}/api/v1/projects`, {
+        method: 'POST',
+        headers: authHeaders(rotated.body.accessToken),
+        body: {
+          id: 'rotated-token-project',
+          name: 'Rotated Token Project'
+        }
+      });
+      const audit = await requestJson(`${url}/api/v1/admin/audit?action=auth.token_rotated`);
+      const auditPayload = audit.body.auditLogs[0]?.payload;
+
+      expect(rotated.status).toBe(200);
+      expect(rotated.body).toMatchObject({
+        memberId: joined.memberId,
+        clientId: joined.clientId,
+        groupKey: joined.groupKey,
+        syncSigningSecret: joined.syncSigningSecret,
+        expiresAt: expect.any(String)
+      });
+      expect(rotated.body.accessToken).toMatch(/^mesh_/);
+      expect(rotated.body.accessToken).not.toBe(joined.accessToken);
+      expect(Date.parse(rotated.body.expiresAt)).toBeGreaterThanOrEqual(Date.parse(joined.expiresAt));
+      expect(oldTokenProjects.status).toBe(401);
+      expect(oldTokenProjects.body).toMatchObject({
+        error: {
+          code: 'auth.invalid_token'
+        }
+      });
+      expect(newTokenProject.status).toBe(200);
+      expect(newTokenProject.body.project).toMatchObject({
+        id: 'rotated-token-project',
+        createdByMemberId: joined.memberId
+      });
+      expect(audit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          actor: joined.memberId,
+          action: 'auth.token_rotated',
+          targetType: 'member',
+          targetId: joined.memberId,
+          groupKey: joined.groupKey,
+          payload: expect.objectContaining({
+            clientId: joined.clientId,
+            previousExpiresAt: joined.expiresAt,
+            expiresAt: rotated.body.expiresAt
+          })
+        })
+      ]);
+      expect(JSON.stringify(auditPayload)).not.toContain(joined.accessToken);
+      expect(JSON.stringify(auditPayload)).not.toContain(rotated.body.accessToken);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('serves admin data for the Vue management dashboard', async () => {
     const core = createDevMeshCore();
     await core.captureKnowledge({
