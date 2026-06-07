@@ -103,7 +103,7 @@
 ## 阶段 6：生产化准备
 
 - [x] access token rotation 和 audit。
-- [ ] 短期 invite 默认策略。
+- [x] 短期 invite 默认策略。
 - [ ] 持久化 Hub 状态和 audit log。
 - [ ] 更完整 ACL 和 token rotation 管理界面。
 
@@ -159,7 +159,7 @@
 ### 阶段 6 验收标准
 
 - access token rotation 会撤销旧 token、保留 client identity、避免 audit 泄露 token 明文，并有 HTTP integration test。
-- invite 默认策略支持短期有效期和使用次数限制，过期和耗尽状态可审计。
+- invite 默认策略支持短期有效期，显式使用次数限制保留在 audit payload 中。
 - Hub groups、invites、members、tokens、projects、sync cursor 和 audit log 能替换为持久化实现。
 - 管理后台能查看关键安全生命周期事件，并保持所有写操作通过 server API。
 

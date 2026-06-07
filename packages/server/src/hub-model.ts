@@ -3,6 +3,7 @@ import type { ProjectAccess, ProjectSummary, SyncEvent } from '@mcp-dev-mesh/pro
 export const DEFAULT_LOCAL_INVITE_TOKEN = 'devmesh-local-invite';
 export const DEFAULT_GROUP_KEY = 'default';
 export const ACCESS_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const DEFAULT_ADMIN_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface HubGroupSeed {
   key: string;

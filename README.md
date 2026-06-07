@@ -344,6 +344,7 @@ mesh_resolve_term
 - `POST /api/v1/join` 需要有效 `inviteToken`，成功后签发 group-scoped Bearer access token。
 - `POST /api/v1/auth/rotate` 需要当前 Bearer token，成功后签发新的 access token、撤销旧 token、保持 sync signing secret 稳定，并写入不含 token 明文的 audit。
 - `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
+- `POST /api/v1/admin/invites` 创建的 admin invite 未显式提供 `expiresAt` 时默认 24 小时后过期；seed 的本地开发 invite 不套用该默认策略。
 - sync push/pull 目前使用开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 不会重复追加，pull 只返回当前 group 的增量事件。
 - `knowledge.deleted` sync event 需要携带 `{ knowledgeId, tombstone: true }`，有效 tombstone 会按 knowledge id 写入 admin audit，并在 replay 时把目标 knowledge 标记为 `tombstone`；缺少 tombstone 语义的删除事件会被拒绝。
 - `knowledge.updated` sync event 可携带 `{ knowledgeId, revisionId, conflict: true, reason? }` 表示离线分支；恢复连接后 replay 会为同一 base knowledge 的不同 revision 创建幂等 `contradicts` edge，并写入 `sync.conflict_replayed` audit。
@@ -440,7 +441,8 @@ pnpm typecheck:examples
 - 已完成 offline-first conflict replay：`knowledge.updated` 离线分支恢复后会按 base knowledge 合并检测冲突，使用 `contradicts` edge 表达并保留 replay audit。
 - 已完成 org-level knowledge sharing：project brief 保持 group/project ACL 隔离，同时允许 org-visible canonical knowledge 跨 group 共享。
 - 已完成 access token rotation：旧 Bearer token 立即失效，新 token 保持原 client identity 和 sync signing secret，并写入 rotation audit。
-- 下一步推进生产化持久化：短期 invite 默认策略、持久化 Hub 状态、持久化 audit log 和更完整 ACL。
+- 已完成短期 invite 默认策略：admin 创建 invite 时默认 24 小时有效，显式 `expiresAt` / `maxUses` 仍可覆盖。
+- 下一步推进生产化持久化：持久化 Hub 状态、持久化 audit log 和更完整 ACL。
 - 扩展自动沉淀的质量评分、低风险自动发布策略和发布包体优化。
 
 后续任务清单见 [docs/TODO.md](./docs/TODO.md)。

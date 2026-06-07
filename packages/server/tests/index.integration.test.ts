@@ -1200,8 +1200,10 @@ describe('hub server HTTP integration', () => {
         groupKey: 'default',
         uses: 0,
         maxUses: 2,
+        expiresAt: expect.any(String),
         status: 'active'
       });
+      expect(Date.parse(invite.body.expiresAt)).toBeGreaterThan(Date.parse(invite.body.createdAt));
       expect(invites.body.invites).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1236,7 +1238,11 @@ describe('hub server HTTP integration', () => {
         expect.arrayContaining([
           expect.objectContaining({
             action: 'invite.created',
-            targetId: 'inv_admin_panel'
+            targetId: 'inv_admin_panel',
+            payload: expect.objectContaining({
+              expiresAt: invite.body.expiresAt,
+              maxUses: 2
+            })
           }),
           expect.objectContaining({
             action: 'member.joined',

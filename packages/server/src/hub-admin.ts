@@ -9,6 +9,7 @@ import type {
 } from '@mcp-dev-mesh/core';
 import type { ProjectAclMember, ProjectAclRole, ProjectAclVisibility, ProjectSummary } from '@mcp-dev-mesh/protocol';
 import {
+  DEFAULT_ADMIN_INVITE_TTL_MS,
   DEFAULT_GROUP_KEY,
   type HubGroup,
   type HubInvite,
@@ -648,11 +649,12 @@ export function createAdminInvite(state: HubState, input: AdminInviteInput): Hub
     return hubError(409, 'admin.invite_token_exists', 'Invite token already exists.');
   }
 
+  const createdAt = new Date();
   const invite: HubInvite = {
     token,
     groupKey,
     uses: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: createdAt.toISOString(),
     createdBy: 'admin'
   };
 
@@ -664,6 +666,8 @@ export function createAdminInvite(state: HubState, input: AdminInviteInput): Hub
     }
 
     invite.expiresAt = expiresAt;
+  } else {
+    invite.expiresAt = new Date(createdAt.getTime() + DEFAULT_ADMIN_INVITE_TTL_MS).toISOString();
   }
 
   if (input.maxUses !== undefined) {
