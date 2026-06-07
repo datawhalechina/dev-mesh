@@ -89,12 +89,13 @@
 
 - [x] group-scoped sync event log 和 cursor 增量拉取基础。
 - [x] signed sync event HMAC 校验和拒绝审计基础。
+- [x] 库级 server-to-server federation 增量复制和 cursor 基础。
 - [ ] server-to-server federation。
 - [ ] signed event log。
 - [ ] tombstone sync。
 - [ ] offline-first conflict replay。
 - [ ] org-level knowledge sharing。
-- [ ] federation sync integration test。
+- [x] federation sync integration test。
 - [x] signed event verification test。
 
 ## 阶段验收标准

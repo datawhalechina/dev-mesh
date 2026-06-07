@@ -344,6 +344,7 @@ mesh_resolve_term
 - `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
 - sync push/pull 目前使用开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 不会重复追加，pull 只返回当前 group 的增量事件。
 - join 会签发开发期 `syncSigningSecret` 并只保存在本机 `identity.json`；带 `hmac-sha256` 签名的 sync event 会被校验，篡改或无效签名会被拒绝并写入 admin audit。
+- `packages/server` 暴露库级 `federateHubSyncEvents`：可在两个 HubState 之间按 peer/group cursor 增量复制 sync event，重复复制幂等跳过，并写入 federation audit；后续可挂接真实 peer HTTP transport。
 - project list 和 project brief 默认只返回当前 token 所属 group 内且 ACL 允许的项目；跨 group 或未授权项目返回 404，避免泄露 project id。
 - 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
 - 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、持久化审计和更完整 ACL。
@@ -428,6 +429,7 @@ pnpm typecheck:examples
 - 已完成 task digest：按任务 key 聚合 task knowledge，展示最新状态、owner、标签、历史片段和状态汇总。
 - 已完成 group-scoped sync event log 基础：支持 push/pull cursor、重复 push 幂等和跨 group 隔离。
 - 已完成 signed sync event 校验基础：支持开发期 HMAC 签名验证、篡改事件拒绝和 audit 记录。
+- 已完成库级 federation sync 基础：支持 HubState 之间按 group/cursor 增量复制、重复复制幂等、tombstone-shaped event 传播和 audit 记录。
 - 下一步推进更完整的分布式同步能力。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。

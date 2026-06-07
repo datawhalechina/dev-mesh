@@ -4,6 +4,23 @@ import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubResult, HubState, HubSyncEvent } from './hub-model.js';
 import { hubError, ok } from './hub-utils.js';
 
+export interface HubSyncEventLogPage {
+  cursor: string;
+  events: HubSyncEvent[];
+}
+
+export interface HubSyncEventMergeInput {
+  groupKey: string;
+  events: HubSyncEvent[];
+  acceptedAt?: string;
+}
+
+export interface HubSyncEventMergeResult {
+  accepted: number;
+  skipped: number;
+  cursor: string;
+}
+
 export function pushHubSyncEvents(
   state: HubState,
   auth: HubAuthContext,
@@ -61,13 +78,61 @@ export function pullHubSyncEvents(
   auth: HubAuthContext,
   cursor: string | undefined
 ): SyncPullResponse {
-  const groupEvents = getGroupSyncEvents(state, auth.groupKey);
-  const offset = readSyncCursorOffset(auth.groupKey, cursor);
-  const nextEvents = groupEvents.slice(offset);
+  const page = pullHubSyncEventLog(state, auth.groupKey, cursor);
 
   return {
-    cursor: createSyncCursor(auth.groupKey, groupEvents.length),
-    events: nextEvents.map(toProtocolSyncEvent)
+    cursor: page.cursor,
+    events: page.events.map(toProtocolSyncEvent)
+  };
+}
+
+export function pullHubSyncEventLog(
+  state: HubState,
+  groupKey: string,
+  cursor: string | undefined,
+  limit?: number
+): HubSyncEventLogPage {
+  const groupEvents = getGroupSyncEvents(state, groupKey);
+  const offset = readSyncCursorOffset(groupKey, cursor);
+  const boundedLimit = limit === undefined ? undefined : Math.max(0, Math.floor(limit));
+  const end = boundedLimit === undefined ? undefined : offset + boundedLimit;
+  const nextEvents = groupEvents.slice(offset, end);
+  const nextOffset = boundedLimit === undefined ? groupEvents.length : offset + nextEvents.length;
+
+  return {
+    cursor: createSyncCursor(groupKey, nextOffset),
+    events: nextEvents.map(cloneHubSyncEvent)
+  };
+}
+
+export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeInput): HubSyncEventMergeResult {
+  const groupEvents = getGroupSyncEvents(state, input.groupKey);
+  const existingIds = new Set(groupEvents.map((event) => event.id));
+  const acceptedAt = input.acceptedAt ?? new Date().toISOString();
+  let accepted = 0;
+  let skipped = 0;
+
+  for (const event of input.events) {
+    if (existingIds.has(event.id)) {
+      skipped += 1;
+      continue;
+    }
+
+    const merged = cloneHubSyncEvent({
+      ...event,
+      groupKey: input.groupKey,
+      acceptedAt
+    });
+
+    groupEvents.push(merged);
+    existingIds.add(merged.id);
+    accepted += 1;
+  }
+
+  return {
+    accepted,
+    skipped,
+    cursor: createSyncCursor(input.groupKey, groupEvents.length)
   };
 }
 
@@ -236,6 +301,24 @@ function toProtocolSyncEvent(event: HubSyncEvent): SyncEvent {
   }
 
   return protocolEvent;
+}
+
+function cloneHubSyncEvent(event: HubSyncEvent): HubSyncEvent {
+  const clone: HubSyncEvent = {
+    id: event.id,
+    kind: event.kind,
+    payload: event.payload,
+    createdAt: event.createdAt,
+    clientId: event.clientId,
+    groupKey: event.groupKey,
+    acceptedAt: event.acceptedAt
+  };
+
+  if (event.signature !== undefined) {
+    clone.signature = event.signature;
+  }
+
+  return clone;
 }
 
 function createSyncCursor(groupKey: string, offset: number): string {

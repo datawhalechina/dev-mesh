@@ -125,5 +125,6 @@ export interface HubState {
   projects: Map<string, ProjectSummary>;
   knowledgeEdges: HubKnowledgeEdge[];
   syncEvents: Map<string, HubSyncEvent[]>;
+  federationCursors: Map<string, string>;
   auditLogs: HubAuditLog[];
 }
