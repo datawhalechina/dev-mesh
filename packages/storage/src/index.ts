@@ -6,6 +6,14 @@ import type {
 } from '@mcp-dev-mesh/core';
 import { matchesKnowledgeFilter, rankKnowledgeItem } from '@mcp-dev-mesh/core';
 import type { RawEvent, StorageBackend } from '@mcp-dev-mesh/extension-api';
+import {
+  createHubState,
+  deserializeHubState,
+  serializeHubState,
+  type HubState,
+  type HubStateOptions,
+  type HubStatePersistenceStore
+} from '@mcp-dev-mesh/server';
 
 export interface InMemoryStorageState {
   knowledgeItems: unknown[];
@@ -33,6 +41,8 @@ export function createInMemoryStorageBackend(): StorageBackend & { state: InMemo
 }
 
 export const DEFAULT_POSTGRES_KNOWLEDGE_TABLE = 'dev_mesh_knowledge_items';
+export const DEFAULT_POSTGRES_HUB_STATE_TABLE = 'dev_mesh_hub_state';
+export const DEFAULT_POSTGRES_HUB_STATE_ID = 'default';
 
 export interface PostgresExecutor {
   query(sql: string, values?: readonly unknown[]): Promise<{ rows: Array<Record<string, unknown>> }>;
@@ -40,6 +50,11 @@ export interface PostgresExecutor {
 
 export interface PostgresKnowledgeRepositoryOptions {
   tableName?: string;
+}
+
+export interface PostgresHubStateStoreOptions {
+  tableName?: string;
+  stateId?: string;
 }
 
 export class PostgresKnowledgeRepository implements KnowledgeRepository {
@@ -217,6 +232,43 @@ export class PostgresKnowledgeRepository implements KnowledgeRepository {
   }
 }
 
+export class PostgresHubStateStore implements HubStatePersistenceStore {
+  private readonly table: string;
+  private readonly stateId: string;
+
+  constructor(
+    private readonly db: PostgresExecutor,
+    options: PostgresHubStateStoreOptions = {}
+  ) {
+    this.table = quoteIdentifier(options.tableName ?? DEFAULT_POSTGRES_HUB_STATE_TABLE);
+    this.stateId = options.stateId ?? DEFAULT_POSTGRES_HUB_STATE_ID;
+  }
+
+  async load(fallback: HubStateOptions = {}): Promise<HubState> {
+    const result = await this.db.query(`SELECT state FROM ${this.table} WHERE id = $1`, [this.stateId]);
+    const row = result.rows[0];
+
+    if (row === undefined) {
+      return createHubState(fallback);
+    }
+
+    return deserializeHubState(readJsonValue(row.state));
+  }
+
+  async save(state: HubState): Promise<void> {
+    await this.db.query(
+      `
+        INSERT INTO ${this.table} (id, state, updated_at)
+        VALUES ($1, $2::jsonb, now())
+        ON CONFLICT (id) DO UPDATE SET
+          state = EXCLUDED.state,
+          updated_at = EXCLUDED.updated_at
+      `,
+      [this.stateId, JSON.stringify(serializeHubState(state))]
+    );
+  }
+}
+
 /**
  * Installs the minimal table needed by PostgresKnowledgeRepository. The table
  * stores the canonical item JSONB plus denormalized columns used for filtering
@@ -266,6 +318,30 @@ export async function migratePostgresKnowledgeRepository(
   `);
 }
 
+/**
+ * Installs a single-row JSONB snapshot table for HubState. The Hub service keeps
+ * enforcing group, token, ACL, sync, and audit invariants in memory while this
+ * store provides a durable replacement for the development JSON file adapter.
+ */
+export async function migratePostgresHubStateStore(
+  db: PostgresExecutor,
+  options: PostgresHubStateStoreOptions = {}
+): Promise<void> {
+  const table = quoteIdentifier(options.tableName ?? DEFAULT_POSTGRES_HUB_STATE_TABLE);
+  const suffix = normalizeIdentifier(options.tableName ?? DEFAULT_POSTGRES_HUB_STATE_TABLE);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS ${table} (
+      id text PRIMARY KEY,
+      state jsonb NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS ${quoteIdentifier(`${suffix}_updated_at_idx`)}
+      ON ${table} (updated_at DESC);
+  `);
+}
+
 export function createPostgresStorageBackend(
   db: PostgresExecutor,
   options: PostgresKnowledgeRepositoryOptions = {}
@@ -283,6 +359,13 @@ export function createPostgresStorageBackend(
   };
 }
 
+export function createPostgresHubStateStore(
+  db: PostgresExecutor,
+  options: PostgresHubStateStoreOptions = {}
+): PostgresHubStateStore {
+  return new PostgresHubStateStore(db, options);
+}
+
 function readKnowledgeItem(row: Record<string, unknown>): KnowledgeItem {
   const value = row.item;
 
@@ -291,6 +374,10 @@ function readKnowledgeItem(row: Record<string, unknown>): KnowledgeItem {
   }
 
   return value as KnowledgeItem;
+}
+
+function readJsonValue(value: unknown): unknown {
+  return typeof value === 'string' ? JSON.parse(value) : value;
 }
 
 function addValue(values: unknown[], value: unknown): string {

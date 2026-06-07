@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { createDevMeshCore } from '@mcp-dev-mesh/core';
 import {
+  createPostgresHubStateStore,
   migratePostgresKnowledgeRepository,
+  migratePostgresHubStateStore,
   PostgresKnowledgeRepository,
   type PostgresExecutor
 } from '../src/index.js';
@@ -89,6 +91,72 @@ describe('PostgreSQL knowledge repository integration', () => {
           id: canonical.id,
           title: 'PostgreSQL repository durable context'
         });
+      } finally {
+        await dropTable(db, tableName).catch(() => undefined);
+        await pool.end();
+      }
+    },
+    30000
+  );
+
+  runWithPostgres(
+    'migrates and reloads Hub state snapshots',
+    async () => {
+      const pool = new Pool({
+        connectionString: postgresUrl
+      });
+      const db = createPoolExecutor(pool);
+      const tableName = `dev_mesh_hub_state_test_${Date.now().toString(36)}`;
+
+      try {
+        await dropTable(db, tableName);
+        await migratePostgresHubStateStore(db, { tableName });
+
+        const store = createPostgresHubStateStore(db, { tableName });
+        const state = await store.load({
+          groups: [
+            {
+              key: 'platform',
+              displayName: 'Platform'
+            }
+          ],
+          invites: [
+            {
+              token: 'inv_platform',
+              groupKey: 'platform'
+            }
+          ]
+        });
+
+        state.auditLogs.push({
+          id: 'audit_pg_hub_state',
+          actor: 'admin',
+          action: 'hub_state.postgres_saved',
+          targetType: 'hub-state',
+          targetId: 'default',
+          groupKey: 'platform',
+          createdAt: '2026-06-07T00:00:00.000Z'
+        });
+        await store.save(state);
+
+        const reloaded = await createPostgresHubStateStore(db, { tableName }).load();
+        const rows = await db.query(`SELECT state->>'version' AS version FROM "${tableName}" WHERE id = $1`, ['default']);
+
+        expect(rows.rows[0]?.version).toBe('1');
+        expect(reloaded.groups.get('platform')).toMatchObject({
+          key: 'platform',
+          displayName: 'Platform'
+        });
+        expect(reloaded.invites.get('inv_platform')).toMatchObject({
+          token: 'inv_platform',
+          groupKey: 'platform'
+        });
+        expect(reloaded.auditLogs).toEqual([
+          expect.objectContaining({
+            action: 'hub_state.postgres_saved',
+            groupKey: 'platform'
+          })
+        ]);
       } finally {
         await dropTable(db, tableName).catch(() => undefined);
         await pool.end();

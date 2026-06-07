@@ -266,6 +266,9 @@ importers:
       '@mcp-dev-mesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
+      '@mcp-dev-mesh/server':
+        specifier: workspace:*
+        version: link:../server
       pg:
         specifier: ^8.21.0
         version: 8.21.0

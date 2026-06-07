@@ -18,6 +18,11 @@ export interface HubStatePersistenceOptions {
   path: string;
 }
 
+export interface HubStatePersistenceStore {
+  load(fallback?: HubStateOptions): Promise<HubState>;
+  save(state: HubState): Promise<void>;
+}
+
 interface SerializedHubState {
   version: 1;
   groups: HubGroup[];
@@ -29,6 +34,17 @@ interface SerializedHubState {
   syncEvents: Array<[string, HubSyncEvent[]]>;
   federationCursors: Array<[string, string]>;
   auditLogs: HubAuditLog[];
+}
+
+export function createJsonHubStateStore(path: string): HubStatePersistenceStore {
+  return {
+    load(fallback) {
+      return loadHubStateFromFile(path, fallback);
+    },
+    save(state) {
+      return saveHubStateToFile(state, path);
+    }
+  };
 }
 
 export async function loadHubStateFromFile(path: string, fallback: HubStateOptions = {}): Promise<HubState> {

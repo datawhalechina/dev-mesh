@@ -105,7 +105,7 @@
 - [x] access token rotation 和 audit。
 - [x] 短期 invite 默认策略。
 - [x] 开发期 JSON file Hub 状态和 audit log persistence adapter。
-- [ ] PostgreSQL-backed Hub state store。
+- [x] PostgreSQL-backed Hub state store。
 - [x] 更完整 ACL 和 token rotation 管理界面。
 
 ## 阶段验收标准
@@ -161,7 +161,7 @@
 
 - access token rotation 会撤销旧 token、保留 client identity、避免 audit 泄露 token 明文，并有 HTTP integration test。
 - invite 默认策略支持短期有效期，显式使用次数限制保留在 audit payload 中。
-- Hub groups、invites、members、tokens、projects、sync cursor 和 audit log 能在开发期通过 JSON file adapter 跨重启恢复，生产实现可替换为 PostgreSQL-backed store。
+- Hub groups、invites、members、tokens、projects、sync cursor 和 audit log 能通过开发期 JSON file adapter 或 PostgreSQL-backed Hub state store 跨重启恢复。
 - 管理后台能查看关键安全生命周期事件，支持 project ACL 和 member token rotation 管理，并保持所有写操作通过 server API。
 
 ## 发布前检查

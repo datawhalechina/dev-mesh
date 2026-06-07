@@ -7,11 +7,14 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createDevMeshCore, type DevMeshCore } from '@mcp-dev-mesh/core';
 import { JsonlKnowledgeRepository } from '@mcp-dev-mesh/local-store';
-import { createHubState, DEFAULT_LOCAL_INVITE_TOKEN } from '../src/hub-state.js';
+import { createHubState, DEFAULT_LOCAL_INVITE_TOKEN, type HubState, type HubStateOptions } from '../src/hub-state.js';
 import {
   createHubServer,
+  deserializeHubState,
   federateHubSyncEventsFromHttpPeer,
+  serializeHubState,
   type KoaHubServer,
+  type HubStatePersistenceStore,
   type MeshServerOptions
 } from '../src/index.js';
 
@@ -2244,6 +2247,63 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('persists hub state through an injected store across server restarts', async () => {
+    const store = new TestHubStateStore();
+    let joined: JoinResponseBody | undefined;
+
+    const first = await startHubServer({
+      core: createDevMeshCore(),
+      hubStateStore: store
+    });
+
+    try {
+      joined = await joinDefaultGroup(first.url);
+      await requestJson(`${first.url}/api/v1/projects`, {
+        method: 'POST',
+        headers: authHeaders(joined.accessToken),
+        body: {
+          id: 'injected-store-project',
+          name: 'Injected Store Project'
+        }
+      });
+    } finally {
+      await first.app.close();
+    }
+
+    if (joined === undefined) {
+      throw new Error('Expected join to complete before injected store restart.');
+    }
+
+    const second = await startHubServer({
+      core: createDevMeshCore(),
+      hubStateStore: store
+    });
+
+    try {
+      const projects = await requestJson(`${second.url}/api/v1/projects`, {
+        headers: authHeaders(joined.accessToken)
+      });
+      const audit = await requestJson(`${second.url}/api/v1/admin/audit?action=project.created`);
+
+      expect(store.saves).toBeGreaterThanOrEqual(2);
+      expect(projects.status).toBe(200);
+      expect(projects.body.projects).toEqual([
+        expect.objectContaining({
+          id: 'injected-store-project',
+          createdByMemberId: joined.memberId
+        })
+      ]);
+      expect(audit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'project.created',
+          targetId: 'injected-store-project'
+        })
+      ]);
+    } finally {
+      await second.app.close();
+    }
+  });
+
   it('persists MCP capture, task, and rating calls when backed by the local store', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-server-'));
     const core = createDevMeshCore({
@@ -2486,6 +2546,20 @@ interface JoinResponseBody {
   accessToken: string;
   syncSigningSecret: string;
   expiresAt: string;
+}
+
+class TestHubStateStore implements HubStatePersistenceStore {
+  saves = 0;
+  private snapshot: unknown;
+
+  async load(fallback: HubStateOptions = {}): Promise<HubState> {
+    return this.snapshot === undefined ? createHubState(fallback) : deserializeHubState(this.snapshot);
+  }
+
+  async save(state: HubState): Promise<void> {
+    this.snapshot = serializeHubState(state);
+    this.saves += 1;
+  }
 }
 
 interface TestSyncEvent {

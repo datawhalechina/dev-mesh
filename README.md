@@ -354,7 +354,7 @@ mesh_resolve_term
 - `packages/server` 暴露 `federateHubSyncEvents` 和 `federateHubSyncEventsFromHttpPeer`：可在两个 HubState 之间或通过 HTTP peer event-log endpoint 按 peer/group cursor 增量复制 sync event，重复复制幂等跳过，并写入 federation audit。
 - project list 和 project brief 默认只返回当前 token 所属 group 内且 ACL 允许的项目；跨 group 或未授权项目返回 404，避免泄露 project id。brief 内容会过滤其他 group 的非 org knowledge，但允许 `visibility: "org"` 的 canonical knowledge 作为组织级共享上下文进入已授权项目 brief。
 - 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
-- `createHubServer({ hubStatePath })` 可把开发期 HubState 持久化到 JSON 文件，并在重启后恢复 groups、invites、members、tokens、projects、sync cursor 和 audit log；生产部署仍应替换为数据库-backed store。
+- `createHubServer({ hubStatePath })` 可把开发期 HubState 持久化到 JSON 文件；`createHubServer({ hubStateStore })` 可接入自定义持久化 store。`packages/storage` 提供 PostgreSQL-backed Hub state store，可通过 JSONB snapshot 在重启后恢复 groups、invites、members、tokens、projects、sync cursor 和 audit log。
 - 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为数据库持久化、短期 token 默认策略和更完整 ACL。
 - `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、glossary、knowledge、knowledge edges、quality review、task digest、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、轮换 member token、配置 project ACL、创建和编辑 glossary term，以及创建 supersede / duplicate / contradict edge。
 
@@ -371,7 +371,7 @@ mesh_resolve_term
 | `pnpm test:e2e` | 启动真实 `dmx-server` 的 Streamable HTTP MCP smoke 测试 |
 | `pnpm test` | 运行全部已发现测试 |
 
-PostgreSQL repository 集成测试默认跳过；如需运行真实数据库测试，先提供专用测试库连接：
+PostgreSQL storage 集成测试默认跳过；如需运行真实数据库测试，先提供专用测试库连接：
 
 ```bash
 DEV_MESH_POSTGRES_URL=postgres://devmesh:devmesh@127.0.0.1:5432/devmesh_test pnpm exec vitest run packages/storage/tests/postgres.integration.test.ts
@@ -446,7 +446,7 @@ pnpm typecheck:examples
 - 已完成短期 invite 默认策略：admin 创建 invite 时默认 24 小时有效，显式 `expiresAt` / `maxUses` 仍可覆盖。
 - 已完成开发期 Hub state persistence：`hubStatePath` 支持 JSON 文件恢复 Hub 状态和 audit log。
 - 已完成 web-admin ACL 和 token rotation 管理：members 表支持按 member 轮换 token，projects 表支持 group/restricted ACL。
-- 下一步推进生产化持久化：PostgreSQL-backed Hub state store。
+- 已完成 PostgreSQL-backed Hub state store：`packages/storage` 提供 migration helper 和 JSONB snapshot store，可通过 `hubStateStore` 注入 Hub Server。
 - 扩展自动沉淀的质量评分、低风险自动发布策略和发布包体优化。
 
 后续任务清单见 [docs/TODO.md](./docs/TODO.md)。
@@ -458,4 +458,4 @@ pnpm typecheck:examples
 - 默认不上传原始对话全文。
 - 默认启用脱敏策略，后续高风险内容应进入 review queue。
 - `.dev-mesh/secrets/`、credential 文件、`.env`、`*.pem`、`*.key` 不应同步或提交。
-- 当前实现仍是开发骨架，生产部署前需要补齐认证、持久化 ACL、持久化审计、redaction 和同步安全测试。
+- 生产部署前仍需接入外部认证、运行时密钥管理、备份恢复和运维监控策略。

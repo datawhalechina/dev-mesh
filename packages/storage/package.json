@@ -18,6 +18,7 @@
   "dependencies": {
     "@mcp-dev-mesh/core": "workspace:*",
     "@mcp-dev-mesh/extension-api": "workspace:*",
+    "@mcp-dev-mesh/server": "workspace:*",
     "pg": "^8.21.0"
   },
   "devDependencies": {

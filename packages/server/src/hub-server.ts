@@ -67,7 +67,7 @@ import {
   type HubStateOptions
 } from './hub-state.js';
 import { createHubProjectBrief } from './hub-knowledge.js';
-import { loadHubStateFromFile, saveHubStateToFile } from './hub-persistence.js';
+import { createJsonHubStateStore, type HubStatePersistenceStore } from './hub-persistence.js';
 import {
   pullHubSyncEventLog,
   pullHubSyncEvents,
@@ -83,6 +83,7 @@ export interface MeshServerOptions {
   logger?: boolean;
   hub?: HubStateOptions;
   hubStatePath?: string;
+  hubStateStore?: HubStatePersistenceStore;
 }
 
 export interface MeshListenOptions {
@@ -162,23 +163,33 @@ interface McpHttpSession {
 export async function createHubServer(options: MeshServerOptions): Promise<KoaHubServer> {
   const app = new Koa();
   const baseUrl = options.baseUrl;
-  const hub =
-    options.hubStatePath === undefined
-      ? createHubState(options.hub)
-      : await loadHubStateFromFile(options.hubStatePath, options.hub);
+  const hubStateStore = resolveHubStateStore(options);
+  const hub = hubStateStore === undefined ? createHubState(options.hub) : await hubStateStore.load(options.hub);
   const mcpSessions = new Map<string, McpHttpSession>();
   const router = createHubRouter(options.core, baseUrl, hub, mcpSessions);
 
   app.use(createErrorMiddleware(options.logger ?? false));
   app.use(createCorsMiddleware());
   app.use(bodyParser());
-  if (options.hubStatePath !== undefined) {
-    app.use(createHubStatePersistenceMiddleware(hub, options.hubStatePath));
+  if (hubStateStore !== undefined) {
+    app.use(createHubStatePersistenceMiddleware(hub, hubStateStore));
   }
   app.use(router.routes());
   app.use(router.allowedMethods());
 
   return new KoaHubServer(app, mcpSessions);
+}
+
+function resolveHubStateStore(options: MeshServerOptions): HubStatePersistenceStore | undefined {
+  if (options.hubStatePath !== undefined && options.hubStateStore !== undefined) {
+    throw new Error('hubStatePath and hubStateStore cannot be used together.');
+  }
+
+  if (options.hubStateStore !== undefined) {
+    return options.hubStateStore;
+  }
+
+  return options.hubStatePath === undefined ? undefined : createJsonHubStateStore(options.hubStatePath);
 }
 
 export async function listenMeshServer(server: KoaHubServer, options: MeshListenOptions = {}): Promise<string> {
@@ -510,7 +521,7 @@ function createHubRouter(
   return router;
 }
 
-function createHubStatePersistenceMiddleware(hub: HubState, path: string): Middleware {
+function createHubStatePersistenceMiddleware(hub: HubState, store: HubStatePersistenceStore): Middleware {
   return async (ctx, next) => {
     await next();
 
@@ -518,7 +529,7 @@ function createHubStatePersistenceMiddleware(hub: HubState, path: string): Middl
       return;
     }
 
-    await saveHubStateToFile(hub, path);
+    await store.save(hub);
   };
 }
 
