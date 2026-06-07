@@ -99,6 +99,7 @@ describe('hub federation sync', () => {
     });
     const targetFrontendPull = pullHubSyncEvents(target, frontendAuth, undefined);
     const targetBackendPull = pullHubSyncEvents(target, backendAuth, undefined);
+    const [firstTargetEvent, targetTombstoneEvent, secondTargetEvent] = targetFrontendPull.events;
 
     expect(firstPush).toMatchObject({
       ok: true,
@@ -168,6 +169,24 @@ describe('hub federation sync', () => {
       })
     ]);
     expect(targetFrontendPull.cursor).toBe('cur_frontend-team_3');
+    if (firstTargetEvent?.log === undefined || targetTombstoneEvent?.log === undefined || secondTargetEvent?.log === undefined) {
+      throw new Error('Expected federated target events to include log metadata.');
+    }
+    expect(firstTargetEvent.log).toMatchObject({
+      sequence: 1,
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+    });
+    expect(firstTargetEvent.log.previousHash).toBeUndefined();
+    expect(targetTombstoneEvent.log).toMatchObject({
+      sequence: 2,
+      previousHash: firstTargetEvent.log.hash,
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+    });
+    expect(secondTargetEvent.log).toMatchObject({
+      sequence: 3,
+      previousHash: targetTombstoneEvent.log.hash,
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+    });
     expect(targetBackendPull).toEqual({
       cursor: 'cur_backend-team_0',
       events: []

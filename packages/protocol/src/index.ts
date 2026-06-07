@@ -109,6 +109,7 @@ export interface SyncEvent {
   payload: Record<string, unknown>;
   createdAt?: string;
   signature?: SyncEventSignature;
+  log?: SyncEventLogMetadata;
 }
 
 export interface SyncEventSignature {
@@ -116,6 +117,12 @@ export interface SyncEventSignature {
   value: string;
   signedAt?: string;
   keyId?: string;
+}
+
+export interface SyncEventLogMetadata {
+  sequence: number;
+  hash: string;
+  previousHash?: string;
 }
 
 export interface SyncPushRequest {

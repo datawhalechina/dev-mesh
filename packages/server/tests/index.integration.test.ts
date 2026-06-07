@@ -119,7 +119,11 @@ describe('hub server HTTP integration', () => {
             id: 'evt_1',
             kind: 'knowledge.created',
             payload: {},
-            createdAt: expect.any(String)
+            createdAt: expect.any(String),
+            log: {
+              sequence: 1,
+              hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+            }
           })
         ]
       });
@@ -268,6 +272,7 @@ describe('hub server HTTP integration', () => {
           events: []
         }
       });
+      const [firstFrontendEvent, secondFrontendEvent] = frontendInitialPull.body.events;
 
       expect(firstPush.body).toMatchObject({
         accepted: 2,
@@ -297,6 +302,17 @@ describe('hub server HTTP integration', () => {
           createdAt: expect.any(String)
         })
       ]);
+      expect(firstFrontendEvent.log).toMatchObject({
+        sequence: 1,
+        hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+      });
+      expect(firstFrontendEvent.log.previousHash).toBeUndefined();
+      expect(secondFrontendEvent.log).toMatchObject({
+        sequence: 2,
+        previousHash: firstFrontendEvent.log.hash,
+        hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+      });
+      expect(secondFrontendEvent.log.hash).not.toBe(firstFrontendEvent.log.hash);
       expect(backendPull.body).toMatchObject({
         cursor: 'cur_backend-team_0',
         events: []
@@ -327,6 +343,11 @@ describe('hub server HTTP integration', () => {
               tombstone: true,
               reason: 'Superseded by canonical context',
               deletedAt: '2026-06-06T01:00:00.000Z'
+            },
+            log: {
+              sequence: 3,
+              previousHash: secondFrontendEvent.log.hash,
+              hash: expect.stringMatching(/^[a-f0-9]{64}$/)
             }
           })
         ]
@@ -439,7 +460,11 @@ describe('hub server HTTP integration', () => {
             algorithm: 'hmac-sha256',
             value: signedEvent.signature.value,
             signedAt: '2026-06-06T12:00:00.000Z'
-          })
+          }),
+          log: {
+            sequence: 1,
+            hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+          }
         })
       ]);
       expect(audit.body.auditLogs).toEqual([

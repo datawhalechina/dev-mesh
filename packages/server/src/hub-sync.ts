@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { SyncEvent, SyncPullResponse, SyncPushRequest, SyncPushResponse } from '@mcp-dev-mesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubResult, HubState, HubSyncEvent } from './hub-model.js';
@@ -62,8 +62,7 @@ export function pushHubSyncEvents(
       continue;
     }
 
-    const hubEvent = createHubSyncEvent(auth, event);
-    groupEvents.push(hubEvent);
+    const hubEvent = appendHubSyncEvent(groupEvents, createHubSyncEvent(auth, event));
     existingIds.add(event.id);
     accepted += 1;
     auditSyncTombstoneAccepted(state, {
@@ -125,13 +124,14 @@ export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeIn
       continue;
     }
 
-    const merged = cloneHubSyncEvent({
-      ...event,
-      groupKey: input.groupKey,
-      acceptedAt
-    });
-
-    groupEvents.push(merged);
+    const merged = appendHubSyncEvent(
+      groupEvents,
+      cloneHubSyncEvent({
+        ...event,
+        groupKey: input.groupKey,
+        acceptedAt
+      })
+    );
     existingIds.add(merged.id);
     accepted += 1;
     auditSyncTombstoneAccepted(state, {
@@ -321,6 +321,10 @@ function toProtocolSyncEvent(event: HubSyncEvent): SyncEvent {
     protocolEvent.signature = event.signature;
   }
 
+  if (event.log !== undefined) {
+    protocolEvent.log = cloneSyncEventLogMetadata(event.log);
+  }
+
   return protocolEvent;
 }
 
@@ -339,7 +343,79 @@ function cloneHubSyncEvent(event: HubSyncEvent): HubSyncEvent {
     clone.signature = event.signature;
   }
 
+  if (event.log !== undefined) {
+    clone.log = cloneSyncEventLogMetadata(event.log);
+  }
+
   return clone;
+}
+
+function appendHubSyncEvent(groupEvents: HubSyncEvent[], event: HubSyncEvent): HubSyncEvent {
+  const previousHash = groupEvents.at(-1)?.log?.hash;
+  const loggedEvent = cloneHubSyncEvent({
+    ...event,
+    log: createSyncEventLogMetadata(event, groupEvents.length + 1, previousHash)
+  });
+
+  groupEvents.push(loggedEvent);
+
+  return loggedEvent;
+}
+
+function createSyncEventLogMetadata(
+  event: HubSyncEvent,
+  sequence: number,
+  previousHash: string | undefined
+): NonNullable<HubSyncEvent['log']> {
+  const log: NonNullable<HubSyncEvent['log']> = {
+    sequence,
+    hash: createSyncEventLogHash(event, sequence, previousHash)
+  };
+
+  if (previousHash !== undefined) {
+    log.previousHash = previousHash;
+  }
+
+  return log;
+}
+
+function cloneSyncEventLogMetadata(log: NonNullable<HubSyncEvent['log']>): NonNullable<HubSyncEvent['log']> {
+  const clone: NonNullable<HubSyncEvent['log']> = {
+    sequence: log.sequence,
+    hash: log.hash
+  };
+
+  if (log.previousHash !== undefined) {
+    clone.previousHash = log.previousHash;
+  }
+
+  return clone;
+}
+
+function createSyncEventLogHash(
+  event: HubSyncEvent,
+  sequence: number,
+  previousHash: string | undefined
+): string {
+  return createHash('sha256')
+    .update(
+      stableStringify({
+        version: 1,
+        sequence,
+        previousHash: previousHash ?? null,
+        event: {
+          id: event.id,
+          kind: event.kind,
+          payload: event.payload,
+          createdAt: event.createdAt,
+          clientId: event.clientId,
+          groupKey: event.groupKey,
+          acceptedAt: event.acceptedAt,
+          signature: event.signature ?? null
+        }
+      })
+    )
+    .digest('hex');
 }
 
 function createSyncCursor(groupKey: string, offset: number): string {
