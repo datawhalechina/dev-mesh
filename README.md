@@ -415,7 +415,7 @@ pnpm typecheck:examples
 
 ## 开发状态
 
-当前重点已推进到阶段 5 分布式 Mesh：
+阶段 5 分布式 Mesh 已完成，当前进入发布前验证和生产化准备：
 
 - 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
 - 已完成 Git snapshot provider、filesystem snapshot provider 和 MCP tool call provider，能采集 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数、工具调用成功/失败信号，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
@@ -437,9 +437,8 @@ pnpm typecheck:examples
 - 已完成 signed event log 验证基础：服务端为 group sync log 生成 sequence、hash 和 previousHash，并可复验 hash chain、HMAC 签名和写入 verification failure audit。
 - 已完成 offline-first conflict replay：`knowledge.updated` 离线分支恢复后会按 base knowledge 合并检测冲突，使用 `contradicts` edge 表达并保留 replay audit。
 - 已完成 org-level knowledge sharing：project brief 保持 group/project ACL 隔离，同时允许 org-visible canonical knowledge 跨 group 共享。
-- 下一步推进更完整的分布式同步能力。
-- 扩展自动沉淀的质量评分和低风险自动发布策略。
-- 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。
+- 下一步推进生产化持久化：短期 invite、token rotation、持久化 Hub 状态、持久化 audit log 和更完整 ACL。
+- 扩展自动沉淀的质量评分、低风险自动发布策略和发布包体优化。
 
 后续任务清单见 [docs/TODO.md](./docs/TODO.md)。
 

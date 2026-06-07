@@ -151,12 +151,12 @@
 
 ## 发布前检查
 
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
-- [ ] `pnpm test:unit`
-- [ ] `pnpm test:integration`
-- [ ] `pnpm test:contract`
-- [ ] `pnpm test:security`
-- [ ] `pnpm test:e2e`
-- [ ] `pnpm build`
-- [ ] `git diff --check`
+- [x] `pnpm typecheck`
+- [x] `pnpm test`
+- [x] `pnpm test:unit`
+- [x] `pnpm test:integration`
+- [x] `pnpm test:contract`
+- [x] `pnpm test:security`
+- [x] `pnpm test:e2e`
+- [x] `pnpm build`
+- [x] `git diff --check`
