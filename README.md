@@ -89,6 +89,9 @@ pnpm test:contract
 pnpm test:security
 pnpm test:e2e
 pnpm build
+pnpm release:check
+pnpm docker:config
+pnpm docker:up
 ```
 
 启动开发期 Hub Server：
@@ -414,8 +417,10 @@ DEV_MESH_LOGGER=true
 Alpha 发布骨架见 [docs/release.md](docs/release.md)。本地容器栈可通过以下命令启动：
 
 ```bash
-docker compose -f deploy/docker-compose.yml up --build
+pnpm docker:up
 ```
+
+更多 Compose 操作见 [deploy/README.md](deploy/README.md)。
 
 ## 开发规范
 

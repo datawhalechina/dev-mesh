@@ -18,7 +18,14 @@
     "dev:admin": "pnpm --filter @mcp-dev-mesh/web-admin dev",
     "dev:client": "pnpm --filter mcp-dev-mesh dev",
     "dev:website": "pnpm --filter @mcp-dev-mesh/website start",
-    "build:website": "pnpm --filter @mcp-dev-mesh/website build"
+    "build:website": "pnpm --filter @mcp-dev-mesh/website build",
+    "release:check": "pnpm typecheck && pnpm test && pnpm build",
+    "docker:config": "docker compose -f deploy/docker-compose.yml config",
+    "docker:build": "docker compose -f deploy/docker-compose.yml build",
+    "docker:up": "docker compose -f deploy/docker-compose.yml up --build",
+    "docker:up:detached": "docker compose -f deploy/docker-compose.yml up --build -d",
+    "docker:down": "docker compose -f deploy/docker-compose.yml down",
+    "docker:down:volumes": "docker compose -f deploy/docker-compose.yml down -v"
   },
   "devDependencies": {
     "@types/koa": "^3.0.3",

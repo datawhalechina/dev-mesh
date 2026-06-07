@@ -19,9 +19,7 @@ Run the full verification suite before creating a tag or building images:
 
 ```bash
 pnpm install
-pnpm typecheck
-pnpm test
-pnpm build
+pnpm release:check
 ```
 
 Known build warnings:
@@ -33,7 +31,7 @@ Known build warnings:
 Build and start the alpha stack:
 
 ```bash
-docker compose -f deploy/docker-compose.yml up --build
+pnpm docker:up
 ```
 
 Default URLs:
@@ -48,14 +46,16 @@ Website: http://127.0.0.1:3000
 Stop the stack:
 
 ```bash
-docker compose -f deploy/docker-compose.yml down
+pnpm docker:down
 ```
 
 Remove local volumes when you intentionally want to reset PostgreSQL and server data:
 
 ```bash
-docker compose -f deploy/docker-compose.yml down -v
+pnpm docker:down:volumes
 ```
+
+The same commands are summarized in [`../deploy/README.md`](../deploy/README.md).
 
 ## Mesh Server Environment
 
