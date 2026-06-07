@@ -343,6 +343,7 @@ mesh_resolve_term
 - `GET /api/v1/groups` 返回可加入的 group 摘要。
 - `POST /api/v1/join` 需要有效 `inviteToken`，成功后签发 group-scoped Bearer access token。
 - `POST /api/v1/auth/rotate` 需要当前 Bearer token，成功后签发新的 access token、撤销旧 token、保持 sync signing secret 稳定，并写入不含 token 明文的 audit。
+- `POST /api/v1/admin/members/:memberId/rotate-token` 支持管理后台按 member 轮换 access token，撤销该 member 旧 token，并只在响应中一次性返回新 token。
 - `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
 - `POST /api/v1/admin/invites` 创建的 admin invite 未显式提供 `expiresAt` 时默认 24 小时后过期；seed 的本地开发 invite 不套用该默认策略。
 - sync push/pull 目前使用开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 不会重复追加，pull 只返回当前 group 的增量事件。
@@ -355,7 +356,7 @@ mesh_resolve_term
 - 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
 - `createHubServer({ hubStatePath })` 可把开发期 HubState 持久化到 JSON 文件，并在重启后恢复 groups、invites、members、tokens、projects、sync cursor 和 audit log；生产部署仍应替换为数据库-backed store。
 - 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为数据库持久化、短期 token 默认策略和更完整 ACL。
-- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、glossary、knowledge、knowledge edges、quality review、task digest、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、配置 project ACL、创建和编辑 glossary term，以及创建 supersede / duplicate / contradict edge。
+- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、glossary、knowledge、knowledge edges、quality review、task digest、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、轮换 member token、配置 project ACL、创建和编辑 glossary term，以及创建 supersede / duplicate / contradict edge。
 
 ## 测试策略
 
@@ -444,7 +445,8 @@ pnpm typecheck:examples
 - 已完成 access token rotation：旧 Bearer token 立即失效，新 token 保持原 client identity 和 sync signing secret，并写入 rotation audit。
 - 已完成短期 invite 默认策略：admin 创建 invite 时默认 24 小时有效，显式 `expiresAt` / `maxUses` 仍可覆盖。
 - 已完成开发期 Hub state persistence：`hubStatePath` 支持 JSON 文件恢复 Hub 状态和 audit log。
-- 下一步推进生产化持久化：PostgreSQL-backed Hub state store 和更完整 ACL。
+- 已完成 web-admin ACL 和 token rotation 管理：members 表支持按 member 轮换 token，projects 表支持 group/restricted ACL。
+- 下一步推进生产化持久化：PostgreSQL-backed Hub state store。
 - 扩展自动沉淀的质量评分、低风险自动发布策略和发布包体优化。
 
 后续任务清单见 [docs/TODO.md](./docs/TODO.md)。

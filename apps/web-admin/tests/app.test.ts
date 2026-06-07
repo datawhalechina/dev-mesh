@@ -33,6 +33,8 @@ describe('web-admin app structure', () => {
     expect(source).toContain('reloadTaskDigest');
     expect(source).toContain('taskDigestStats');
     expect(source).toContain('disableMemberRow');
+    expect(source).toContain('rotateMemberTokenRow');
     expect(source).toContain('revokeInviteRow');
+    expect(source).toContain('Rotated Token');
   });
 });

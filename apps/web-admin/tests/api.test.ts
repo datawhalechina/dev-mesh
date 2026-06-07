@@ -11,6 +11,7 @@ import {
   fetchKnowledgeEdges,
   fetchQualityReview,
   fetchTaskDigest,
+  rotateMemberToken,
   revokeInvite,
   updateGlossaryItem,
   updateProjectAcl
@@ -227,16 +228,43 @@ describe('web-admin API client', () => {
   });
 
   it('posts invite and member management requests', async () => {
-    const fetchMock = vi.fn(async () =>
-      jsonResponse({
-        token: 'inv_design',
-        groupKey: 'design-team',
-        uses: 0,
-        status: 'active',
-        createdAt: '2026-06-06T00:00:00.000Z',
-        createdBy: 'admin'
-      })
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          token: 'inv_design',
+          groupKey: 'design-team',
+          uses: 0,
+          status: 'active',
+          createdAt: '2026-06-06T00:00:00.000Z',
+          createdBy: 'admin'
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          token: 'inv_design',
+          groupKey: 'design-team',
+          uses: 0,
+          status: 'revoked',
+          createdAt: '2026-06-06T00:00:00.000Z',
+          createdBy: 'admin'
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          memberId: 'member_design_xiaoyun',
+          status: 'disabled'
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          memberId: 'member_design_xiaoyun',
+          clientId: 'client_design_xiaoyun',
+          groupKey: 'design-team',
+          accessToken: 'mesh_rotated',
+          expiresAt: '2026-06-13T00:00:00.000Z'
+        })
+      );
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -247,6 +275,7 @@ describe('web-admin API client', () => {
     });
     await revokeInvite('inv_design');
     await disableMember('member_design_xiaoyun', 'Offboarded');
+    await rotateMemberToken('member_design_xiaoyun');
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -275,6 +304,13 @@ describe('web-admin API client', () => {
         body: JSON.stringify({
           reason: 'Offboarded'
         })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      '/api/v1/admin/members/member_design_xiaoyun/rotate-token',
+      expect.objectContaining({
+        method: 'POST'
       })
     );
   });

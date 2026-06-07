@@ -16,6 +16,7 @@ import type {
   QualityReviewFilters,
   QualityReviewResponse,
   ReviewQueueItem,
+  RotatedAccessToken,
   TaskDigestFilters,
   TaskDigestResponse
 } from './types.js';
@@ -47,6 +48,12 @@ export async function disableMember(memberId: string, reason?: string): Promise<
   return requestJson<MemberSummary>(`/api/v1/admin/members/${encodeURIComponent(memberId)}/disable`, {
     method: 'POST',
     body: reason ? { reason } : {}
+  });
+}
+
+export async function rotateMemberToken(memberId: string): Promise<RotatedAccessToken> {
+  return requestJson<RotatedAccessToken>(`/api/v1/admin/members/${encodeURIComponent(memberId)}/rotate-token`, {
+    method: 'POST'
   });
 }
 

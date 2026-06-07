@@ -39,6 +39,15 @@ export interface MemberSummary {
   tokenExpiresAt?: string;
 }
 
+export interface RotatedAccessToken {
+  memberId: string;
+  clientId: string;
+  groupKey: string;
+  accessToken: string;
+  syncSigningSecret?: string;
+  expiresAt?: string;
+}
+
 export interface ProjectSummary {
   id: string;
   projectKey: string;

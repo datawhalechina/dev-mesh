@@ -21,6 +21,7 @@ import {
   fetchQualityReview,
   fetchReviewQueue,
   fetchTaskDigest,
+  rotateMemberToken,
   revokeInvite,
   updateGlossaryItem,
   updateProjectAcl
@@ -45,6 +46,7 @@ import type {
   QualityReviewItem,
   QualityReviewResponse,
   ReviewQueueItem,
+  RotatedAccessToken,
   TaskDigestFilters,
   TaskDigestResponse,
   TaskStatus
@@ -98,8 +100,10 @@ const groupDialogOpen = ref(false);
 const inviteDialogOpen = ref(false);
 const projectDialogOpen = ref(false);
 const projectAclDialogOpen = ref(false);
+const rotatedTokenDialogOpen = ref(false);
 const glossaryDialogOpen = ref(false);
 const edgeDialogOpen = ref(false);
+const rotatedToken = ref<RotatedAccessToken | null>(null);
 const selectedAclProject = ref<ProjectSummary | null>(null);
 const editingGlossaryId = ref<string | null>(null);
 const groupForm = reactive<GroupInput>({
@@ -430,6 +434,21 @@ async function disableMemberRow(row: MemberSummary): Promise<void> {
 
   try {
     await disableMember(row.memberId, 'Disabled from web admin');
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function rotateMemberTokenRow(row: MemberSummary): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    rotatedToken.value = await rotateMemberToken(row.memberId);
+    rotatedTokenDialogOpen.value = true;
     await refreshAll();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
@@ -880,17 +899,27 @@ interface KnowledgeEdgeFormInput {
               </el-table-column>
               <el-table-column prop="clientId" label="Client" min-width="260" />
               <el-table-column prop="tokenExpiresAt" label="Token Expires" min-width="190" />
-              <el-table-column label="Actions" width="130" fixed="right">
+              <el-table-column label="Actions" width="220" fixed="right">
                 <template #default="{ row }">
-                  <el-button
-                    :disabled="row.status === 'disabled'"
-                    :icon="Lock"
-                    size="small"
-                    type="danger"
-                    @click="disableMemberRow(row)"
-                  >
-                    Disable
-                  </el-button>
+                  <el-button-group>
+                    <el-button
+                      :disabled="row.status === 'disabled'"
+                      :icon="Refresh"
+                      size="small"
+                      @click="rotateMemberTokenRow(row)"
+                    >
+                      Rotate
+                    </el-button>
+                    <el-button
+                      :disabled="row.status === 'disabled'"
+                      :icon="Lock"
+                      size="small"
+                      type="danger"
+                      @click="disableMemberRow(row)"
+                    >
+                      Disable
+                    </el-button>
+                  </el-button-group>
                 </template>
               </el-table-column>
             </el-table>
@@ -1253,6 +1282,23 @@ interface KnowledgeEdgeFormInput {
       <template #footer>
         <el-button @click="inviteDialogOpen = false">Cancel</el-button>
         <el-button type="primary" @click="submitInvite">Create</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="rotatedTokenDialogOpen" title="Rotated Token" width="640px">
+      <el-descriptions v-if="rotatedToken" :column="1" border>
+        <el-descriptions-item label="Member">{{ rotatedToken.memberId }}</el-descriptions-item>
+        <el-descriptions-item label="Client">{{ rotatedToken.clientId }}</el-descriptions-item>
+        <el-descriptions-item label="Access Token">
+          <span class="secret-value">{{ rotatedToken.accessToken }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item v-if="rotatedToken.syncSigningSecret" label="Sync Secret">
+          <span class="secret-value">{{ rotatedToken.syncSigningSecret }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="Expires">{{ rotatedToken.expiresAt }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button type="primary" @click="rotatedTokenDialogOpen = false">Close</el-button>
       </template>
     </el-dialog>
 

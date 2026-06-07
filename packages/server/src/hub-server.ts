@@ -34,6 +34,7 @@ import {
   listAdminProjects,
   listAdminReviewQueue,
   revokeAdminInvite,
+  rotateAdminMemberAccessToken,
   updateAdminGlossary,
   updateAdminProjectAcl,
   type AdminAuditQuery,
@@ -377,6 +378,21 @@ function createHubRouter(
     }
 
     sendHubResult(ctx, disableAdminMember(hub, memberId, readBody<AdminMemberDisableInput>(ctx)));
+  });
+
+  router.post('/api/v1/admin/members/:memberId/rotate-token', (ctx) => {
+    const memberId = ctx.params.memberId;
+
+    if (memberId === undefined) {
+      sendHubError(ctx, {
+        statusCode: 400,
+        code: 'admin.member_id_required',
+        message: 'Member id is required.'
+      });
+      return;
+    }
+
+    sendHubResult(ctx, rotateAdminMemberAccessToken(hub, memberId));
   });
 
   router.get('/api/v1/admin/invites', (ctx) => {

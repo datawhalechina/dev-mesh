@@ -163,6 +163,14 @@ body {
   font-size: 54px;
 }
 
+.secret-value {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  line-height: 1.5;
+}
+
 @media (max-width: 900px) {
   .admin-shell {
     display: block;

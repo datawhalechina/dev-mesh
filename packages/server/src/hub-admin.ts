@@ -7,8 +7,9 @@ import type {
   KnowledgeLayer,
   SearchKnowledgeInput
 } from '@mcp-dev-mesh/core';
-import type { ProjectAclMember, ProjectAclRole, ProjectAclVisibility, ProjectSummary } from '@mcp-dev-mesh/protocol';
+import type { JoinResponse, ProjectAclMember, ProjectAclRole, ProjectAclVisibility, ProjectSummary } from '@mcp-dev-mesh/protocol';
 import {
+  ACCESS_TOKEN_TTL_MS,
   DEFAULT_ADMIN_INVITE_TTL_MS,
   DEFAULT_GROUP_KEY,
   type HubGroup,
@@ -767,6 +768,63 @@ export function disableAdminMember(
   return ok(summary);
 }
 
+export function rotateAdminMemberAccessToken(state: HubState, memberId: string): HubResult<JoinResponse> {
+  const member = state.members.get(memberId);
+
+  if (member === undefined) {
+    return hubError(404, 'admin.member_not_found', 'Member was not found.');
+  }
+
+  if (member.status === 'disabled') {
+    return hubError(403, 'admin.member_disabled', 'Disabled members cannot receive rotated access tokens.');
+  }
+
+  const previousTokens = [...state.tokens.values()].filter((token) => token.memberId === member.memberId);
+  const previousToken = previousTokens.find((token) => token.clientId === member.clientId) ?? previousTokens[0];
+
+  if (previousToken === undefined) {
+    return hubError(404, 'admin.member_token_not_found', 'Member does not have an access token to rotate.');
+  }
+
+  const accessToken = createAccessToken();
+  const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS).toISOString();
+
+  for (const token of previousTokens) {
+    state.tokens.delete(token.token);
+  }
+
+  state.tokens.set(accessToken, {
+    token: accessToken,
+    memberId: member.memberId,
+    clientId: member.clientId,
+    groupKey: member.groupKey,
+    syncSigningSecret: previousToken.syncSigningSecret,
+    expiresAt
+  });
+  appendHubAuditLog(state, {
+    actor: 'admin',
+    action: 'auth.token_rotated',
+    targetType: 'member',
+    targetId: member.memberId,
+    groupKey: member.groupKey,
+    payload: {
+      clientId: member.clientId,
+      previousExpiresAt: previousToken.expiresAt,
+      expiresAt,
+      revokedTokenCount: previousTokens.length
+    }
+  });
+
+  return ok({
+    memberId: member.memberId,
+    clientId: member.clientId,
+    groupKey: member.groupKey,
+    accessToken,
+    syncSigningSecret: previousToken.syncSigningSecret,
+    expiresAt
+  });
+}
+
 export function listAdminAuditLogs(state: HubState, input: AdminAuditQuery = {}): { auditLogs: AdminAuditLog[] } {
   const limit = input.limit ?? 50;
   const auditLogs = state.auditLogs
@@ -935,6 +993,10 @@ function createInviteToken(state: HubState): string {
   } while (state.invites.has(token));
 
   return token;
+}
+
+function createAccessToken(): string {
+  return `mesh_${randomUUID().replace(/-/g, '')}`;
 }
 
 function createKnowledgeEdgeId(): string {
