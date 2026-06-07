@@ -24,6 +24,12 @@ Start in the background:
 pnpm docker:up:detached
 ```
 
+Verify the running stack:
+
+```bash
+pnpm docker:smoke
+```
+
 Stop the stack:
 
 ```bash
@@ -58,6 +64,21 @@ The Compose stack defines the development alpha environment inline. Use `mesh-se
 ```bash
 cp deploy/mesh-server.env.example mesh-server.env
 node apps/mesh-server/dist/index.js --env-file ./mesh-server.env
+```
+
+The smoke test URLs can be overridden when ports or hosts differ:
+
+```bash
+DEV_MESH_SMOKE_HUB_URL=http://127.0.0.1:8721 pnpm docker:smoke
+DEV_MESH_SMOKE_WEB_ADMIN_URL=http://127.0.0.1:5173 pnpm docker:smoke
+DEV_MESH_SMOKE_WEBSITE_URL=http://127.0.0.1:3000 pnpm docker:smoke
+```
+
+PowerShell example:
+
+```powershell
+$env:DEV_MESH_SMOKE_HUB_URL = 'http://127.0.0.1:8721'
+pnpm docker:smoke
 ```
 
 For full release notes and boundaries, see [`../docs/release.md`](../docs/release.md).

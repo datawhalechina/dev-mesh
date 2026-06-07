@@ -92,6 +92,7 @@ pnpm build
 pnpm release:check
 pnpm docker:config
 pnpm docker:up
+pnpm docker:smoke
 ```
 
 启动开发期 Hub Server：

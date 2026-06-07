@@ -34,6 +34,13 @@ Build and start the alpha stack:
 pnpm docker:up
 ```
 
+For background startup followed by a smoke check:
+
+```bash
+pnpm docker:up:detached
+pnpm docker:smoke
+```
+
 Default URLs:
 
 ```text
@@ -56,6 +63,14 @@ pnpm docker:down:volumes
 ```
 
 The same commands are summarized in [`../deploy/README.md`](../deploy/README.md).
+
+`pnpm docker:smoke` waits for the stack and checks:
+
+- Hub Server `/healthz`.
+- Hub Server `/.well-known/dev-mesh`.
+- Web Admin static shell.
+- Web Admin `/healthz` proxy.
+- Website home page.
 
 ## Mesh Server Environment
 
