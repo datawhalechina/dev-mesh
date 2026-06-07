@@ -2,9 +2,6 @@ name: Docker Images
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: read

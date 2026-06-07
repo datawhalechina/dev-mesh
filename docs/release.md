@@ -103,7 +103,7 @@ docker build -f apps/web-admin/Dockerfile -t mcp-dev-mesh-web-admin:alpha .
 docker build -f apps/website/Dockerfile -t mcp-dev-mesh-website:alpha .
 ```
 
-The `Docker Images` GitHub workflow publishes the three application images to GitHub Container Registry on `v*` tags and manual dispatch:
+The `Docker Images` GitHub workflow is manual-only for now, so `v*` tags can publish npm and GitHub Release artifacts without automatically publishing containers. When run manually, it publishes the three application images to GitHub Container Registry:
 
 ```text
 ghcr.io/<owner>/mcp-dev-mesh-server:<tag>
@@ -111,12 +111,12 @@ ghcr.io/<owner>/mcp-dev-mesh-web-admin:<tag>
 ghcr.io/<owner>/mcp-dev-mesh-website:<tag>
 ```
 
-Tag rules:
+Tag rules for manual runs:
 
-- Tag builds publish `<git-tag>`, `alpha`, and `sha-<short-sha>`.
-- Manual dispatch builds publish `manual-<run-number>` and `sha-<short-sha>`.
+- Manual dispatch on a branch publishes `manual-<run-number>` and `sha-<short-sha>`.
+- Manual dispatch on a tag publishes `<git-tag>`, `alpha`, and `sha-<short-sha>`.
 
-The workflow uses the repository `GITHUB_TOKEN` with `packages: write`; no registry password needs to be committed.
+The workflow uses the repository `GITHUB_TOKEN` with `packages: write`; no registry password needs to be committed. The target registry can be switched to Docker Hub later without changing the npm or GitHub Release workflows.
 
 ## Website Deployment
 
@@ -157,7 +157,7 @@ The CLI package bundles internal workspace code into `dist/index.js`; runtime np
 ## Current Release Boundaries
 
 - Public npm publishing is enabled for the `mcp-dev-mesh` CLI only. Internal workspace libraries remain private and are bundled into the CLI.
-- Container images are published to GHCR, but the Compose stack still builds from source for local alpha testing.
+- Container image publishing is manual-only and currently targets GHCR; Docker Hub publishing can be wired in later without affecting npm releases.
 - GitHub Release artifacts currently cover static frontends and deployment docs; the Node server is released through source checkout or container images, not as a standalone npm package.
 - Web Admin is intended to be served behind the included Nginx proxy or another reverse proxy that forwards `/api` and `/healthz` to the Hub Server.
 - Production secrets and external PostgreSQL credentials should be provided through the deployment platform, not committed to the repository.
