@@ -64,7 +64,7 @@ import {
   type HubState,
   type HubStateOptions
 } from './hub-state.js';
-import { pullHubSyncEvents, pushHubSyncEvents } from './hub-sync.js';
+import { pullHubSyncEvents, pushHubSyncEvents, replayHubSyncTombstones } from './hub-sync.js';
 import { createMeshMcpServer } from './mcp.js';
 
 export interface MeshServerOptions {
@@ -198,7 +198,7 @@ function createHubRouter(
     sendHubResult(ctx, joinHubGroup(hub, readBody<JoinRequest>(ctx)));
   });
 
-  router.post('/api/v1/sync/push', (ctx) => {
+  router.post('/api/v1/sync/push', async (ctx) => {
     const auth = requireHubAuth(hub, ctx.headers);
 
     if (!auth.ok) {
@@ -206,7 +206,16 @@ function createHubRouter(
       return;
     }
 
-    sendHubResult(ctx, pushHubSyncEvents(hub, auth.value, readBody<SyncPushRequest>(ctx)));
+    const result = pushHubSyncEvents(hub, auth.value, readBody<SyncPushRequest>(ctx));
+
+    if (result.ok && result.value.accepted > 0) {
+      await replayHubSyncTombstones(hub, core, {
+        groupKey: auth.value.groupKey,
+        actor: auth.value.memberId
+      });
+    }
+
+    sendHubResult(ctx, result);
   });
 
   router.get('/api/v1/sync/pull', (ctx) => {

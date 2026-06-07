@@ -377,6 +377,88 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('replays tombstone sync events into the knowledge repository', async () => {
+    const core = createDevMeshCore();
+    const item = await core.captureKnowledge({
+      id: 'kn_tombstone_sync_1',
+      type: 'decision',
+      title: 'Tombstone replay target',
+      summary: 'This knowledge should disappear from default sync search after replay.',
+      tags: ['sync', 'tombstone']
+    });
+    const { app, url } = await startHubServer({
+      core
+    });
+
+    try {
+      const joined = await joinDefaultGroup(url);
+      const push = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(joined.accessToken),
+        body: {
+          clientId: joined.clientId,
+          events: [
+            {
+              id: 'evt_tombstone_replay_1',
+              kind: 'knowledge.deleted',
+              payload: {
+                knowledgeId: item.id,
+                tombstone: true,
+                reason: 'Remote deletion won conflict replay',
+                deletedAt: '2026-06-07T03:00:00.000Z'
+              },
+              createdAt: '2026-06-07T03:00:00.000Z'
+            }
+          ]
+        }
+      });
+      const stored = await core.getKnowledge(item.id);
+      const defaultSearch = await core.searchKnowledge({
+        query: 'tombstone replay target',
+        limit: 10
+      });
+      const allKnowledge = await core.listKnowledge({
+        includeSuperseded: true
+      });
+      const audit = await requestJson(`${url}/api/v1/admin/audit?action=sync.tombstone_replayed`);
+
+      expect(push.body).toMatchObject({
+        accepted: 1,
+        rejected: [],
+        cursor: 'cur_default_1'
+      });
+      expect(stored).toMatchObject({
+        id: item.id,
+        status: 'tombstone',
+        updatedAt: '2026-06-07T03:00:00.000Z'
+      });
+      expect(defaultSearch.map((result) => result.id)).not.toContain(item.id);
+      expect(allKnowledge).toEqual([
+        expect.objectContaining({
+          id: item.id,
+          status: 'tombstone'
+        })
+      ]);
+      expect(audit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'sync.tombstone_replayed',
+          targetType: 'knowledge',
+          targetId: item.id,
+          groupKey: joined.groupKey,
+          payload: expect.objectContaining({
+            eventId: 'evt_tombstone_replay_1',
+            clientId: joined.clientId,
+            previousStatus: 'active',
+            reason: 'Remote deletion won conflict replay',
+            deletedAt: '2026-06-07T03:00:00.000Z'
+          })
+        })
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('verifies signed sync events and audits tampered payloads', async () => {
     const { app, url } = await startHubServer({
       core: createDevMeshCore()

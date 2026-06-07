@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import type { DevMeshCore, KnowledgeItem } from '@mcp-dev-mesh/core';
 import type { SyncEvent, SyncPullResponse, SyncPushRequest, SyncPushResponse } from '@mcp-dev-mesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubResult, HubState, HubSyncEvent } from './hub-model.js';
@@ -36,6 +37,20 @@ export interface HubSyncEventLogVerificationResult {
   ok: boolean;
   checked: number;
   rejected: HubSyncEventLogVerificationFailure[];
+}
+
+export interface HubSyncTombstoneReplayInput {
+  groupKey: string;
+  cursor?: string;
+  actor?: string;
+}
+
+export interface HubSyncTombstoneReplayResult {
+  scanned: number;
+  applied: number;
+  skipped: number;
+  missing: number;
+  cursor: string;
 }
 
 export function pushHubSyncEvents(
@@ -161,6 +176,56 @@ export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeIn
     accepted,
     skipped,
     cursor: createSyncCursor(input.groupKey, groupEvents.length)
+  };
+}
+
+export async function replayHubSyncTombstones(
+  state: HubState,
+  core: DevMeshCore,
+  input: HubSyncTombstoneReplayInput
+): Promise<HubSyncTombstoneReplayResult> {
+  const page = pullHubSyncEventLog(state, input.groupKey, input.cursor);
+  let applied = 0;
+  let skipped = 0;
+  let missing = 0;
+
+  for (const event of page.events) {
+    const tombstone = readKnowledgeTombstonePayload(event);
+
+    if (tombstone === undefined) {
+      skipped += 1;
+      continue;
+    }
+
+    const existing = await core.repository.get(tombstone.knowledgeId);
+
+    if (existing === undefined) {
+      missing += 1;
+      continue;
+    }
+
+    if (existing.status === 'tombstone') {
+      skipped += 1;
+      continue;
+    }
+
+    await core.repository.upsert(createTombstoneKnowledgeItem(existing, tombstone.deletedAt ?? event.createdAt));
+    applied += 1;
+    auditSyncTombstoneReplayed(state, {
+      actor: input.actor ?? event.clientId,
+      groupKey: input.groupKey,
+      event,
+      tombstone,
+      previousStatus: existing.status
+    });
+  }
+
+  return {
+    scanned: page.events.length,
+    applied,
+    skipped,
+    missing,
+    cursor: page.cursor
   };
 }
 
@@ -584,6 +649,14 @@ function readKnowledgeTombstonePayload(
   return tombstone;
 }
 
+function createTombstoneKnowledgeItem(item: KnowledgeItem, updatedAt: string): KnowledgeItem {
+  return {
+    ...item,
+    status: 'tombstone',
+    updatedAt
+  };
+}
+
 function createSyncEventSignature(auth: HubAuthContext, event: SyncEvent): string {
   return createHmac('sha256', auth.syncSigningSecret)
     .update(
@@ -728,6 +801,40 @@ function auditSyncTombstoneAccepted(
     action: 'sync.tombstone_accepted',
     targetType: 'knowledge',
     targetId: tombstone.knowledgeId,
+    groupKey: input.groupKey,
+    payload
+  });
+}
+
+function auditSyncTombstoneReplayed(
+  state: HubState,
+  input: {
+    actor: string;
+    groupKey: string;
+    event: HubSyncEvent;
+    tombstone: { knowledgeId: string; reason?: string; deletedAt?: string };
+    previousStatus: string;
+  }
+): void {
+  const payload: Record<string, unknown> = {
+    eventId: input.event.id,
+    clientId: input.event.clientId,
+    previousStatus: input.previousStatus
+  };
+
+  if (input.tombstone.reason !== undefined) {
+    payload.reason = input.tombstone.reason;
+  }
+
+  if (input.tombstone.deletedAt !== undefined) {
+    payload.deletedAt = input.tombstone.deletedAt;
+  }
+
+  appendHubAuditLog(state, {
+    actor: input.actor,
+    action: 'sync.tombstone_replayed',
+    targetType: 'knowledge',
+    targetId: input.tombstone.knowledgeId,
     groupKey: input.groupKey,
     payload
   });

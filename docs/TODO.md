@@ -94,7 +94,7 @@
 - [x] signed event log 链式摘要 metadata 基础。
 - [ ] server-to-server federation。
 - [x] signed event log。
-- [ ] tombstone sync。
+- [x] tombstone sync。
 - [ ] offline-first conflict replay。
 - [ ] org-level knowledge sharing。
 - [x] federation sync integration test。
