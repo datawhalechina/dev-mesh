@@ -103,7 +103,20 @@ docker build -f apps/web-admin/Dockerfile -t mcp-dev-mesh-web-admin:alpha .
 docker build -f apps/website/Dockerfile -t mcp-dev-mesh-website:alpha .
 ```
 
-The `Docker Images` GitHub workflow builds these images on `v*` tags and manual dispatch. It does not push images yet.
+The `Docker Images` GitHub workflow publishes the three application images to GitHub Container Registry on `v*` tags and manual dispatch:
+
+```text
+ghcr.io/<owner>/mcp-dev-mesh-server:<tag>
+ghcr.io/<owner>/mcp-dev-mesh-web-admin:<tag>
+ghcr.io/<owner>/mcp-dev-mesh-website:<tag>
+```
+
+Tag rules:
+
+- Tag builds publish `<git-tag>`, `alpha`, and `sha-<short-sha>`.
+- Manual dispatch builds publish `manual-<run-number>` and `sha-<short-sha>`.
+
+The workflow uses the repository `GITHUB_TOKEN` with `packages: write`; no registry password needs to be committed.
 
 ## Website Deployment
 
@@ -112,6 +125,6 @@ The `Website Pages` GitHub workflow builds the VitePress site and uploads `apps/
 ## Current Release Boundaries
 
 - Public npm publishing is not enabled. Packages still use `private: true` and workspace dependencies.
-- Container images are build-checked but not pushed to a registry.
+- Container images are published to GHCR, but the Compose stack still builds from source for local alpha testing.
 - Web Admin is intended to be served behind the included Nginx proxy or another reverse proxy that forwards `/api` and `/healthz` to the Hub Server.
 - Production secrets and external PostgreSQL credentials should be provided through the deployment platform, not committed to the repository.
