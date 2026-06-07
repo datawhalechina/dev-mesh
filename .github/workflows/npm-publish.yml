@@ -1,0 +1,55 @@
+name: NPM Publish
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release
+        run: pnpm release:check
+
+      - name: Pack CLI package
+        run: |
+          mkdir -p release/npm
+          npm pack ./apps/dmx --pack-destination release/npm
+
+      - name: Upload npm package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: release/npm/*.tgz
+          if-no-files-found: error
+
+      - name: Publish CLI to npm
+        if: github.ref_type == 'tag'
+        working-directory: apps/dmx
+        run: npm publish --tag alpha --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

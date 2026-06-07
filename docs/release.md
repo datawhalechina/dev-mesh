@@ -136,9 +136,27 @@ mcp-dev-mesh-deploy-<tag>.tar.gz
 
 The Web Admin and Website archives contain static files ready for any static host. The deploy archive contains `README.md`, `deploy/`, and this release guide.
 
+## NPM CLI Publishing
+
+The `NPM Publish` GitHub workflow publishes the `mcp-dev-mesh` CLI package on `v*` tags. Manual dispatch builds and uploads the npm tarball as a workflow artifact without publishing.
+
+Required repository secret:
+
+```text
+NPM_TOKEN
+```
+
+The workflow publishes with the `alpha` dist-tag:
+
+```bash
+npm install -g mcp-dev-mesh@alpha
+```
+
+The CLI package bundles internal workspace code into `dist/index.js`; runtime npm dependencies are limited to external packages used by the bundled CLI.
+
 ## Current Release Boundaries
 
-- Public npm publishing is not enabled. Packages still use `private: true` and workspace dependencies.
+- Public npm publishing is enabled for the `mcp-dev-mesh` CLI only. Internal workspace libraries remain private and are bundled into the CLI.
 - Container images are published to GHCR, but the Compose stack still builds from source for local alpha testing.
 - GitHub Release artifacts currently cover static frontends and deployment docs; the Node server is released through source checkout or container images, not as a standalone npm package.
 - Web Admin is intended to be served behind the included Nginx proxy or another reverse proxy that forwards `/api` and `/healthz` to the Hub Server.
