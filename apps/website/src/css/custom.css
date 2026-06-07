@@ -1,0 +1,47 @@
+:root {
+  --ifm-color-primary: #227d66;
+  --ifm-color-primary-dark: #1f705c;
+  --ifm-color-primary-darker: #1d6a57;
+  --ifm-color-primary-darkest: #185747;
+  --ifm-color-primary-light: #258a70;
+  --ifm-color-primary-lighter: #279077;
+  --ifm-color-primary-lightest: #2fa98b;
+  --ifm-font-family-base: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ifm-heading-letter-spacing: 0;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(42, 168, 137, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #8ed7bf;
+  --ifm-color-primary-dark: #73cdae;
+  --ifm-color-primary-darker: #65c8a6;
+  --ifm-color-primary-darkest: #3eb88e;
+  --ifm-color-primary-light: #a9e1d0;
+  --ifm-color-primary-lighter: #b7e6d8;
+  --ifm-color-primary-lightest: #e0f5ee;
+  --docusaurus-highlighted-code-line-bg: rgba(142, 215, 191, 0.16);
+}
+
+.navbar {
+  box-shadow: 0 1px 0 rgba(24, 34, 28, 0.08);
+}
+
+.button {
+  letter-spacing: 0;
+}
+
+.button--primary {
+  --ifm-button-background-color: #2aa889;
+  --ifm-button-border-color: #2aa889;
+}
+
+.button--secondary {
+  --ifm-button-background-color: #fff8ea;
+  --ifm-button-border-color: #fff8ea;
+  color: #18221c;
+}
+
+.footer {
+  background: #13201a;
+}

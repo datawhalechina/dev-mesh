@@ -16,7 +16,9 @@
     "test:e2e": "pnpm --filter @mcp-dev-mesh/mesh-server... build && vitest run --config vitest.e2e.config.ts",
     "dev:server": "pnpm --filter @mcp-dev-mesh/mesh-server dev",
     "dev:admin": "pnpm --filter @mcp-dev-mesh/web-admin dev",
-    "dev:client": "pnpm --filter mcp-dev-mesh dev"
+    "dev:client": "pnpm --filter mcp-dev-mesh dev",
+    "dev:website": "pnpm --filter @mcp-dev-mesh/website start",
+    "build:website": "pnpm --filter @mcp-dev-mesh/website build"
   },
   "devDependencies": {
     "@types/koa": "^3.0.3",

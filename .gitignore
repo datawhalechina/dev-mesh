@@ -7,3 +7,5 @@ coverage/
 .dev-mesh/queue/
 .dev-mesh/secrets/
 .dev-mesh/sync/
+apps/website/.docusaurus/
+apps/website/build/
