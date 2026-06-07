@@ -2089,6 +2089,93 @@ describe('hub server HTTP integration', () => {
     }
   }, 30000);
 
+  it('persists hub state and audit logs across server restarts', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-hub-state-'));
+    const hubStatePath = join(projectRoot, 'hub-state.json');
+    let joined: JoinResponseBody | undefined;
+
+    try {
+      const first = await startHubServer({
+        core: createDevMeshCore(),
+        hubStatePath
+      });
+
+      try {
+        joined = await joinDefaultGroup(first.url);
+        await requestJson(`${first.url}/api/v1/projects`, {
+          method: 'POST',
+          headers: authHeaders(joined.accessToken),
+          body: {
+            id: 'persisted-hub-project',
+            name: 'Persisted Hub Project'
+          }
+        });
+      } finally {
+        await first.app.close();
+      }
+
+      if (joined === undefined) {
+        throw new Error('Expected join to complete before restart.');
+      }
+
+      const persisted = JSON.parse(await readFile(hubStatePath, 'utf8'));
+      expect(persisted).toMatchObject({
+        version: 1,
+        groups: [
+          expect.objectContaining({
+            key: 'default'
+          })
+        ],
+        projects: [
+          expect.objectContaining({
+            id: 'persisted-hub-project',
+            groupKey: 'default'
+          })
+        ],
+        auditLogs: expect.arrayContaining([
+          expect.objectContaining({
+            action: 'member.joined',
+            targetId: joined.memberId
+          }),
+          expect.objectContaining({
+            action: 'project.created',
+            targetId: 'persisted-hub-project'
+          })
+        ])
+      });
+
+      const second = await startHubServer({
+        core: createDevMeshCore(),
+        hubStatePath
+      });
+
+      try {
+        const projects = await requestJson(`${second.url}/api/v1/projects`, {
+          headers: authHeaders(joined.accessToken)
+        });
+        const audit = await requestJson(`${second.url}/api/v1/admin/audit?action=project.created`);
+
+        expect(projects.status).toBe(200);
+        expect(projects.body.projects).toEqual([
+          expect.objectContaining({
+            id: 'persisted-hub-project',
+            createdByMemberId: joined.memberId
+          })
+        ]);
+        expect(audit.body.auditLogs).toEqual([
+          expect.objectContaining({
+            action: 'project.created',
+            targetId: 'persisted-hub-project'
+          })
+        ]);
+      } finally {
+        await second.app.close();
+      }
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
   it('persists MCP capture, task, and rating calls when backed by the local store', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-server-'));
     const core = createDevMeshCore({

@@ -353,7 +353,8 @@ mesh_resolve_term
 - `packages/server` 暴露 `federateHubSyncEvents` 和 `federateHubSyncEventsFromHttpPeer`：可在两个 HubState 之间或通过 HTTP peer event-log endpoint 按 peer/group cursor 增量复制 sync event，重复复制幂等跳过，并写入 federation audit。
 - project list 和 project brief 默认只返回当前 token 所属 group 内且 ACL 允许的项目；跨 group 或未授权项目返回 404，避免泄露 project id。brief 内容会过滤其他 group 的非 org knowledge，但允许 `visibility: "org"` 的 canonical knowledge 作为组织级共享上下文进入已授权项目 brief。
 - 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
-- 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为持久化 invite、短期 token、持久化审计和更完整 ACL。
+- `createHubServer({ hubStatePath })` 可把开发期 HubState 持久化到 JSON 文件，并在重启后恢复 groups、invites、members、tokens、projects、sync cursor 和 audit log；生产部署仍应替换为数据库-backed store。
+- 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为数据库持久化、短期 token 默认策略和更完整 ACL。
 - `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、glossary、knowledge、knowledge edges、quality review、task digest、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、配置 project ACL、创建和编辑 glossary term，以及创建 supersede / duplicate / contradict edge。
 
 ## 测试策略
@@ -442,7 +443,8 @@ pnpm typecheck:examples
 - 已完成 org-level knowledge sharing：project brief 保持 group/project ACL 隔离，同时允许 org-visible canonical knowledge 跨 group 共享。
 - 已完成 access token rotation：旧 Bearer token 立即失效，新 token 保持原 client identity 和 sync signing secret，并写入 rotation audit。
 - 已完成短期 invite 默认策略：admin 创建 invite 时默认 24 小时有效，显式 `expiresAt` / `maxUses` 仍可覆盖。
-- 下一步推进生产化持久化：持久化 Hub 状态、持久化 audit log 和更完整 ACL。
+- 已完成开发期 Hub state persistence：`hubStatePath` 支持 JSON 文件恢复 Hub 状态和 audit log。
+- 下一步推进生产化持久化：PostgreSQL-backed Hub state store 和更完整 ACL。
 - 扩展自动沉淀的质量评分、低风险自动发布策略和发布包体优化。
 
 后续任务清单见 [docs/TODO.md](./docs/TODO.md)。

@@ -66,6 +66,7 @@ import {
   type HubStateOptions
 } from './hub-state.js';
 import { createHubProjectBrief } from './hub-knowledge.js';
+import { loadHubStateFromFile, saveHubStateToFile } from './hub-persistence.js';
 import {
   pullHubSyncEventLog,
   pullHubSyncEvents,
@@ -80,6 +81,7 @@ export interface MeshServerOptions {
   baseUrl?: string;
   logger?: boolean;
   hub?: HubStateOptions;
+  hubStatePath?: string;
 }
 
 export interface MeshListenOptions {
@@ -159,13 +161,19 @@ interface McpHttpSession {
 export async function createHubServer(options: MeshServerOptions): Promise<KoaHubServer> {
   const app = new Koa();
   const baseUrl = options.baseUrl;
-  const hub = createHubState(options.hub);
+  const hub =
+    options.hubStatePath === undefined
+      ? createHubState(options.hub)
+      : await loadHubStateFromFile(options.hubStatePath, options.hub);
   const mcpSessions = new Map<string, McpHttpSession>();
   const router = createHubRouter(options.core, baseUrl, hub, mcpSessions);
 
   app.use(createErrorMiddleware(options.logger ?? false));
   app.use(createCorsMiddleware());
   app.use(bodyParser());
+  if (options.hubStatePath !== undefined) {
+    app.use(createHubStatePersistenceMiddleware(hub, options.hubStatePath));
+  }
   app.use(router.routes());
   app.use(router.allowedMethods());
 
@@ -484,6 +492,18 @@ function createHubRouter(
   });
 
   return router;
+}
+
+function createHubStatePersistenceMiddleware(hub: HubState, path: string): Middleware {
+  return async (ctx, next) => {
+    await next();
+
+    if (ctx.method === 'GET' || ctx.method === 'HEAD' || ctx.status >= 500) {
+      return;
+    }
+
+    await saveHubStateToFile(hub, path);
+  };
 }
 
 function createErrorMiddleware(logger: boolean): Middleware {
