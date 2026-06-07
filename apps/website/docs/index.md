@@ -8,35 +8,35 @@ aside: false
 <main class="mesh-home">
   <section class="mesh-hero">
     <div class="mesh-hero__inner">
-      <p class="mesh-eyebrow">Local-first context memory</p>
+      <p class="mesh-eyebrow">Project context layer</p>
       <h1>MCP Dev Mesh</h1>
       <p class="mesh-hero__lead">
-        把 Codex、Claude Code、opencode 的项目经验沉淀到可审查、可同步、可检索的
-        <code>.dev-mesh</code> 知识网络中。
+        给项目放一个可检索、可审查的上下文层。决策、任务进展、术语和命令经验落在
+        <code>.dev-mesh</code>，再通过 MCP 被本地工具调用。
       </p>
       <div class="mesh-actions">
         <a class="mesh-button" href="/getting-started">开始使用</a>
-        <a class="mesh-button mesh-button--secondary" href="/architecture">查看架构</a>
+        <a class="mesh-button mesh-button--secondary" href="/reference/cli">CLI 参考</a>
       </div>
     </div>
   </section>
 
   <section class="mesh-section mesh-section--warm">
     <div class="mesh-section__inner">
-      <p class="mesh-kicker">Project memory that travels with the repo</p>
-      <h2>从一次对话，到长期项目上下文</h2>
+      <p class="mesh-kicker">What goes into the repo</p>
+      <h2>记录工程事实，不写概念口号</h2>
       <div class="mesh-grid">
         <article class="mesh-panel">
-          <h3>本地优先</h3>
-          <p>知识先写入项目自己的 .dev-mesh 目录，团队可以审查、同步和迁移。</p>
+          <h3>决策记录</h3>
+          <p>服务端配置、存储策略、接口边界这些“为什么这样做”，落成可检索条目。</p>
         </article>
         <article class="mesh-panel">
-          <h3>MCP 接入</h3>
-          <p>Codex、Claude Code 和 opencode 通过本地 proxy 调用统一工具沉淀上下文。</p>
+          <h3>任务进展</h3>
+          <p>完成了什么、还缺什么、下次从哪里继续，按项目写入本地事件和知识文件。</p>
         </article>
         <article class="mesh-panel">
-          <h3>团队 Mesh</h3>
-          <p>Hub Server 管理成员、项目、邀请、同步状态和跨项目经验检索。</p>
+          <h3>命令经验</h3>
+          <p>能复用的启动、部署、排障命令留在仓库旁边，下一轮不用重新翻历史。</p>
         </article>
       </div>
     </div>
@@ -45,18 +45,18 @@ aside: false
   <section class="mesh-section mesh-section--cool">
     <div class="mesh-section__inner mesh-path">
       <div>
-        <p class="mesh-kicker">CLI and MCP workflow</p>
-        <h2>最小链路清晰可测</h2>
+        <p class="mesh-kicker">Local workflow</p>
+        <h2>先本地可用，再团队同步</h2>
         <p class="mesh-path__copy">
-          先用 CLI 完成 smoke test，再把 MCP proxy 接到 AI 工具。每条知识都可以回到
-          项目文件里检查。
+          <code>dmx</code> 先把知识库建在项目目录里。需要团队协作时，再接入 Hub Server 做成员、
+          邀请、同步状态和跨项目检索。
         </p>
       </div>
       <ol class="mesh-path__list">
-        <li><code>dmx init</code><span>创建项目级知识库</span></li>
-        <li><code>dmx proxy</code><span>暴露本地 MCP 工具</span></li>
-        <li><code>dmx capture</code><span>沉淀任务和决策</span></li>
-        <li><code>dmx search</code><span>回收上下文给下一轮协作</span></li>
+        <li><code>dmx init</code><span>初始化项目级 .dev-mesh</span></li>
+        <li><code>dmx capture</code><span>写入决策、任务和经验</span></li>
+        <li><code>dmx search</code><span>从本地知识库取回上下文</span></li>
+        <li><code>dmx join</code><span>接入团队 Hub Server</span></li>
       </ol>
     </div>
   </section>
