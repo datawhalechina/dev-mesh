@@ -122,9 +122,24 @@ The workflow uses the repository `GITHUB_TOKEN` with `packages: write`; no regis
 
 The `Website Pages` GitHub workflow builds the VitePress site and uploads `apps/website/docs/.vitepress/dist` to GitHub Pages. Enable Pages in repository settings before relying on the workflow.
 
+## GitHub Release Artifacts
+
+The `Release Artifacts` GitHub workflow runs `pnpm release:check`, packages non-Docker artifacts, and uploads them as workflow artifacts. On `v*` tags, it also creates a GitHub Release with generated notes.
+
+Release assets:
+
+```text
+mcp-dev-mesh-web-admin-<tag>.tar.gz
+mcp-dev-mesh-website-<tag>.tar.gz
+mcp-dev-mesh-deploy-<tag>.tar.gz
+```
+
+The Web Admin and Website archives contain static files ready for any static host. The deploy archive contains `README.md`, `deploy/`, and this release guide.
+
 ## Current Release Boundaries
 
 - Public npm publishing is not enabled. Packages still use `private: true` and workspace dependencies.
 - Container images are published to GHCR, but the Compose stack still builds from source for local alpha testing.
+- GitHub Release artifacts currently cover static frontends and deployment docs; the Node server is released through source checkout or container images, not as a standalone npm package.
 - Web Admin is intended to be served behind the included Nginx proxy or another reverse proxy that forwards `/api` and `/healthz` to the Hub Server.
 - Production secrets and external PostgreSQL credentials should be provided through the deployment platform, not committed to the repository.

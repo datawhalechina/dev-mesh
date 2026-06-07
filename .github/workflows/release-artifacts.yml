@@ -1,0 +1,80 @@
+name: Release Artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release
+        run: pnpm release:check
+
+      - name: Resolve artifact suffix
+        id: artifact
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          suffix="${REF_NAME//\//-}"
+
+          if [[ "${REF_TYPE}" != "tag" ]]; then
+            suffix="manual-${GITHUB_RUN_NUMBER}-${suffix}"
+          fi
+
+          echo "suffix=${suffix}" >> "${GITHUB_OUTPUT}"
+
+      - name: Package static artifacts
+        shell: bash
+        run: |
+          mkdir -p release
+
+          tar -czf "release/mcp-dev-mesh-web-admin-${{ steps.artifact.outputs.suffix }}.tar.gz" \
+            -C apps/web-admin/dist .
+
+          tar -czf "release/mcp-dev-mesh-website-${{ steps.artifact.outputs.suffix }}.tar.gz" \
+            -C apps/website/docs/.vitepress/dist .
+
+          tar -czf "release/mcp-dev-mesh-deploy-${{ steps.artifact.outputs.suffix }}.tar.gz" \
+            README.md \
+            deploy \
+            docs/release.md
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ steps.artifact.outputs.suffix }}
+          path: release/*.tar.gz
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.tar.gz
+          generate_release_notes: true
+          prerelease: true
