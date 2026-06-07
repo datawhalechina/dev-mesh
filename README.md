@@ -18,7 +18,7 @@
 - `apps/dmx`：`dmx` CLI，本地 init/capture/search/status/rate/inbox/index/doctor/proxy、全局 init 工具选择和远端 group join
 - `apps/mesh-server`：Koa2 Hub Server 启动入口
 - `apps/web-admin`：Vue 3 + Element Plus 管理后台
-- `apps/website`：Docusaurus 项目官网和使用文档
+- `apps/website`：VitePress 项目官网和使用文档
 - `packages/core`：知识条目、PARA、质量信号、搜索和评分
 - `packages/agent`：Context Pack 构建
 - `packages/client`：本地 runtime、local-only 组合和 Koa2 + 官方 MCP SDK 本地 proxy
@@ -39,7 +39,7 @@ apps/
     src/                  # Hub Server 可执行入口
     tests/                # E2E smoke 测试
   web-admin/              # Vue + Element Plus 管理后台
-  website/                # Docusaurus 官网
+  website/                # VitePress 官网
 packages/
   */src/                  # 生产代码
   */tests/                # 单元、集成、契约、安全测试

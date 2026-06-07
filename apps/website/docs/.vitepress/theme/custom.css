@@ -1,21 +1,41 @@
-.hero {
+:root {
+  --vp-c-brand-1: #227d66;
+  --vp-c-brand-2: #2aa889;
+  --vp-c-brand-3: #8ed7bf;
+  --vp-c-brand-soft: rgba(42, 168, 137, 0.14);
+  --vp-font-family-base: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --vp-home-hero-name-color: #fff8ea;
+}
+
+.VPNavBarTitle .title {
+  letter-spacing: 0;
+}
+
+.mesh-home {
+  margin: calc(var(--vp-nav-height) * -1) 0 0;
+}
+
+.mesh-hero {
   min-height: min(72vh, 720px);
   display: flex;
   align-items: center;
   background:
-    linear-gradient(90deg, rgba(9, 19, 16, 0.88), rgba(9, 19, 16, 0.58) 48%, rgba(9, 19, 16, 0.2)),
+    linear-gradient(90deg, rgba(9, 19, 16, 0.9), rgba(9, 19, 16, 0.6) 48%, rgba(9, 19, 16, 0.22)),
     url('/img/context-mesh-hero.png') center / cover no-repeat;
   color: #fff8ea;
 }
 
-.heroInner {
+.mesh-hero__inner,
+.mesh-section__inner {
   width: min(1120px, calc(100% - 40px));
   margin: 0 auto;
-  padding: 72px 0;
 }
 
-.eyebrow,
-.kicker {
+.mesh-hero__inner {
+  padding: 96px 0 72px;
+}
+
+.mesh-eyebrow {
   margin: 0 0 12px;
   color: #8ed7bf;
   font-size: 0.95rem;
@@ -24,7 +44,7 @@
   text-transform: uppercase;
 }
 
-.heroTitle {
+.mesh-hero h1 {
   max-width: 760px;
   margin: 0;
   color: #fff8ea;
@@ -33,7 +53,7 @@
   letter-spacing: 0;
 }
 
-.heroLead {
+.mesh-hero__lead {
   max-width: 680px;
   margin: 24px 0 0;
   color: #f7efe2;
@@ -41,42 +61,70 @@
   line-height: 1.65;
 }
 
-.heroActions {
+.mesh-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 32px;
 }
 
-.action {
+.mesh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid #2aa889;
   border-radius: 8px;
+  background: #2aa889;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
 }
 
-.band,
-.pathBand {
+.mesh-button:hover {
+  border-color: #227d66;
+  background: #227d66;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.mesh-button--secondary {
+  border-color: #fff8ea;
+  background: #fff8ea;
+  color: #18221c;
+}
+
+.mesh-button--secondary:hover {
+  border-color: #f0dcc0;
+  background: #f0dcc0;
+  color: #18221c;
+}
+
+.mesh-section {
   padding: 72px 0;
 }
 
-.band {
+.mesh-section--warm {
   background: #fffaf1;
 }
 
-.pathBand {
+.mesh-section--cool {
   background: #f3f7f0;
 }
 
-.bandInner,
-.pathInner {
-  width: min(1120px, calc(100% - 40px));
-  margin: 0 auto;
+.mesh-kicker {
+  margin: 0 0 12px;
+  color: #227d66;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
-.sectionHeader {
-  max-width: 720px;
-}
-
-.sectionHeader h2,
-.pathInner h2 {
+.mesh-section h2 {
+  max-width: 760px;
   margin: 0;
   color: #18221c;
   font-size: 2.25rem;
@@ -84,14 +132,14 @@
   letter-spacing: 0;
 }
 
-.flowGrid {
+.mesh-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   margin-top: 32px;
 }
 
-.flowItem {
+.mesh-panel {
   min-height: 188px;
   padding: 24px;
   border: 1px solid #d9dfd5;
@@ -100,34 +148,34 @@
   box-shadow: 0 16px 36px rgba(24, 34, 28, 0.08);
 }
 
-.flowItem h3 {
+.mesh-panel h3 {
   margin: 0 0 12px;
   color: #18221c;
   font-size: 1.25rem;
   letter-spacing: 0;
 }
 
-.flowItem p,
-.pathCopy {
+.mesh-panel p,
+.mesh-path__copy {
   margin: 0;
   color: #435149;
   line-height: 1.7;
 }
 
-.pathInner {
+.mesh-path {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
   gap: 40px;
   align-items: center;
 }
 
-.pathCopy {
+.mesh-path__copy {
   max-width: 620px;
   margin-top: 16px;
   font-size: 1.05rem;
 }
 
-.pathList {
+.mesh-path__list {
   display: grid;
   gap: 12px;
   margin: 0;
@@ -135,7 +183,7 @@
   list-style: none;
 }
 
-.pathList li {
+.mesh-path__list li {
   display: grid;
   grid-template-columns: 120px 1fr;
   gap: 16px;
@@ -148,55 +196,54 @@
   box-shadow: 0 12px 28px rgba(39, 63, 50, 0.08);
 }
 
-.pathList code {
+.mesh-path__list code {
   color: #8f3429;
   font-size: 0.95rem;
 }
 
-.pathList span {
+.mesh-path__list span {
   color: #273f32;
   font-weight: 650;
 }
 
 @media (max-width: 880px) {
-  .hero {
+  .mesh-hero {
     min-height: 680px;
     background-position: 62% center;
   }
 
-  .heroInner {
-    padding: 64px 0;
+  .mesh-hero__inner {
+    padding: 88px 0 64px;
   }
 
-  .heroTitle {
+  .mesh-hero h1 {
     font-size: 4.2rem;
   }
 
-  .heroLead {
+  .mesh-hero__lead {
     font-size: 1.1rem;
   }
 
-  .flowGrid,
-  .pathInner {
+  .mesh-grid,
+  .mesh-path {
     grid-template-columns: 1fr;
   }
 
-  .pathList li {
+  .mesh-path__list li {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 520px) {
-  .hero {
+  .mesh-hero {
     min-height: 620px;
   }
 
-  .heroTitle {
+  .mesh-hero h1 {
     font-size: 3.1rem;
   }
 
-  .band,
-  .pathBand {
+  .mesh-section {
     padding: 48px 0;
   }
 }

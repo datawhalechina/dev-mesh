@@ -61,4 +61,4 @@ pnpm dev:admin
 pnpm build
 ```
 
-然后按实际部署平台托管 `apps/web-admin/dist` 和官网 `apps/website/build`。
+然后按实际部署平台托管 `apps/web-admin/dist` 和官网 `apps/website/docs/.vitepress/dist`。

@@ -7,5 +7,6 @@ coverage/
 .dev-mesh/queue/
 .dev-mesh/secrets/
 .dev-mesh/sync/
-apps/website/.docusaurus/
-apps/website/build/
+apps/website/docs/.vitepress/cache/
+apps/website/docs/.vitepress/dist/
+apps/website/docs/.vitepress/.temp/

@@ -14,7 +14,7 @@ apps/
   dmx              CLI 客户端
   mesh-server      Hub Server 启动入口
   web-admin        管理后台
-  website          Docusaurus 官网
+  website          VitePress 官网
 
 packages/
   client           本地项目运行时、proxy、doctor、join

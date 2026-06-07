@@ -1,14 +1,16 @@
 {
-  "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
-    "baseUrl": ".",
     "ignoreDeprecations": "6.0",
-    "types": ["node", "@docusaurus/module-type-aliases"]
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "types": ["node"],
+    "skipLibCheck": true
   },
   "include": [
-    "docusaurus.config.ts",
-    "sidebars.ts",
-    "src",
-    "docs"
+    "docs/.vitepress/**/*.ts",
+    "docs/.vitepress/**/*.vue"
   ]
 }
