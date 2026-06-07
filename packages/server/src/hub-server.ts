@@ -64,6 +64,7 @@ import {
   type HubState,
   type HubStateOptions
 } from './hub-state.js';
+import { createHubProjectBrief } from './hub-knowledge.js';
 import {
   pullHubSyncEventLog,
   pullHubSyncEvents,
@@ -327,15 +328,7 @@ function createHubRouter(
       return;
     }
 
-    ctx.body = {
-      projectId: project.value.id,
-      groupKey: project.value.groupKey,
-      items: await core.searchKnowledge({
-        query: project.value.projectKey,
-        layers: ['canonical'],
-        limit: 5
-      })
-    };
+    ctx.body = await createHubProjectBrief(core, auth.value, project.value);
   });
 
   router.get('/api/v1/admin/overview', async (ctx) => {

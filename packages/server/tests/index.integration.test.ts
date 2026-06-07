@@ -1307,6 +1307,131 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('includes org-visible knowledge in project briefs across groups', async () => {
+    const core = createDevMeshCore();
+    await core.captureKnowledge({
+      id: 'kn_frontend_project_brief_local',
+      type: 'decision',
+      layer: 'canonical',
+      title: 'frontend-dashboard local routing convention',
+      summary: 'The frontend-dashboard local group owns the routing convention.',
+      visibility: 'project',
+      para: {
+        category: 'projects',
+        key: 'frontend-dashboard'
+      },
+      source: {
+        kind: 'admin',
+        metadata: {
+          groupKey: 'frontend-team',
+          projectKey: 'frontend-dashboard'
+        }
+      }
+    });
+    await core.captureKnowledge({
+      id: 'kn_frontend_project_brief_backend_team',
+      type: 'decision',
+      layer: 'canonical',
+      title: 'frontend-dashboard backend team rollout note',
+      summary: 'The backend-team note should not cross the group boundary.',
+      visibility: 'team',
+      para: {
+        category: 'projects',
+        key: 'frontend-dashboard'
+      },
+      source: {
+        kind: 'admin',
+        metadata: {
+          groupKey: 'backend-team',
+          projectKey: 'frontend-dashboard'
+        }
+      }
+    });
+    await core.captureKnowledge({
+      id: 'kn_frontend_project_brief_org',
+      type: 'convention',
+      layer: 'canonical',
+      title: 'frontend-dashboard org-wide API naming convention',
+      summary: 'The org-wide API naming convention is shared with every group.',
+      visibility: 'org',
+      para: {
+        category: 'projects',
+        key: 'frontend-dashboard'
+      },
+      source: {
+        kind: 'admin',
+        metadata: {
+          groupKey: 'backend-team',
+          projectKey: 'frontend-dashboard'
+        }
+      }
+    });
+    const { app, url } = await startHubServer({
+      core,
+      hub: {
+        groups: [
+          {
+            key: 'frontend-team',
+            displayName: 'Frontend Team'
+          },
+          {
+            key: 'backend-team',
+            displayName: 'Backend Team'
+          }
+        ],
+        invites: [
+          {
+            token: 'inv_frontend_org_brief',
+            groupKey: 'frontend-team'
+          },
+          {
+            token: 'inv_backend_org_brief',
+            groupKey: 'backend-team'
+          }
+        ]
+      }
+    });
+
+    try {
+      const frontendJoin = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_frontend_org_brief',
+          displayName: 'Xiaoyun',
+          handle: 'xiaoyun'
+        }
+      });
+      const project = await requestJson(`${url}/api/v1/projects`, {
+        method: 'POST',
+        headers: authHeaders(frontendJoin.body.accessToken),
+        body: {
+          id: 'frontend-dashboard',
+          name: 'Frontend Dashboard'
+        }
+      });
+      const brief = await requestJson(`${url}/api/v1/projects/frontend-dashboard/brief`, {
+        headers: authHeaders(frontendJoin.body.accessToken)
+      });
+      const briefItemIds = brief.body.items.map((item: { id: string }) => item.id);
+
+      expect(project.body.project).toMatchObject({
+        id: 'frontend-dashboard',
+        groupKey: 'frontend-team'
+      });
+      expect(brief.status).toBe(200);
+      expect(brief.body).toMatchObject({
+        projectId: 'frontend-dashboard',
+        groupKey: 'frontend-team'
+      });
+      expect(briefItemIds).toEqual(
+        expect.arrayContaining(['kn_frontend_project_brief_local', 'kn_frontend_project_brief_org'])
+      );
+      expect(briefItemIds).not.toContain('kn_frontend_project_brief_backend_team');
+    } finally {
+      await app.close();
+    }
+  });
+
   it('manages project glossary items through admin APIs', async () => {
     const { app, url } = await startHubServer({
       core: createDevMeshCore()
