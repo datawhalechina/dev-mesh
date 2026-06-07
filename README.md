@@ -433,7 +433,7 @@ pnpm typecheck:examples
 - 已完成 signed sync event 校验基础：支持开发期 HMAC 签名验证、篡改事件拒绝和 audit 记录。
 - 已完成库级 federation sync 基础：支持 HubState 之间按 group/cursor 增量复制、重复复制幂等、tombstone-shaped event 传播和 audit 记录。
 - 已完成 tombstone sync 校验和审计基础：`knowledge.deleted` 必须指向 knowledge id，并在 push / federation merge 时写入 tombstone audit。
-- 已完成 signed event log 链式摘要基础：服务端为 group sync log 生成 sequence、hash 和 previousHash，并随 pull / federation 事件返回。
+- 已完成 signed event log 验证基础：服务端为 group sync log 生成 sequence、hash 和 previousHash，并可复验 hash chain、HMAC 签名和写入 verification failure audit。
 - 下一步推进更完整的分布式同步能力。
 - 扩展自动沉淀的质量评分和低风险自动发布策略。
 - 引入 PostgreSQL repository、持久化 Hub 状态和同步测试。

@@ -22,6 +22,22 @@ export interface HubSyncEventMergeResult {
   cursor: string;
 }
 
+export interface HubSyncEventLogVerificationInput {
+  groupKey: string;
+  actor?: string;
+}
+
+export interface HubSyncEventLogVerificationFailure {
+  id: string;
+  reason: string;
+}
+
+export interface HubSyncEventLogVerificationResult {
+  ok: boolean;
+  checked: number;
+  rejected: HubSyncEventLogVerificationFailure[];
+}
+
 export function pushHubSyncEvents(
   state: HubState,
   auth: HubAuthContext,
@@ -146,6 +162,68 @@ export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeIn
     skipped,
     cursor: createSyncCursor(input.groupKey, groupEvents.length)
   };
+}
+
+export function verifyHubSyncEventLog(
+  state: HubState,
+  input: HubSyncEventLogVerificationInput
+): HubSyncEventLogVerificationResult {
+  const groupEvents = getGroupSyncEvents(state, input.groupKey);
+  const rejected: HubSyncEventLogVerificationFailure[] = [];
+  let previousHash: string | undefined;
+
+  for (const [index, event] of groupEvents.entries()) {
+    const expectedSequence = index + 1;
+
+    if (event.log === undefined) {
+      rejected.push({
+        id: event.id,
+        reason: 'event.log_missing'
+      });
+      previousHash = undefined;
+    } else {
+      if (event.log.sequence !== expectedSequence) {
+        rejected.push({
+          id: event.id,
+          reason: 'event.log_sequence_mismatch'
+        });
+      }
+
+      if (event.log.previousHash !== previousHash) {
+        rejected.push({
+          id: event.id,
+          reason: 'event.log_previous_hash_mismatch'
+        });
+      }
+
+      if (event.log.hash !== createSyncEventLogHash(event, expectedSequence, previousHash)) {
+        rejected.push({
+          id: event.id,
+          reason: 'event.log_hash_mismatch'
+        });
+      }
+
+      previousHash = event.log.hash;
+    }
+
+    const signatureRejection = verifyStoredSyncEventSignature(state, event);
+
+    if (signatureRejection !== undefined) {
+      rejected.push(signatureRejection);
+    }
+  }
+
+  const result: HubSyncEventLogVerificationResult = {
+    ok: rejected.length === 0,
+    checked: groupEvents.length,
+    rejected
+  };
+
+  if (!result.ok && input.actor !== undefined) {
+    auditSyncEventLogVerificationFailure(state, input, result);
+  }
+
+  return result;
 }
 
 function getGroupSyncEvents(state: HubState, groupKey: string): HubSyncEvent[] {
@@ -535,6 +613,48 @@ function isEqualSignature(expected: string, actual: string): boolean {
   return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
+function verifyStoredSyncEventSignature(
+  state: HubState,
+  event: HubSyncEvent
+): HubSyncEventLogVerificationFailure | undefined {
+  if (event.signature === undefined) {
+    return undefined;
+  }
+
+  const auth = findSyncEventAuthContext(state, event);
+
+  if (auth === undefined) {
+    return {
+      id: event.id,
+      reason: 'event.signature_secret_missing'
+    };
+  }
+
+  const rejection = validateSyncEventSignature(auth, event);
+
+  return rejection === undefined
+    ? undefined
+    : {
+        id: rejection.id,
+        reason: rejection.reason
+      };
+}
+
+function findSyncEventAuthContext(state: HubState, event: HubSyncEvent): HubAuthContext | undefined {
+  for (const token of state.tokens.values()) {
+    if (token.clientId === event.clientId && token.groupKey === event.groupKey) {
+      return {
+        memberId: token.memberId,
+        clientId: token.clientId,
+        groupKey: token.groupKey,
+        syncSigningSecret: token.syncSigningSecret
+      };
+    }
+  }
+
+  return undefined;
+}
+
 function auditSyncSignatureRejection(
   state: HubState,
   auth: HubAuthContext,
@@ -554,6 +674,24 @@ function auditSyncSignatureRejection(
     payload: {
       clientId: auth.clientId,
       reason
+    }
+  });
+}
+
+function auditSyncEventLogVerificationFailure(
+  state: HubState,
+  input: HubSyncEventLogVerificationInput,
+  result: HubSyncEventLogVerificationResult
+): void {
+  appendHubAuditLog(state, {
+    actor: input.actor ?? 'system',
+    action: 'sync.event_log_verification_failed',
+    targetType: 'sync_log',
+    targetId: input.groupKey,
+    groupKey: input.groupKey,
+    payload: {
+      checked: result.checked,
+      rejected: result.rejected
     }
   });
 }

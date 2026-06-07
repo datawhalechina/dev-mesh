@@ -431,7 +431,7 @@ GET  /api/v1/admin/audit
 
 - `/api/v1/join` 要求 `inviteToken`，token 绑定一个 group；请求里的 `groupKey` 必须与 invite 绑定的 group 一致。
 - join 成功后返回 group-scoped Bearer token；后续 sync 和 projects API 必须携带 `Authorization: Bearer <token>`。
-- `/api/v1/sync/push` 和 `/api/v1/sync/pull` 已支持开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 幂等跳过，pull 只返回当前 group 的增量事件；服务端为接受的事件附加 `log.sequence`、`log.hash` 和可选 `log.previousHash`，作为 append-only log 链式摘要基础；`knowledge.deleted` 事件必须携带 `{ knowledgeId, tombstone: true }` 并写入 tombstone audit；join 签发开发期 `syncSigningSecret`，带 `hmac-sha256` 签名的 sync event 会被校验，篡改或无效签名会被拒绝并写入 audit；`packages/server` 暴露库级 `federateHubSyncEvents`，可在两个 HubState 之间按 peer/group cursor 增量复制事件并写入 federation / tombstone audit，后续再挂接真实 peer HTTP transport。
+- `/api/v1/sync/push` 和 `/api/v1/sync/pull` 已支持开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 幂等跳过，pull 只返回当前 group 的增量事件；服务端为接受的事件附加 `log.sequence`、`log.hash` 和可选 `log.previousHash`，并通过 `verifyHubSyncEventLog` 复验 append-only log 链、HMAC 签名和 verification failure audit；`knowledge.deleted` 事件必须携带 `{ knowledgeId, tombstone: true }` 并写入 tombstone audit；join 签发开发期 `syncSigningSecret`，带 `hmac-sha256` 签名的 sync event 会被校验，篡改或无效签名会被拒绝并写入 audit；`packages/server` 暴露库级 `federateHubSyncEvents`，可在两个 HubState 之间按 peer/group cursor 增量复制事件并写入 federation / tombstone audit，后续再挂接真实 peer HTTP transport。
 - `/api/v1/projects` 和 `/api/v1/projects/:id/brief` 只返回当前 token 所属 group 且 ACL 允许访问的项目；访问其他 group 或未授权项目返回 404，避免泄露 project id。
 - Admin API 支持创建或撤销 invite、禁用 member、创建 group/project、配置 project ACL、管理 canonical glossary term、创建 supersede / duplicate / contradict edge、查询 quality review dashboard 和 task digest，并把这些写操作追加到 audit log；被禁用 member 的既有 Bearer token 会被拒绝。
 - 内存状态只用于当前 skeleton 和集成测试。生产实现应替换为 PostgreSQL-backed repository、短期 invite、token rotation、持久化 audit log 和更完整的 ACL。
@@ -2593,8 +2593,7 @@ CI 门禁：
 - group-scoped sync event log / cursor foundation（已支持 push/pull cursor、重复 push 幂等和跨 group 隔离）
 - signed sync event verification foundation（已支持开发期 HMAC 校验、拒绝篡改事件和 audit 记录）
 - tombstone sync validation / audit foundation（已支持 `knowledge.deleted` 结构校验和 push / federation merge 审计）
-- signed event log hash-chain metadata foundation（已支持服务端 sequence、hash 和 previousHash 元数据）
-- signed event log
+- signed event log verification（已支持服务端 sequence/hash/previousHash 元数据、hash chain 复验、HMAC 复验和 failure audit）
 - tombstone sync
 - offline-first conflict handling
 - org-level knowledge sharing

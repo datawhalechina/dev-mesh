@@ -93,7 +93,7 @@
 - [x] tombstone sync 事件校验和审计基础。
 - [x] signed event log 链式摘要 metadata 基础。
 - [ ] server-to-server federation。
-- [ ] signed event log。
+- [x] signed event log。
 - [ ] tombstone sync。
 - [ ] offline-first conflict replay。
 - [ ] org-level knowledge sharing。
