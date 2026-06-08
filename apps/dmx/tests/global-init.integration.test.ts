@@ -122,9 +122,31 @@ describe('dmx CLI global init', () => {
       expect(codexConfig).toContain('command = "dmx"');
       expect(codexConfig).toContain('"serve"');
       expect(codexConfig).toContain('"--mcp"');
+      expect(codexConfig).not.toContain('"--root"');
     } finally {
       await rm(globalRoot, { recursive: true, force: true });
       await rm(codexHome, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it('only pins an MCP project root when --root is explicit', async () => {
+    const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-explicit-root-global-'));
+    const codexHome = await mkdtemp(join(tmpdir(), 'dev-mesh-explicit-root-codex-home-'));
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-explicit-root-project-'));
+
+    try {
+      await runDmx(['init', '--global', '--yes', '--tool', 'codex', '--root', projectRoot], {
+        DEV_MESH_HOME: globalRoot,
+        CODEX_HOME: codexHome
+      });
+      const codexConfig = await readFile(join(codexHome, 'config.toml'), 'utf8');
+
+      expect(codexConfig).toContain('"--root"');
+      expect(codexConfig).toContain(JSON.stringify(projectRoot));
+    } finally {
+      await rm(globalRoot, { recursive: true, force: true });
+      await rm(codexHome, { recursive: true, force: true });
+      await rm(projectRoot, { recursive: true, force: true });
     }
   }, 30000);
 });

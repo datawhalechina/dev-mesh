@@ -392,9 +392,15 @@ function parseScopeOption(value: string): GlobalToolScope {
 }
 
 function createDmxServeMcpCommand(options: InitCommandOptions): { command: string; args: string[] } {
+  const args = ['serve', '--mcp', '--name', options.name];
+
+  if (options.rootExplicit) {
+    args.splice(2, 0, '--root', options.root);
+  }
+
   return {
     command: 'dmx',
-    args: ['serve', '--mcp', '--root', options.root, '--name', options.name]
+    args
   };
 }
 

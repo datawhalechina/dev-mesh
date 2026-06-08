@@ -154,7 +154,7 @@ pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --
 ```
 
 该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `dev-mesh` MCP server 配置。
-默认写入的是 stdio MCP 命令：`dmx serve --mcp --root <project>`。MCP host 启动这个前台 launcher 后，launcher 会按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，并把最近状态写入 `.dev-mesh/sync/status.json`。
+默认写入的是 stdio MCP 命令：`dmx serve --mcp --name <name>`，不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，并把最近状态写入 `.dev-mesh/sync/status.json`。
 
 加入开发期 Hub Server 的 group：
 
@@ -292,7 +292,13 @@ pnpm --filter mcp-dev-mesh dev -- doctor --root .
 
 ## 本地 MCP Proxy
 
-本地 MCP 入口由 `packages/client` 提供。推荐让 MCP host 启动 stdio launcher：
+本地 MCP 入口由 `packages/client` 提供。推荐让 MCP host 启动 stdio launcher；`dmx init` 写入的全局配置默认不包含 `--root`，让 Codex 等 MCP host 按当前项目目录启动：
+
+```bash
+dmx serve --mcp
+```
+
+手动调试时可以显式指定项目根：
 
 ```bash
 dmx serve --mcp --root .

@@ -23,7 +23,7 @@ pnpm --filter mcp-dev-mesh dev -- init --root C:\path\to\project --name local
 pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --yes
 ```
 
-`dmx init` 会把支持的 MCP host 配置为运行 `dmx serve --mcp`。前台 launcher 会按项目拉起共享 daemon；执行 `dmx join` 后，daemon 会在 `auto_sync` 开启时自动与 Hub push/pull。
+`dmx init` 会把支持的 MCP host 配置为运行 `dmx serve --mcp`。默认配置不固化 `--root`，让 MCP host 在当前项目目录启动 launcher；前台 launcher 会按项目拉起共享 daemon。执行 `dmx join` 后，daemon 会在 `auto_sync` 开启时自动与 Hub push/pull。
 
 ## 加入 Hub
 
@@ -36,6 +36,8 @@ pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 --root C:\path\to\p
 ```powershell
 pnpm --filter mcp-dev-mesh dev -- serve --mcp --root C:\path\to\project --name local
 ```
+
+上面的 `--root` 适合手动调试；`dmx init` 写入全局 MCP host 配置时默认不会带 `--root`。
 
 常用调试参数：
 

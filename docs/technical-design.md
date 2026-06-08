@@ -870,7 +870,7 @@ npm install -g mcp-dev-mesh && dmx init --global --yes && dmx join https://dev-m
 ```text
 1. 用户运行 dmx init --global。
 2. 客户端创建或迁移 ~/.dev-mesh/config.toml。
-3. 客户端准备 stdio MCP launcher 命令：dmx serve --mcp --root <project>。
+3. 客户端准备 stdio MCP launcher 命令：默认写入 `dmx serve --mcp --name <name>`，由 MCP host 的当前工作目录决定项目根；只有显式传 `--root <project>` 时才固定项目根。
 4. 客户端扫描本机已安装的编程工具：Codex、Claude Code、opencode。
 5. 客户端打开 TUI 选择页面，展示 detected / not found / already configured 状态。
 6. 用户选择要注册 MCP 的工具和 scope，默认选中已安装且未配置的工具。
@@ -2108,7 +2108,7 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 当前实现状态：
 
 - `@mcp-dev-mesh/client` 已提供 stdio launcher、项目级 daemon 和 Koa2 + 官方 MCP TypeScript SDK Streamable HTTP transport 的本地 proxy。
-- `dmx serve --mcp --root .` 会作为 MCP host 的前台 stdio 入口，按需复用或 detached spawn 项目 daemon，并在 daemon 冷启动或不可用时降级为本进程执行。
+- `dmx serve --mcp` 会作为 MCP host 的前台 stdio 入口，默认使用 host 当前工作目录作为项目根；`--root .` 可用于手动调试或显式固定项目根。launcher 会按需复用或 detached spawn 项目 daemon，并在 daemon 冷启动或不可用时降级为本进程执行。
 - daemon 通过 `.dev-mesh/daemon.pid` 做项目级锁，并把运行状态写入 `.dev-mesh/daemon.json`；空闲超过阈值后自动退出。
 - daemon 负责远端共享同步：当项目 `auto_sync = true` 且本机 `identity.json` 存在 joined server 时，daemon 会把 `.dev-mesh/events/*.jsonl` 事件签名后增量 push 到 Hub，并按 pull cursor 拉取同 group 事件。
 - 客户端同步游标写入 `.dev-mesh/sync/cursors.json`，最近一次 daemon sync 状态写入 `.dev-mesh/sync/status.json`，`dmx doctor` 会读取该状态报告远端错误和本地待推送事件数量。
