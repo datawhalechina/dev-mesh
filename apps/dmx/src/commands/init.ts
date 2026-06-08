@@ -145,7 +145,7 @@ export function renderGlobalInitTui(state: GlobalInitTuiState): string {
     'Detected tools:',
     ...rows,
     '',
-    'Automation: auto_init, auto_reference, and auto_capture are enabled; auto_sync stays off until join.',
+    'Automation: auto_init, auto_reference, auto_capture, and auto_sync are enabled by default.',
     '',
     'Keys: ↑/↓ move, Space toggle, s scope, Enter apply, q cancel.',
     ...error,

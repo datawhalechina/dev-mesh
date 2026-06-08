@@ -22,7 +22,7 @@ export async function checkSync(context: DoctorContext): Promise<DevMeshDoctorCh
       category: 'sync',
       status: 'warn',
       message: 'Project auto_sync is enabled but no joined server identity was found.',
-      fixHint: 'Run dmx join <server> --group <groupKey> --name <displayName>, or set automation.auto_sync = false.'
+      fixHint: 'Run dmx join <server> --group <groupKey> --name <displayName> to enable remote sync.'
     });
   } else {
     checks.push({

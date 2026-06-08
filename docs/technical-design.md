@@ -948,7 +948,7 @@ local_identity_id = "local_01J..."
 auto_init = true
 auto_reference = true
 auto_capture = true
-auto_sync = false
+auto_sync = true
 daemon_autostart = true
 
 [redaction]

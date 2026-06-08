@@ -52,7 +52,7 @@ describe('runDevMeshDoctor', () => {
           expect.objectContaining({
             id: 'sync.identity',
             category: 'sync',
-            status: 'ok'
+            status: 'warn'
           }),
           expect.objectContaining({
             id: 'adapter.codex.detect',
@@ -103,7 +103,6 @@ describe('runDevMeshDoctor', () => {
       await writeFile(
         configPath,
         config
-          .replace('auto_sync = false', 'auto_sync = true')
           .replace('redaction_enabled = true', 'redaction_enabled = false')
           .replace('upload_raw_transcripts = false', 'upload_raw_transcripts = true'),
         'utf8'

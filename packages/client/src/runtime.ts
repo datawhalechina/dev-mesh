@@ -205,7 +205,7 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
         autoInit: true,
         autoReference: true,
         autoCapture: true,
-        autoSync: false
+        autoSync: true
       };
     }
   };

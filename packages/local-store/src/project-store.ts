@@ -231,7 +231,7 @@ function defaultProjectConfig(options: EnsureProjectStoreOptions): string {
       autoInit: true,
       autoReference: true,
       autoCapture: true,
-      autoSync: false
+      autoSync: true
     },
     privacy: {
       redactionEnabled: true,

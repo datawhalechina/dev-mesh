@@ -34,7 +34,7 @@ describe('local project store', () => {
         localOnly: true,
         automation: {
           autoInit: true,
-          autoSync: false
+          autoSync: true
         },
         privacy: {
           redactionEnabled: true,
@@ -122,7 +122,7 @@ describe('local project store', () => {
           'auto_init = true',
           'auto_reference = false',
           'auto_capture = true',
-          'auto_sync = false',
+          'auto_sync = true',
           '',
           '[privacy]',
           'redaction_enabled = true',
