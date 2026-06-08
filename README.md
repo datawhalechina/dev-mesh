@@ -131,7 +131,15 @@ Website: http://127.0.0.1:3000
 
 ## CLI 示例
 
-当前 CLI 通过 workspace dev script 运行：
+安装后的 CLI 入口是 `dmx`。首次安装后直接运行：
+
+```bash
+dmx init
+```
+
+该命令会扫描本机 Codex、Claude Code 和 opencode，进入 TUI 选择要配置的 MCP Host，并写入对应工具的 `dev-mesh` MCP server 配置。默认全局自动化策略启用 `auto_init`、`auto_reference`、`auto_capture`，但 `auto_sync` 保持关闭，直到加入服务器 group。
+
+当前仓库开发期也可以通过 workspace dev script 运行：
 
 初始化全局配置，并选择要注册的 MCP Host 工具：
 
@@ -170,7 +178,7 @@ pnpm --filter mcp-dev-mesh dev -- proxy --root . --name local --port 8722
 初始化项目本地知识库：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- init --root . --name local
+pnpm --filter mcp-dev-mesh dev -- init --project --root . --name local
 ```
 
 写入一条本地知识：

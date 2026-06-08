@@ -15,6 +15,7 @@ export function registerInitCommand(program: Command): void {
     .command('init')
     .description('Initialize global or project Dev Mesh state')
     .option('--global', 'initialize ~/.dev-mesh instead of the current project')
+    .option('--project', 'initialize .dev-mesh in the selected project')
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
     .option('--mcp-url <url>', 'local MCP proxy URL', 'http://127.0.0.1:8722/mcp')
@@ -22,11 +23,11 @@ export function registerInitCommand(program: Command): void {
     .option('--tool <tool>', 'MCP host tool to register; repeatable', collectOption, [])
     .option('--tools <tools>', 'comma-separated MCP host tools')
     .option('--scope <scope>', 'MCP host configuration scope for selected tools: user or project', parseScopeOption, 'user')
-    .action(runInitCommand);
+    .action((options: InitCommandOptions, command: Command) => runInitCommand(withInitCommandSources(options, command)));
 }
 
 async function runInitCommand(options: InitCommandOptions): Promise<void> {
-  if (options.global) {
+  if (shouldRunGlobalInit(options)) {
     const explicitTools = collectGlobalToolOptions(options.tool, options.tools);
     const selection =
       explicitTools === undefined
@@ -143,6 +144,8 @@ export function renderGlobalInitTui(state: GlobalInitTuiState): string {
     '',
     'Detected tools:',
     ...rows,
+    '',
+    'Automation: auto_init, auto_reference, and auto_capture are enabled; auto_sync stays off until join.',
     '',
     'Keys: ↑/↓ move, Space toggle, s scope, Enter apply, q cancel.',
     ...error,
@@ -388,13 +391,34 @@ function parseScopeOption(value: string): GlobalToolScope {
 
 interface InitCommandOptions {
   global?: boolean;
+  project?: boolean;
   root: string;
+  rootExplicit?: boolean;
   name: string;
   mcpUrl: string;
   yes?: boolean;
   tool?: string[];
   tools?: string;
   scope: GlobalToolScope;
+}
+
+function shouldRunGlobalInit(options: InitCommandOptions): boolean {
+  if (options.global) {
+    return true;
+  }
+
+  if (options.project || options.rootExplicit) {
+    return false;
+  }
+
+  return true;
+}
+
+function withInitCommandSources(options: InitCommandOptions, command: Command): InitCommandOptions {
+  return {
+    ...options,
+    rootExplicit: command.getOptionValueSource('root') !== 'default'
+  };
 }
 
 interface PromptGlobalToolsOptions {

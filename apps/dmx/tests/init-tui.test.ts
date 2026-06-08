@@ -29,6 +29,7 @@ describe('global init TUI state', () => {
     expect(renderGlobalInitTui(state)).toContain('[x] Codex        installed, not configured');
     expect(renderGlobalInitTui(state)).toContain('[x] Claude Code  installed, already configured');
     expect(renderGlobalInitTui(state)).toContain('[ ] opencode     not found');
+    expect(renderGlobalInitTui(state)).toContain('auto_capture');
 
     const moved = applyGlobalInitTuiKey(state, 'down').state;
     const scoped = applyGlobalInitTuiKey(moved, 'scope').state;

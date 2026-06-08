@@ -91,6 +91,34 @@ describe('dmx CLI global init', () => {
       await rm(opencodeConfigHome, { recursive: true, force: true });
     }
   }, 30000);
+
+  it('uses global tool setup as the default init flow', async () => {
+    const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-default-global-'));
+    const codexHome = await mkdtemp(join(tmpdir(), 'dev-mesh-default-codex-home-'));
+    const mcpUrl = 'http://127.0.0.1:9998/mcp';
+
+    try {
+      const init = await runDmx(['init', '--yes', '--tool', 'codex', '--mcp-url', mcpUrl], {
+        DEV_MESH_HOME: globalRoot,
+        CODEX_HOME: codexHome
+      });
+      const initJson = JSON.parse(init.stdout) as GlobalInitOutput;
+      const config = await readFile(join(globalRoot, 'config.toml'), 'utf8');
+      const codexConfig = await readFile(join(codexHome, 'config.toml'), 'utf8');
+
+      expect(initJson).toMatchObject({
+        globalRoot,
+        selectedTools: ['codex']
+      });
+      expect(config).toContain('auto_capture = true');
+      expect(config).toContain('auto_sync = false');
+      expect(codexConfig).toContain(`[mcp_servers.dev-mesh]`);
+      expect(codexConfig).toContain(`url = "${mcpUrl}"`);
+    } finally {
+      await rm(globalRoot, { recursive: true, force: true });
+      await rm(codexHome, { recursive: true, force: true });
+    }
+  }, 30000);
 });
 
 interface GlobalToolOutput {
