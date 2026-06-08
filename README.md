@@ -154,7 +154,7 @@ pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --
 ```
 
 该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `dev-mesh` MCP server 配置。
-默认写入的是 stdio MCP 命令：`dmx serve --mcp --name <name>`，不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
+默认写入的是 stdio MCP 命令：`dmx serve --mcp --name <name>`，不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。daemon 会在 `auto_capture = true` 时后台采集 Git / filesystem 开发信号，写入 `.dev-mesh/events/` 和 `.dev-mesh/capture/status.json`；`mesh_list_development_signals` 会把这些信号交给 Codex、Claude Code 或 opencode 自己总结，再由工具调用 `mesh_capture_knowledge` / `mesh_capture_task` 沉淀高质量知识。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
 
 加入开发期 Hub Server 的 group：
 
@@ -180,7 +180,7 @@ pnpm --filter mcp-dev-mesh dev -- serve --mcp --root . --name local
 pnpm --filter mcp-dev-mesh dev -- proxy --root . --name local --port 8722
 ```
 
-`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
+`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。后台 auto-capture 只采集结构化开发信号，不在本地用粗规则代替编码助手总结；Codex、Claude Code 或 opencode 可以通过 `mesh_list_development_signals` 读取这些信号，并基于当前上下文调用 capture 工具沉淀知识。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
 
 初始化项目本地知识库：
 
@@ -257,7 +257,7 @@ pnpm --filter mcp-dev-mesh dev -- index rebuild --root .
 pnpm --filter mcp-dev-mesh dev -- doctor --root .
 ```
 
-`dmx doctor` 会检查本地 store、privacy 配置、sync 身份、daemon sync 状态、stdio launcher/daemon 状态和内置 adapter 状态。真实终端中会用 Clack TUI 按类别展示检查结果和修复建议；需要机器读取时可使用 `dmx doctor --json`。
+`dmx doctor` 会检查本地 store、privacy 配置、auto-capture 状态、sync 身份、daemon sync 状态、stdio launcher/daemon 状态和内置 adapter 状态。真实终端中会用 Clack TUI 按类别展示检查结果和修复建议；需要机器读取时可使用 `dmx doctor --json`。
 
 ## `.dev-mesh/` 本地知识库
 
@@ -328,6 +328,7 @@ mesh_capture_task
 mesh_rate_knowledge
 mesh_search_member_experience
 mesh_resolve_term
+mesh_list_development_signals
 ```
 
 集成测试覆盖 stdio launcher 启动 daemon、SDK client 调用 `tools/list` / `mesh_capture_knowledge`，以及 HTTP proxy 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_search_context`，并验证默认写入当前项目 store。
@@ -381,6 +382,7 @@ mesh_capture_task
 mesh_rate_knowledge
 mesh_search_member_experience
 mesh_resolve_term
+mesh_list_development_signals
 ```
 
 其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件。

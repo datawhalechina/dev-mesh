@@ -86,12 +86,17 @@ export const meshResolveTermInputSchema = z.object({
   limit: z.number().int().min(1).max(10).default(5)
 });
 
+export const meshListDevelopmentSignalsInputSchema = z.object({
+  limit: z.number().int().min(1).max(50).default(10)
+});
+
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
 export type MeshCaptureKnowledgeInput = z.infer<typeof meshCaptureKnowledgeInputSchema>;
 export type MeshCaptureTaskInput = z.infer<typeof meshCaptureTaskInputSchema>;
 export type MeshRateKnowledgeInput = z.infer<typeof meshRateKnowledgeInputSchema>;
 export type MeshSearchMemberExperienceInput = z.infer<typeof meshSearchMemberExperienceInputSchema>;
 export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
+export type MeshListDevelopmentSignalsInput = z.infer<typeof meshListDevelopmentSignalsInputSchema>;
 
 export interface MeshToolHandlers {
   searchContext(input: MeshSearchContextInput): Promise<unknown>;
@@ -100,6 +105,7 @@ export interface MeshToolHandlers {
   rateKnowledge(input: MeshRateKnowledgeInput): Promise<unknown>;
   searchMemberExperience(input: MeshSearchMemberExperienceInput): Promise<unknown>;
   resolveTerm(input: MeshResolveTermInput): Promise<unknown>;
+  listDevelopmentSignals(input: MeshListDevelopmentSignalsInput): Promise<unknown>;
 }
 
 export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers): void {
@@ -117,7 +123,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_capture_knowledge',
     {
       title: 'Capture knowledge',
-      description: 'Capture a decision, convention, pitfall, command, or other knowledge item.',
+      description:
+        'Capture a durable project decision, convention, pitfall, command, or handoff that you have summarized from the current coding context. Do not store secrets or raw private transcript text.',
       inputSchema: meshCaptureKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.captureKnowledge(meshCaptureKnowledgeInputSchema.parse(args)))
@@ -127,7 +134,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_capture_task',
     {
       title: 'Capture task progress',
-      description: 'Capture current task state as project knowledge.',
+      description: 'Capture current task state or handoff after you summarize what changed and what remains.',
       inputSchema: meshCaptureTaskInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.captureTask(meshCaptureTaskInputSchema.parse(args)))
@@ -162,6 +169,18 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
       inputSchema: meshResolveTermInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.resolveTerm(meshResolveTermInputSchema.parse(args)))
+  );
+
+  server.registerTool(
+    'mesh_list_development_signals',
+    {
+      title: 'List development signals',
+      description:
+        'List recent unsummarized development signals captured by the daemon. Use your own coding context to summarize durable knowledge, then call mesh_capture_knowledge or mesh_capture_task.',
+      inputSchema: meshListDevelopmentSignalsInputSchema.shape
+    },
+    async (args) =>
+      jsonToolResult(await handlers.listDevelopmentSignals(meshListDevelopmentSignalsInputSchema.parse(args)))
   );
 }
 

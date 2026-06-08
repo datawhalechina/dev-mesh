@@ -1,3 +1,5 @@
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createAgentContextService, type AgentContextService, type BuildContextPackInput } from '@mcp-dev-mesh/agent';
 import { createDevMeshCore, type CaptureKnowledgeInput, type DevMeshCore, type RateKnowledgeInput } from '@mcp-dev-mesh/core';
 import type { Extractor, ExtractProposal, RawEvent } from '@mcp-dev-mesh/extension-api';
@@ -55,6 +57,18 @@ export interface CaptureRawEventResult {
   results: PublishExtractProposalResult[];
 }
 
+export interface ListDevelopmentSignalsInput {
+  limit?: number;
+}
+
+export interface DevelopmentSignal {
+  eventId: string;
+  capturedAt: string;
+  projectKey: string;
+  rawEvent: RawEvent;
+  instruction?: string;
+}
+
 export interface DevMeshClientRuntime {
   projectRoot: string;
   core: DevMeshCore;
@@ -73,6 +87,7 @@ export interface DevMeshClientRuntime {
   acceptInboxItem(id: string): Promise<AcceptPendingKnowledgeResult>;
   rejectInboxItem(id: string, reason?: string): Promise<RejectPendingKnowledgeResult>;
   searchContext(input: BuildContextPackInput): Promise<unknown>;
+  listDevelopmentSignals(input?: ListDevelopmentSignalsInput): Promise<unknown>;
   rebuildIndex(): Promise<RebuildProjectIndexResult>;
   status(): Promise<Record<string, unknown>>;
 }
@@ -190,6 +205,14 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
       return rejectPendingKnowledge(projectRoot, id, safeReason);
     },
     searchContext: (input) => agent.buildContextPack(input),
+    async listDevelopmentSignals(input = {}) {
+      return {
+        projectRoot,
+        instruction:
+          'Review these development signals with your current coding context. Capture only durable decisions, conventions, pitfalls, commands, or task handoffs with mesh_capture_knowledge or mesh_capture_task.',
+        signals: await readDevelopmentSignals(projectRoot, input)
+      };
+    },
     rebuildIndex: () => rebuildProjectIndex(projectRoot),
     async status() {
       const store = await ensureProjectStore(projectRoot, storeOptions(options.memberName));
@@ -209,6 +232,118 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
       };
     }
   };
+}
+
+async function readDevelopmentSignals(
+  projectRoot: string,
+  input: ListDevelopmentSignalsInput
+): Promise<DevelopmentSignal[]> {
+  const limit = Math.min(Math.max(Math.trunc(input.limit ?? 10), 1), 50);
+  const store = await ensureProjectStore(projectRoot);
+  const events = await readProjectEvents(store.paths.eventsDir);
+
+  return events
+    .filter((event) => event.kind === 'raw.captured')
+    .map(toDevelopmentSignal)
+    .filter((signal): signal is DevelopmentSignal => signal !== undefined)
+    .sort((left, right) => `${right.capturedAt}:${right.eventId}`.localeCompare(`${left.capturedAt}:${left.eventId}`))
+    .slice(0, limit);
+}
+
+async function readProjectEvents(eventsDir: string): Promise<DevMeshEvent[]> {
+  let files: string[];
+
+  try {
+    files = await readdir(eventsDir);
+  } catch {
+    return [];
+  }
+
+  const events: DevMeshEvent[] = [];
+
+  for (const file of files.filter((entry) => entry.endsWith('.jsonl')).sort()) {
+    const content = await readFile(join(eventsDir, file), 'utf8');
+
+    for (const line of content.split(/\r?\n/)) {
+      const event = parseProjectEventLine(line);
+
+      if (event !== undefined) {
+        events.push(event);
+      }
+    }
+  }
+
+  return events;
+}
+
+function parseProjectEventLine(line: string): DevMeshEvent | undefined {
+  const trimmed = line.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const value = JSON.parse(trimmed) as Partial<DevMeshEvent>;
+
+    if (
+      typeof value.id === 'string' &&
+      typeof value.kind === 'string' &&
+      typeof value.projectKey === 'string' &&
+      typeof value.createdAt === 'string' &&
+      isRecord(value.payload)
+    ) {
+      return {
+        id: value.id,
+        kind: value.kind,
+        projectKey: value.projectKey,
+        createdAt: value.createdAt,
+        payload: value.payload
+      };
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function toDevelopmentSignal(event: DevMeshEvent): DevelopmentSignal | undefined {
+  const rawEvent = event.payload.rawEvent;
+
+  if (!isRawEvent(rawEvent)) {
+    return undefined;
+  }
+
+  const signal: DevelopmentSignal = {
+    eventId: event.id,
+    capturedAt: event.createdAt,
+    projectKey: event.projectKey,
+    rawEvent
+  };
+  const processing = isRecord(event.payload.processing) ? event.payload.processing : {};
+  const instruction = readString(processing.instruction);
+
+  if (instruction !== undefined) {
+    signal.instruction = instruction;
+  }
+
+  return signal;
+}
+
+function isRawEvent(value: unknown): value is RawEvent {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.kind === 'string' &&
+    typeof value.summary === 'string' &&
+    typeof value.createdAt === 'string' &&
+    (value.payload === undefined || isRecord(value.payload)) &&
+    (value.source === undefined || isRecord(value.source))
+  );
 }
 
 function extractProposalToCaptureInput(proposal: ExtractProposal): CaptureKnowledgeInput {
@@ -257,4 +392,8 @@ function readProposalRisk(proposal: ExtractProposal): 'low' | 'medium' | 'high' 
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

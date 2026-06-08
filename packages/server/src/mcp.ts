@@ -75,6 +75,13 @@ export function createMeshMcpServer(core: DevMeshCore): McpServer {
         types: ['glossary'],
         limit: input.limit
       });
+    },
+    async listDevelopmentSignals() {
+      return {
+        projectRoot: core.projectRoot,
+        instruction: 'Development signals are captured by the local daemon, not the remote Hub MCP server.',
+        signals: []
+      };
     }
   });
 

@@ -18,6 +18,7 @@ export function registerServeCommand(program: Command): void {
     .option('--global-root <path>', 'global Dev Mesh root')
     .option('--daemon-idle-ms <number>', 'background daemon idle timeout in milliseconds', parseIntOption)
     .option('--daemon-sync-interval-ms <number>', 'background daemon sync interval in milliseconds', parseIntOption)
+    .option('--daemon-capture-interval-ms <number>', 'background daemon auto capture interval in milliseconds', parseIntOption)
     .action(runServeCommand);
 }
 
@@ -55,6 +56,10 @@ function createDaemonOptions(options: ServeCommandOptions): LocalMcpDaemonOption
     daemonOptions.syncIntervalMs = options.daemonSyncIntervalMs;
   }
 
+  if (options.daemonCaptureIntervalMs !== undefined) {
+    daemonOptions.captureIntervalMs = options.daemonCaptureIntervalMs;
+  }
+
   if (options.globalRoot !== undefined) {
     daemonOptions.globalRoot = options.globalRoot;
   }
@@ -82,4 +87,5 @@ interface ServeCommandOptions {
   globalRoot?: string;
   daemonIdleMs?: number;
   daemonSyncIntervalMs?: number;
+  daemonCaptureIntervalMs?: number;
 }

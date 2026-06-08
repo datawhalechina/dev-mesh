@@ -739,6 +739,7 @@ MCP 服务端应在 server instructions 中告诉 Agent 何时使用工具：
 Before starting non-trivial implementation, automatically call mesh_get_project_brief or mesh_search_context.
 If the user asks for a named teammate's experience, call mesh_search_member_experience with memberName.
 When you learn a durable project convention, decision, pitfall, command, or task handoff, automatically call mesh_capture_knowledge or mesh_capture_task.
+Periodically call mesh_list_development_signals when available; use the coding assistant's own reasoning to summarize durable knowledge from those signals instead of storing raw signal text directly.
 Classify durable knowledge into raw, extract, and canonical layers; attach it to the right PARA index.
 When the user says a knowledge item is wrong, outdated, not advanced, or less useful, call mesh_rate_knowledge instead of silently ignoring it.
 Do not store secrets, raw credentials, personal private data, or large source files.
@@ -1141,7 +1142,7 @@ Codex opens project
 | --- | --- | --- |
 | `auto_init` | 开启 | Codex、Claude Code、opencode 打开项目时自动创建或迁移 `.dev-mesh/`。 |
 | `auto_reference` | 开启 | Agent 开始任务、进入编辑或提出技术问题时，优先引用本地 `.dev-mesh/index`；已 join 时可 fallback 到远端知识。 |
-| `auto_capture` | 开启 | 开发过程中自动沉淀技术决策、踩坑、命令结果、任务进度和交接摘要。 |
+| `auto_capture` | 开启 | daemon 后台采集 Git / filesystem 开发信号，MCP host 通过 `mesh_list_development_signals` 读取信号，并由 Codex、Claude Code、opencode 自己总结后调用 capture 工具沉淀知识。 |
 | `auto_sync` | 未 join 时待机，join 后开启 | 本地知识 committed 后自动 debounce 推送到已加入的 Server Group，并定期拉取同组成员经验。 |
 
 自动引用路径：
@@ -2113,7 +2114,7 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 - daemon 负责远端共享同步：当项目 `auto_sync = true` 且本机 `identity.json` 存在 joined server 时，daemon 会把 `.dev-mesh/events/*.jsonl` 事件签名后增量 push 到 Hub，并按 pull cursor 拉取同 group 事件。可回放的 `knowledge` snapshot 会 upsert 到本地 `.dev-mesh/knowledge/`，让同组成员沉淀的知识进入本地搜索；replay 不追加新的本地 event，避免同步回环。
 - 客户端同步游标写入 `.dev-mesh/sync/cursors.json`，最近一次 daemon sync 状态写入 `.dev-mesh/sync/status.json`，`dmx doctor` 会读取该状态报告远端错误和本地待推送事件数量。
 - `dmx proxy --root . --port 8722` 仍可直接启动 `http://127.0.0.1:8722/mcp`，用于调试或嵌入。
-- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`。
+- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_list_development_signals`。
 - 本地 proxy 不依赖 `packages/server`，只通过 `packages/mcp-contracts` 共享 tool schema，避免 client/server 反向耦合。
 
 ### 12.2 Adapter 接口

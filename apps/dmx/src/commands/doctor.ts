@@ -107,10 +107,11 @@ function formatDoctorStatus(status: DevMeshDoctorStatus): string {
   }
 }
 
-const DOCTOR_CATEGORY_ORDER: DevMeshDoctorCategory[] = ['store', 'privacy', 'sync', 'proxy', 'adapter'];
+const DOCTOR_CATEGORY_ORDER: DevMeshDoctorCategory[] = ['store', 'privacy', 'capture', 'sync', 'proxy', 'adapter'];
 
 const DOCTOR_CATEGORY_TITLES: Record<DevMeshDoctorCategory, string> = {
   adapter: 'MCP hosts',
+  capture: 'Auto capture',
   privacy: 'Privacy',
   proxy: 'Launcher and daemon',
   store: 'Project store',

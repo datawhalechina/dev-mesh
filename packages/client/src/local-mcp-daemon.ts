@@ -8,6 +8,7 @@ import { DEV_MESH_DIR, ensureProjectStore } from '@mcp-dev-mesh/local-store';
 import type {
   MeshCaptureKnowledgeInput,
   MeshCaptureTaskInput,
+  MeshListDevelopmentSignalsInput,
   MeshRateKnowledgeInput,
   MeshResolveTermInput,
   MeshSearchContextInput,
@@ -24,6 +25,10 @@ import {
   DEFAULT_DAEMON_SYNC_INTERVAL_MS,
   startDaemonSyncWorker
 } from './daemon-sync.js';
+import {
+  DEFAULT_DAEMON_AUTO_CAPTURE_INTERVAL_MS,
+  startDaemonAutoCaptureWorker
+} from './daemon-auto-capture.js';
 
 export const DEV_MESH_DAEMON_INTERNAL_ENV = 'DEV_MESH_DAEMON_INTERNAL';
 export const DAEMON_PID_FILENAME = 'daemon.pid';
@@ -45,6 +50,7 @@ export interface LocalMcpDaemonOptions {
   startupWaitMs?: number;
   idleMs?: number;
   syncIntervalMs?: number;
+  captureIntervalMs?: number;
 }
 
 export interface LocalMcpDaemonState {
@@ -72,7 +78,8 @@ type DaemonToolName =
   | 'mesh_capture_task'
   | 'mesh_rate_knowledge'
   | 'mesh_search_member_experience'
-  | 'mesh_resolve_term';
+  | 'mesh_resolve_term'
+  | 'mesh_list_development_signals';
 
 const DAEMON_VERSION = '0.1.0';
 
@@ -122,6 +129,13 @@ export async function runLocalMcpDaemon(options: LocalMcpDaemonOptions = {}): Pr
   }
 
   const syncWorker = startDaemonSyncWorker(syncOptions);
+  const captureWorker = startDaemonAutoCaptureWorker({
+    projectRoot,
+    intervalMs: options.captureIntervalMs ?? DEFAULT_DAEMON_AUTO_CAPTURE_INTERVAL_MS,
+    onError(error: unknown) {
+      process.stderr.write(`Dev Mesh daemon auto capture skipped: ${serializeError(error)}\n`);
+    }
+  });
   const state: LocalMcpDaemonState = {
     pid: process.pid,
     projectRoot,
@@ -151,6 +165,7 @@ export async function runLocalMcpDaemon(options: LocalMcpDaemonOptions = {}): Pr
       process.off('SIGTERM', shutdown);
       clearInterval(idleTimer);
       syncWorker.stop();
+      captureWorker.stop();
       proxy
         .close()
         .then(() => releaseDaemonFiles(projectRoot))
@@ -239,6 +254,13 @@ function createDaemonAwareHandlers(localHandlers: MeshToolHandlers, options: Loc
     captureTask: (input) =>
       callDaemonOrLocal('mesh_capture_task', input, () => localHandlers.captureTask(input), options),
     rateKnowledge: (input) => callDaemonOrLocal('mesh_rate_knowledge', input, () => localHandlers.rateKnowledge(input), options),
+    listDevelopmentSignals: (input) =>
+      callDaemonOrLocal(
+        'mesh_list_development_signals',
+        input,
+        () => localHandlers.listDevelopmentSignals(input),
+        options
+      ),
     searchMemberExperience: (input) =>
       callDaemonOrLocal(
         'mesh_search_member_experience',
@@ -256,6 +278,7 @@ async function callDaemonOrLocal(
     | MeshSearchContextInput
     | MeshCaptureKnowledgeInput
     | MeshCaptureTaskInput
+    | MeshListDevelopmentSignalsInput
     | MeshRateKnowledgeInput
     | MeshSearchMemberExperienceInput
     | MeshResolveTermInput,
@@ -484,6 +507,10 @@ function compactDaemonOptions(options: LocalMcpDaemonOptions): LocalMcpDaemonOpt
 
   if (options.syncIntervalMs !== undefined) {
     next.syncIntervalMs = options.syncIntervalMs;
+  }
+
+  if (options.captureIntervalMs !== undefined) {
+    next.captureIntervalMs = options.captureIntervalMs;
   }
 
   return next;

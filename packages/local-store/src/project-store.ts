@@ -265,6 +265,7 @@ function projectConfigToToml(config: ProjectConfig): string {
 function defaultStoreGitignore(): string {
   return [
     'index/',
+    'capture/',
     'queue/',
     'sync/',
     'secrets/',

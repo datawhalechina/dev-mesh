@@ -52,10 +52,25 @@ export {
   startDaemonSyncWorker
 } from './daemon-sync.js';
 export type { DaemonSyncOptions, DaemonSyncRemoteStatus, DaemonSyncStatus, DaemonSyncWorker } from './daemon-sync.js';
+export {
+  DAEMON_AUTO_CAPTURE_STATUS_FILENAME,
+  DEFAULT_DAEMON_AUTO_CAPTURE_INTERVAL_MS,
+  readDaemonAutoCaptureStatus,
+  runDaemonAutoCaptureOnce,
+  startDaemonAutoCaptureWorker
+} from './daemon-auto-capture.js';
+export type {
+  DaemonAutoCaptureOptions,
+  DaemonAutoCaptureProviderStatus,
+  DaemonAutoCaptureStatus,
+  DaemonAutoCaptureWorker
+} from './daemon-auto-capture.js';
 export { createDevMeshClientRuntime } from './runtime.js';
 export type {
   CaptureRawEventResult,
+  DevelopmentSignal,
   DevMeshClientOptions,
   DevMeshClientRuntime,
+  ListDevelopmentSignalsInput,
   PublishExtractProposalResult
 } from './runtime.js';

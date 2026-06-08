@@ -13,6 +13,7 @@ import {
   type MeshToolHandlers,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
+  type MeshListDevelopmentSignalsInput,
   type MeshRateKnowledgeInput,
   type MeshSearchContextInput
 } from '@mcp-dev-mesh/mcp-contracts';
@@ -39,6 +40,7 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
     captureKnowledge: (input) => runtime.captureKnowledge(toCaptureInput(input)),
     captureTask: (input) => runtime.captureTask(toTaskCaptureInput(input)),
     rateKnowledge: (input) => runtime.rateKnowledge(toRateInput(input)),
+    listDevelopmentSignals: (input) => runtime.listDevelopmentSignals(toListDevelopmentSignalsInput(input)),
     searchMemberExperience(input) {
       return runtime.searchContext({
         ...toContextPackInput(input),
@@ -193,4 +195,10 @@ function toRateInput(input: MeshRateKnowledgeInput): RateKnowledgeInput {
   }
 
   return rate;
+}
+
+function toListDevelopmentSignalsInput(input: MeshListDevelopmentSignalsInput): MeshListDevelopmentSignalsInput {
+  return {
+    limit: input.limit
+  };
 }
