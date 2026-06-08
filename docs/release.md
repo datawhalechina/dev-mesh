@@ -153,6 +153,7 @@ npm install -g mcp-dev-mesh@alpha
 ```
 
 The CLI package bundles internal workspace code into `dist/index.js`; runtime npm dependencies are limited to external packages used by the bundled CLI.
+The CLI package `repository.url` must match the GitHub repository used by Actions provenance.
 
 ## Current Release Boundaries
 

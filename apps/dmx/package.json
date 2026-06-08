@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Local-first MCP project context mesh CLI",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xy200303/mcp-dev-mesh.git"
+  },
   "main": "./dist/index.js",
   "bin": {
     "dmx": "dist/index.js"
