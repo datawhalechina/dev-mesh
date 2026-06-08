@@ -65,7 +65,8 @@ describe('MCP tool contract schemas', () => {
       rateKnowledge: vi.fn(async () => ({ ok: 'rate' })),
       searchMemberExperience: vi.fn(async () => ({ ok: 'member' })),
       resolveTerm: vi.fn(async () => ({ ok: 'term' })),
-      listDevelopmentSignals: vi.fn(async () => ({ ok: 'signals' }))
+      listDevelopmentSignals: vi.fn(async () => ({ ok: 'signals' })),
+      scanProjectKnowledge: vi.fn(async () => ({ ok: 'scan' }))
     };
 
     registerMeshTools(fakeServer as never, handlers);
@@ -77,7 +78,8 @@ describe('MCP tool contract schemas', () => {
       'mesh_rate_knowledge',
       'mesh_search_member_experience',
       'mesh_resolve_term',
-      'mesh_list_development_signals'
+      'mesh_list_development_signals',
+      'mesh_scan_project_knowledge'
     ]);
 
     const result = await registered[0]?.callback({ query: 'auth' });

@@ -4,6 +4,7 @@ import { createAgentContextService, type AgentContextService, type BuildContextP
 import { createDevMeshCore, type CaptureKnowledgeInput, type DevMeshCore, type RateKnowledgeInput } from '@mcp-dev-mesh/core';
 import type { Extractor, ExtractProposal, RawEvent } from '@mcp-dev-mesh/extension-api';
 import { createRuleBasedExtractor, createSecretRedactor } from '@mcp-dev-mesh/extractor';
+import { createFileSystemCaptureProvider, createGitCaptureProvider } from '@mcp-dev-mesh/providers';
 import {
   appendProjectEvent,
   ensureProjectStore,
@@ -61,12 +62,35 @@ export interface ListDevelopmentSignalsInput {
   limit?: number;
 }
 
+export interface ProjectKnowledgeScanInput {
+  limit?: number;
+}
+
 export interface DevelopmentSignal {
   eventId: string;
   capturedAt: string;
   projectKey: string;
   rawEvent: RawEvent;
   instruction?: string;
+}
+
+export interface ProjectKnowledgeSignal {
+  kind: string;
+  summary: string;
+  payload?: Record<string, unknown>;
+  source?: Record<string, unknown>;
+}
+
+export interface ProjectKnowledgeScanResult {
+  projectRoot: string;
+  instruction: string;
+  limit: number;
+  signals: ProjectKnowledgeSignal[];
+  highlights: {
+    changedFiles: string[];
+    fileCount: number;
+    todoFiles: string[];
+  };
 }
 
 export interface DevMeshClientRuntime {
@@ -88,6 +112,7 @@ export interface DevMeshClientRuntime {
   rejectInboxItem(id: string, reason?: string): Promise<RejectPendingKnowledgeResult>;
   searchContext(input: BuildContextPackInput): Promise<unknown>;
   listDevelopmentSignals(input?: ListDevelopmentSignalsInput): Promise<unknown>;
+  scanProjectKnowledge(input?: ProjectKnowledgeScanInput): Promise<unknown>;
   rebuildIndex(): Promise<RebuildProjectIndexResult>;
   status(): Promise<Record<string, unknown>>;
 }
@@ -213,6 +238,9 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
         signals: await readDevelopmentSignals(projectRoot, input)
       };
     },
+    async scanProjectKnowledge(input = {}) {
+      return readProjectKnowledgeScan(projectRoot, input);
+    },
     rebuildIndex: () => rebuildProjectIndex(projectRoot),
     async status() {
       const store = await ensureProjectStore(projectRoot, storeOptions(options.memberName));
@@ -248,6 +276,56 @@ async function readDevelopmentSignals(
     .filter((signal): signal is DevelopmentSignal => signal !== undefined)
     .sort((left, right) => `${right.capturedAt}:${right.eventId}`.localeCompare(`${left.capturedAt}:${left.eventId}`))
     .slice(0, limit);
+}
+
+async function readProjectKnowledgeScan(
+  projectRoot: string,
+  input: ProjectKnowledgeScanInput
+): Promise<ProjectKnowledgeScanResult> {
+  const limit = Math.min(Math.max(Math.trunc(input.limit ?? 50), 1), 200);
+  const signals: ProjectKnowledgeSignal[] = [];
+  const changedFiles: string[] = [];
+  const todoFiles: string[] = [];
+  const providers = [
+    createGitCaptureProvider(),
+    createFileSystemCaptureProvider({
+      maxFiles: limit
+    })
+  ];
+
+  for (const provider of providers) {
+    if (!(await provider.detect(projectRoot))) {
+      continue;
+    }
+
+    for await (const event of provider.collect({ projectRoot })) {
+      signals.push(summarizeProjectKnowledgeSignal(event));
+
+      if (event.kind === 'git.snapshot') {
+        changedFiles.push(...readChangedFilePaths(event.payload));
+      }
+
+      if (event.kind === 'filesystem.snapshot') {
+        const fileSummaries = readFileSummaries(event.payload);
+
+        changedFiles.push(...fileSummaries.map((file) => file.path));
+        todoFiles.push(...fileSummaries.filter((file) => (file.markers?.todo ?? 0) + (file.markers?.fixme ?? 0) > 0).map((file) => file.path));
+      }
+    }
+  }
+
+  return {
+    projectRoot,
+    instruction:
+      'Use your own coding context to inspect the listed signals and the most relevant source files, then summarize only durable decisions, conventions, pitfalls, commands, or task handoffs with mesh_capture_knowledge or mesh_capture_task.',
+    limit,
+    signals,
+    highlights: {
+      changedFiles: uniqueStrings(changedFiles).slice(0, limit),
+      fileCount: changedFiles.length,
+      todoFiles: uniqueStrings(todoFiles).slice(0, limit)
+    }
+  };
 }
 
 async function readProjectEvents(eventsDir: string): Promise<DevMeshEvent[]> {
@@ -346,6 +424,79 @@ function isRawEvent(value: unknown): value is RawEvent {
   );
 }
 
+function summarizeProjectKnowledgeSignal(event: RawEvent): ProjectKnowledgeSignal {
+  const signal: ProjectKnowledgeSignal = {
+    kind: event.kind,
+    summary: event.summary
+  };
+
+  if (isRecord(event.payload)) {
+    signal.payload = event.payload;
+  }
+
+  if (isRecord(event.source)) {
+    signal.source = event.source;
+  }
+
+  return signal;
+}
+
+function readChangedFilePaths(payload: Record<string, unknown> | undefined): string[] {
+  if (payload === undefined) {
+    return [];
+  }
+
+  return readRecordList(payload.changedFiles)
+    .map((record) => readString(record.path))
+    .filter((path): path is string => path !== undefined);
+}
+
+function readFileSummaries(
+  payload: Record<string, unknown> | undefined
+): Array<{ markers?: { fixme?: number; todo?: number }; path: string }> {
+  if (payload === undefined) {
+    return [];
+  }
+
+  return readRecordList(payload.files)
+    .map((record) => {
+      const path = readString(record.path);
+
+      if (path === undefined) {
+        return undefined;
+      }
+
+      const summary: { markers?: { fixme?: number; todo?: number }; path: string } = {
+        path
+      };
+
+      if (isRecord(record.markers)) {
+        const markers: { fixme?: number; todo?: number } = {};
+        const todo = readNumber(record.markers.todo);
+        const fixme = readNumber(record.markers.fixme);
+
+        if (todo !== undefined) {
+          markers.todo = todo;
+        }
+
+        if (fixme !== undefined) {
+          markers.fixme = fixme;
+        }
+
+        if (Object.keys(markers).length > 0) {
+          summary.markers = markers;
+        }
+      }
+
+      return summary;
+    })
+    .filter((file): file is { markers?: { fixme?: number; todo?: number }; path: string } => file !== undefined);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)].sort();
+}
+
 function extractProposalToCaptureInput(proposal: ExtractProposal): CaptureKnowledgeInput {
   const source: NonNullable<CaptureKnowledgeInput['source']> = {
     kind: 'extractor'
@@ -392,6 +543,18 @@ function readProposalRisk(proposal: ExtractProposal): 'low' | 'medium' | 'high' 
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function readRecordList(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => (isRecord(item) ? item : {})).filter((item) => Object.keys(item).length > 0);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

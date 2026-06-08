@@ -13,7 +13,9 @@ import {
   registerMeshTools,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
+  type MeshListDevelopmentSignalsInput,
   type MeshRateKnowledgeInput,
+  type MeshScanProjectKnowledgeInput,
   type MeshSearchContextInput
 } from '@mcp-dev-mesh/mcp-contracts';
 import {
@@ -76,11 +78,25 @@ export function createMeshMcpServer(core: DevMeshCore): McpServer {
         limit: input.limit
       });
     },
-    async listDevelopmentSignals() {
+    async listDevelopmentSignals(input: MeshListDevelopmentSignalsInput) {
       return {
         projectRoot: core.projectRoot,
         instruction: 'Development signals are captured by the local daemon, not the remote Hub MCP server.',
+        limit: input.limit,
         signals: []
+      };
+    },
+    async scanProjectKnowledge(input: MeshScanProjectKnowledgeInput) {
+      return {
+        projectRoot: core.projectRoot,
+        instruction: 'Project-wide scanning is only meaningful in the local daemon where Git and filesystem access are available.',
+        limit: input.limit,
+        signals: [],
+        highlights: {
+          changedFiles: [],
+          fileCount: 0,
+          todoFiles: []
+        }
       };
     }
   });

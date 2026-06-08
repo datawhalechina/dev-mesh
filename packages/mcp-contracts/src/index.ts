@@ -90,6 +90,10 @@ export const meshListDevelopmentSignalsInputSchema = z.object({
   limit: z.number().int().min(1).max(50).default(10)
 });
 
+export const meshScanProjectKnowledgeInputSchema = z.object({
+  limit: z.number().int().min(1).max(200).default(50)
+});
+
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
 export type MeshCaptureKnowledgeInput = z.infer<typeof meshCaptureKnowledgeInputSchema>;
 export type MeshCaptureTaskInput = z.infer<typeof meshCaptureTaskInputSchema>;
@@ -97,6 +101,7 @@ export type MeshRateKnowledgeInput = z.infer<typeof meshRateKnowledgeInputSchema
 export type MeshSearchMemberExperienceInput = z.infer<typeof meshSearchMemberExperienceInputSchema>;
 export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
 export type MeshListDevelopmentSignalsInput = z.infer<typeof meshListDevelopmentSignalsInputSchema>;
+export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
 
 export interface MeshToolHandlers {
   searchContext(input: MeshSearchContextInput): Promise<unknown>;
@@ -106,6 +111,7 @@ export interface MeshToolHandlers {
   searchMemberExperience(input: MeshSearchMemberExperienceInput): Promise<unknown>;
   resolveTerm(input: MeshResolveTermInput): Promise<unknown>;
   listDevelopmentSignals(input: MeshListDevelopmentSignalsInput): Promise<unknown>;
+  scanProjectKnowledge(input: MeshScanProjectKnowledgeInput): Promise<unknown>;
 }
 
 export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers): void {
@@ -181,6 +187,17 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     },
     async (args) =>
       jsonToolResult(await handlers.listDevelopmentSignals(meshListDevelopmentSignalsInputSchema.parse(args)))
+  );
+
+  server.registerTool(
+    'mesh_scan_project_knowledge',
+    {
+      title: 'Scan project knowledge',
+      description:
+        'Scan the current project for high-signal Git and filesystem activity, then use your own coding context to summarize durable knowledge before calling capture tools.',
+      inputSchema: meshScanProjectKnowledgeInputSchema.shape
+    },
+    async (args) => jsonToolResult(await handlers.scanProjectKnowledge(meshScanProjectKnowledgeInputSchema.parse(args)))
   );
 }
 

@@ -329,6 +329,7 @@ mesh_rate_knowledge
 mesh_search_member_experience
 mesh_resolve_term
 mesh_list_development_signals
+mesh_scan_project_knowledge
 ```
 
 集成测试覆盖 stdio launcher 启动 daemon、SDK client 调用 `tools/list` / `mesh_capture_knowledge`，以及 HTTP proxy 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_search_context`，并验证默认写入当前项目 store。
@@ -383,6 +384,7 @@ mesh_rate_knowledge
 mesh_search_member_experience
 mesh_resolve_term
 mesh_list_development_signals
+mesh_scan_project_knowledge
 ```
 
 其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件。

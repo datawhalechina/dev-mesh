@@ -71,6 +71,8 @@ export type {
   DevelopmentSignal,
   DevMeshClientOptions,
   DevMeshClientRuntime,
+  ProjectKnowledgeScanInput,
+  ProjectKnowledgeScanResult,
   ListDevelopmentSignalsInput,
   PublishExtractProposalResult
 } from './runtime.js';

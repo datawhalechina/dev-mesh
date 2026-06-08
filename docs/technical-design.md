@@ -1303,6 +1303,8 @@ Agent 在工作过程中主动调用：
 - `mesh_capture_knowledge`
 - `mesh_capture_task`
 - `mesh_resolve_term`
+- `mesh_list_development_signals`
+- `mesh_scan_project_knowledge`
 
 这层跨工具最稳定，因为 Codex、Claude Code、opencode 都能通过 MCP tools 与服务端交互。
 
@@ -2114,7 +2116,7 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 - daemon 负责远端共享同步：当项目 `auto_sync = true` 且本机 `identity.json` 存在 joined server 时，daemon 会把 `.dev-mesh/events/*.jsonl` 事件签名后增量 push 到 Hub，并按 pull cursor 拉取同 group 事件。可回放的 `knowledge` snapshot 会 upsert 到本地 `.dev-mesh/knowledge/`，让同组成员沉淀的知识进入本地搜索；replay 不追加新的本地 event，避免同步回环。
 - 客户端同步游标写入 `.dev-mesh/sync/cursors.json`，最近一次 daemon sync 状态写入 `.dev-mesh/sync/status.json`，`dmx doctor` 会读取该状态报告远端错误和本地待推送事件数量。
 - `dmx proxy --root . --port 8722` 仍可直接启动 `http://127.0.0.1:8722/mcp`，用于调试或嵌入。
-- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_list_development_signals`。
+- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_list_development_signals`、`mesh_scan_project_knowledge`。
 - 本地 proxy 不依赖 `packages/server`，只通过 `packages/mcp-contracts` 共享 tool schema，避免 client/server 反向耦合。
 
 ### 12.2 Adapter 接口
