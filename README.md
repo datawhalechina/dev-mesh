@@ -154,7 +154,7 @@ pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --
 ```
 
 该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `dev-mesh` MCP server 配置。
-默认写入的是 stdio MCP 命令：`dmx serve --mcp --name <name>`，不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，并把最近状态写入 `.dev-mesh/sync/status.json`。
+默认写入的是 stdio MCP 命令：`dmx serve --mcp --name <name>`，不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
 
 加入开发期 Hub Server 的 group：
 
@@ -180,7 +180,7 @@ pnpm --filter mcp-dev-mesh dev -- serve --mcp --root . --name local
 pnpm --filter mcp-dev-mesh dev -- proxy --root . --name local --port 8722
 ```
 
-`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，并定期拉取同组事件到 `.dev-mesh/sync/remotes/`。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
+`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
 
 初始化项目本地知识库：
 
@@ -394,7 +394,7 @@ mesh_resolve_term
 - `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
 - `POST /api/v1/admin/invites` 创建的 admin invite 未显式提供 `expiresAt` 时默认 24 小时后过期；seed 的本地开发 invite 不套用该默认策略。
 - sync push/pull 目前使用开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 不会重复追加，pull 只返回当前 group 的增量事件。
-- 客户端 daemon 会在 `auto_sync = true` 且存在 joined server identity 时自动调用 sync push/pull；本地已推送事件和远端 pull cursor 存在 `.dev-mesh/sync/cursors.json`，最近一次同步状态存在 `.dev-mesh/sync/status.json`。
+- 客户端 daemon 会在 `auto_sync = true` 且存在 joined server identity 时自动调用 sync push/pull；本地已推送事件和远端 pull cursor 存在 `.dev-mesh/sync/cursors.json`，最近一次同步状态存在 `.dev-mesh/sync/status.json`。pull 到的 replayable knowledge snapshot 会写入本地 `.dev-mesh/knowledge/`，不会追加新的本地 event，避免同步回环。
 - `knowledge.deleted` sync event 需要携带 `{ knowledgeId, tombstone: true }`，有效 tombstone 会按 knowledge id 写入 admin audit，并在 replay 时把目标 knowledge 标记为 `tombstone`；缺少 tombstone 语义的删除事件会被拒绝。
 - `knowledge.updated` sync event 可携带 `{ knowledgeId, revisionId, conflict: true, reason? }` 表示离线分支；恢复连接后 replay 会为同一 base knowledge 的不同 revision 创建幂等 `contradicts` edge，并写入 `sync.conflict_replayed` audit。
 - 服务端接受的 sync event 会附加 `log.sequence` / `log.hash` / `log.previousHash` 元数据，用于开发期 append-only event log 的 tamper-evident 链式校验基础。
@@ -503,7 +503,7 @@ pnpm typecheck:examples
 
 阶段 5 分布式 Mesh 已完成，当前进入发布前验证和生产化准备：
 
-- 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx serve --mcp` stdio launcher、按需项目 daemon、daemon 自动 sync push/pull、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
+- 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx serve --mcp` stdio launcher、按需项目 daemon、daemon 自动 sync push/pull 和远端 knowledge replay、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
 - 已完成 Git snapshot provider、filesystem snapshot provider 和 MCP tool call provider，能采集 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数、工具调用成功/失败信号，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
 - 已完成 rule-based extractor，能把 provider raw event 生成带 risk 和 evidence metadata 的 `task_progress`、`command`、`pitfall` 等 extract proposal。
 - 已完成内置 redactor 的 secret、PII、URL token、Authorization、cookie、private key 和 sensitive path 脱敏。

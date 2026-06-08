@@ -3,7 +3,8 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { appendProjectEvent, ensureProjectStore } from '@mcp-dev-mesh/local-store';
+import { createKnowledgeItem } from '@mcp-dev-mesh/core';
+import { captureProjectKnowledge, ensureProjectStore, JsonlKnowledgeRepository } from '@mcp-dev-mesh/local-store';
 import { readDaemonSyncStatus, runDaemonSyncOnce } from '../src/daemon-sync.js';
 
 describe('daemon sync', () => {
@@ -23,17 +24,37 @@ describe('daemon sync', () => {
       syncSigningSecret: 'sync_secret_value'
     };
     const requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
+    const remoteKnowledge = createKnowledgeItem({
+      id: 'kn_remote_1',
+      type: 'decision',
+      title: 'Remote team context',
+      summary: 'Use the shared shell command wrapper before release checks.',
+      content: 'Run focused verification through the shared wrapper so logs stay consistent.',
+      layer: 'canonical',
+      tags: ['remote', 'release'],
+      createdAt: '2026-06-08T00:01:00.000Z',
+      createdBy: {
+        displayName: 'Ayuan',
+        clientId: 'client_frontend-team_ayuan_def456'
+      },
+      visibility: 'team'
+    });
 
     try {
       await ensureProjectStore(projectRoot);
-      const localEvent = await appendProjectEvent(
+      const localCapture = await captureProjectKnowledge(
         projectRoot,
-        'knowledge.captured',
         {
-          knowledgeId: 'kn_local_1',
-          title: 'Daemon sync captures local events'
+          id: 'kn_local_1',
+          type: 'decision',
+          title: 'Daemon sync captures local events',
+          summary: 'Daemon sync should include a replayable knowledge snapshot.',
+          layer: 'canonical',
+          tags: ['sync']
         },
-        'frontend-app'
+        {
+          projectKey: 'frontend-app'
+        }
       );
       await writeFile(
         join(globalRoot, 'identity.json'),
@@ -70,13 +91,18 @@ describe('daemon sync', () => {
           }
 
           expect(pushedEvent).toMatchObject({
-            id: localEvent.id,
+            id: localCapture.event.id,
             kind: 'knowledge.captured',
             payload: {
               knowledgeId: 'kn_local_1',
-              projectKey: 'frontend-app'
+              projectKey: 'frontend-app',
+              knowledge: {
+                id: 'kn_local_1',
+                title: 'Daemon sync captures local events',
+                summary: 'Daemon sync should include a replayable knowledge snapshot.'
+              }
             },
-            createdAt: localEvent.createdAt,
+            createdAt: localCapture.event.createdAt,
             signature: {
               algorithm: 'hmac-sha256',
               keyId: joinedServer.clientId,
@@ -108,7 +134,9 @@ describe('daemon sync', () => {
                 id: 'evt_remote_1',
                 kind: 'knowledge.captured',
                 payload: {
-                  title: 'Remote team context'
+                  projectKey: 'frontend-app',
+                  knowledgeId: remoteKnowledge.id,
+                  knowledge: remoteKnowledge
                 },
                 createdAt: '2026-06-08T00:01:00.000Z'
               }
@@ -147,17 +175,31 @@ describe('daemon sync', () => {
       const remoteEvents = await readFile(join(remoteEventsDir, remoteEventFile), 'utf8');
       const storedStatus = await readDaemonSyncStatus(projectRoot);
       const remoteCursor = Object.values(cursors.remotes)[0];
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const replayed = await repository.get(remoteKnowledge.id);
+      const search = await repository.search({
+        query: 'shared shell wrapper',
+        layers: ['canonical']
+      });
 
       expect(requests.map((request) => `${request.method} ${request.url}`)).toEqual([
         'POST http://mesh.test/api/v1/sync/push',
         'GET http://mesh.test/api/v1/sync/pull'
       ]);
       expect(remoteCursor).toMatchObject({
-        pushedEventIds: [localEvent.id],
+        pushedEventIds: [localCapture.event.id],
         pullCursor: 'cur_frontend-team_2',
         pushCursor: 'cur_frontend-team_1'
       });
       expect(remoteEvents).toContain('"id":"evt_remote_1"');
+      expect(replayed).toMatchObject({
+        id: remoteKnowledge.id,
+        title: 'Remote team context',
+        createdBy: {
+          displayName: 'Ayuan'
+        }
+      });
+      expect(search.map((item) => item.id)).toContain(remoteKnowledge.id);
       expect(status).toMatchObject({
         enabled: true,
         remotes: [
@@ -168,6 +210,7 @@ describe('daemon sync', () => {
             queuedLocalEvents: 0,
             pushedEvents: 1,
             pulledEvents: 1,
+            replayedEvents: 1,
             rejectedEvents: 0
           }
         ]

@@ -1,8 +1,10 @@
 import { createHash, createHmac } from 'node:crypto';
 import { appendFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { KnowledgeItem, KnowledgeLayer, KnowledgeVisibility, ParaCategory, QualitySignals } from '@mcp-dev-mesh/core';
 import {
   ensureProjectStore,
+  JsonlKnowledgeRepository,
   readProjectConfig,
   type DevMeshEvent,
   type ProjectConfig,
@@ -50,6 +52,7 @@ export interface DaemonSyncRemoteStatus {
   queuedLocalEvents: number;
   pushedEvents: number;
   pulledEvents: number;
+  replayedEvents: number;
   rejectedEvents: number;
   lastPushAt?: string;
   lastPullAt?: string;
@@ -218,12 +221,14 @@ async function syncRemote(
   const pendingEvents = localEvents.filter((event) => !pushedIds.has(event.id)).slice(0, batchSize);
   let pushedEvents = 0;
   let pulledEvents = 0;
+  let replayedEvents = 0;
   let rejectedEvents = 0;
   let lastPushAt: string | undefined;
   let lastPullAt: string | undefined;
+  const repository = new JsonlKnowledgeRepository(store.projectRoot);
 
   if (pendingEvents.length > 0) {
-    const push = await pushRemoteEvents(remote, pendingEvents, options);
+    const push = await pushRemoteEvents(remote, pendingEvents, config, repository, options);
     const rejectedIds = new Set(push.rejected.map((event) => event.id));
     const acceptedOrDuplicateIds = pendingEvents.map((event) => event.id).filter((id) => !rejectedIds.has(id));
 
@@ -238,6 +243,7 @@ async function syncRemote(
 
   if (pull.events.length > 0) {
     await appendPulledRemoteEvents(store, remote, pull.events);
+    replayedEvents = await replayPulledRemoteEvents(repository, pull.events);
   }
 
   cursor.pullCursor = pull.cursor;
@@ -255,6 +261,7 @@ async function syncRemote(
     queuedLocalEvents,
     pushedEvents,
     pulledEvents,
+    replayedEvents,
     rejectedEvents
   };
 
@@ -272,8 +279,12 @@ async function syncRemote(
 async function pushRemoteEvents(
   remote: ValidJoinedServerRecord,
   events: DevMeshEvent[],
+  config: ProjectConfig,
+  repository: JsonlKnowledgeRepository,
   options: DaemonSyncOptions
 ): Promise<SyncPushResponse> {
+  const syncEvents = await Promise.all(events.map((event) => toSyncEvent(remote, event, config, repository, options)));
+
   return fetchJson<SyncPushResponse>(
     `${normalizeServerUrl(remote.serverUrl)}/api/v1/sync/push`,
     {
@@ -281,7 +292,7 @@ async function pushRemoteEvents(
       headers: createRemoteHeaders(remote),
       body: JSON.stringify({
         clientId: remote.clientId,
-        events: events.map((event) => toSyncEvent(remote, event, options))
+        events: syncEvents
       })
     },
     options
@@ -308,14 +319,28 @@ async function pullRemoteEvents(
   );
 }
 
-function toSyncEvent(remote: JoinedServerRecord, event: DevMeshEvent, options: DaemonSyncOptions): SyncEvent {
+async function toSyncEvent(
+  remote: JoinedServerRecord,
+  event: DevMeshEvent,
+  config: ProjectConfig,
+  repository: JsonlKnowledgeRepository,
+  options: DaemonSyncOptions
+): Promise<SyncEvent> {
+  const payload: Record<string, unknown> = {
+    ...event.payload,
+    projectKey: event.projectKey
+  };
+  const knowledgeId = readPayloadString(event.payload, 'knowledgeId');
+  const item = knowledgeId === undefined ? undefined : await repository.get(knowledgeId);
+
+  if (item !== undefined) {
+    payload.knowledge = createSyncKnowledgeSnapshot(item, config);
+  }
+
   const syncEvent: SyncEvent = {
     id: event.id,
     kind: event.kind,
-    payload: {
-      ...event.payload,
-      projectKey: event.projectKey
-    },
+    payload,
     createdAt: event.createdAt
   };
 
@@ -324,6 +349,20 @@ function toSyncEvent(remote: JoinedServerRecord, event: DevMeshEvent, options: D
   }
 
   return syncEvent;
+}
+
+function createSyncKnowledgeSnapshot(item: KnowledgeItem, config: ProjectConfig): KnowledgeItem {
+  const snapshot = JSON.parse(JSON.stringify(item)) as KnowledgeItem;
+
+  if (snapshot.layer === 'raw' && !config.privacy.uploadRawTranscripts) {
+    delete snapshot.content;
+  }
+
+  if (!config.privacy.uploadLargeSourceBlocks && snapshot.content !== undefined && snapshot.content.length > 4000) {
+    delete snapshot.content;
+  }
+
+  return snapshot;
 }
 
 function signSyncEvent(remote: JoinedServerRecord, event: SyncEvent, options: DaemonSyncOptions): NonNullable<SyncEvent['signature']> {
@@ -446,6 +485,60 @@ async function appendPulledRemoteEvents(store: ProjectStore, remote: JoinedServe
   }
 }
 
+async function replayPulledRemoteEvents(repository: JsonlKnowledgeRepository, events: SyncEvent[]): Promise<number> {
+  let replayed = 0;
+
+  for (const event of events) {
+    if (event.kind === 'knowledge.deleted') {
+      replayed += await replayKnowledgeTombstone(repository, event);
+      continue;
+    }
+
+    const item = readKnowledgeSnapshot(event);
+
+    if (item === undefined) {
+      continue;
+    }
+
+    await repository.upsert(item);
+    replayed += 1;
+  }
+
+  return replayed;
+}
+
+async function replayKnowledgeTombstone(repository: JsonlKnowledgeRepository, event: SyncEvent): Promise<number> {
+  const knowledgeId = readPayloadString(event.payload, 'knowledgeId');
+
+  if (knowledgeId === undefined) {
+    return 0;
+  }
+
+  const existing = await repository.get(knowledgeId);
+
+  if (existing === undefined) {
+    return 0;
+  }
+
+  await repository.upsert({
+    ...existing,
+    status: 'tombstone',
+    updatedAt: readPayloadString(event.payload, 'deletedAt') ?? event.createdAt ?? new Date().toISOString()
+  });
+
+  return 1;
+}
+
+function readKnowledgeSnapshot(event: SyncEvent): KnowledgeItem | undefined {
+  const value = event.payload.knowledge;
+
+  if (!isKnowledgeItem(value)) {
+    return undefined;
+  }
+
+  return value;
+}
+
 async function readDaemonSyncCursors(store: ProjectStore): Promise<DaemonSyncCursorFile> {
   try {
     const parsed = JSON.parse(await readFile(getDaemonSyncCursorPath(store), 'utf8')) as DaemonSyncCursorFile;
@@ -523,6 +616,7 @@ function createRemoteErrorStatus(remote: JoinedServerRecord, error: unknown): Da
     queuedLocalEvents: 0,
     pushedEvents: 0,
     pulledEvents: 0,
+    replayedEvents: 0,
     rejectedEvents: 0,
     lastError: serializeError(error)
   };
@@ -573,6 +667,71 @@ function mergeUniqueStrings(existing: string[], next: string[]): string[] {
   }
 
   return merged;
+}
+
+function readPayloadString(payload: Record<string, unknown>, key: string): string | undefined {
+  const value = payload[key];
+
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function isKnowledgeItem(value: unknown): value is KnowledgeItem {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    isKnowledgeLayer(value.layer) &&
+    typeof value.entryKey === 'string' &&
+    typeof value.type === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.summary === 'string' &&
+    isPlainRecord(value.para) &&
+    isParaCategory(value.para.category) &&
+    typeof value.para.key === 'string' &&
+    Array.isArray(value.tags) &&
+    value.tags.every((tag) => typeof tag === 'string') &&
+    isPlainRecord(value.source) &&
+    typeof value.source.kind === 'string' &&
+    isPlainRecord(value.createdBy) &&
+    typeof value.createdBy.displayName === 'string' &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string' &&
+    isKnowledgeVisibility(value.visibility) &&
+    (value.status === 'active' || value.status === 'superseded' || value.status === 'tombstone') &&
+    isQualitySignals(value.quality) &&
+    (value.content === undefined || typeof value.content === 'string')
+  );
+}
+
+function isKnowledgeLayer(value: unknown): value is KnowledgeLayer {
+  return value === 'raw' || value === 'extract' || value === 'canonical';
+}
+
+function isParaCategory(value: unknown): value is ParaCategory {
+  return value === 'projects' || value === 'areas' || value === 'resources' || value === 'archives';
+}
+
+function isKnowledgeVisibility(value: unknown): value is KnowledgeVisibility {
+  return value === 'private' || value === 'project' || value === 'team' || value === 'org';
+}
+
+function isQualitySignals(value: unknown): value is QualitySignals {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+
+  return [
+    value.confidence,
+    value.weight,
+    value.rating,
+    value.adoptionScore,
+    value.sourceTrust,
+    value.evidence,
+    value.freshness,
+    value.qualityScore
+  ].every((entry) => typeof entry === 'number' && Number.isFinite(entry));
 }
 
 function stableStringify(value: unknown): string {
