@@ -146,7 +146,7 @@ Required repository secret:
 NPM_TOKEN
 ```
 
-The workflow publishes with the `alpha` dist-tag:
+The workflow publishes with provenance, public package access, and the `alpha` dist-tag:
 
 ```bash
 npm install -g mcp-dev-mesh@alpha

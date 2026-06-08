@@ -50,6 +50,6 @@ jobs:
       - name: Publish CLI to npm
         if: github.ref_type == 'tag'
         working-directory: apps/dmx
-        run: npm publish --tag alpha --provenance
+        run: npm publish --tag alpha --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
