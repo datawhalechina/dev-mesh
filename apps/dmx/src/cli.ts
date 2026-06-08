@@ -14,7 +14,7 @@ import { registerStatusCommand } from './commands/status.js';
 export function createDmxProgram(): Command {
   const program = new Command();
 
-  program.name('dmx').description('MCP Dev Mesh local-first CLI').version('0.1.1');
+  program.name('dmx').description('MCP Dev Mesh local-first CLI').version('0.1.3');
 
   registerInitCommand(program);
   registerJoinCommand(program);
