@@ -5,7 +5,7 @@ title: 快速开始
 
 # 快速开始
 
-下面的流程会启动 Hub Server、初始化一个目标项目、启动本地 MCP proxy，并用手动 capture 命令验证知识是否写入项目。
+下面的流程会启动 Hub Server、初始化一个目标项目、配置本地 stdio MCP launcher，并用手动 capture 命令验证知识是否写入项目。
 
 ## 准备
 
@@ -50,28 +50,20 @@ pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 --root $project --g
 
 执行后目标项目会出现 `.dev-mesh` 目录。
 
-## 启动本地 MCP proxy
+## 配置 AI 客户端
 
-保持服务端运行，再打开一个终端：
+全局配置 Codex、Claude Code 和 opencode。配置写入的是 `dmx serve --mcp` stdio MCP 命令；AI 客户端启动它后，会按需拉起项目 daemon。
 
 ```powershell
 $project="C:\path\to\your\project"
 
-pnpm --filter mcp-dev-mesh dev -- proxy --root $project --name local --port 8722
+pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --yes
 ```
 
-proxy 默认暴露在：
-
-```text
-http://127.0.0.1:8722/mcp
-```
-
-## 配置 AI 客户端
-
-全局配置 Codex、Claude Code 和 opencode 指向本地 proxy：
+如需直接调试 HTTP MCP proxy，可以手动运行：
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --mcp-url http://127.0.0.1:8722/mcp --yes
+pnpm --filter mcp-dev-mesh dev -- proxy --root $project --name local --port 8722
 ```
 
 之后在目标项目里让 AI 助手沉淀知识，它就可以通过 MCP 工具写入 `.dev-mesh`。

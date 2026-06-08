@@ -3,11 +3,17 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import type { ConfigureInput, ConfigureResult, DoctorCheck, RemoveInput, ToolAdapter } from '@mcp-dev-mesh/extension-api';
+import type {
+  ConfigureInput,
+  ConfigureResult,
+  DoctorCheck,
+  McpCommandConfig,
+  RemoveInput,
+  ToolAdapter
+} from '@mcp-dev-mesh/extension-api';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_CODEX_MCP_SERVER_NAME = 'dev-mesh';
-const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:8722/mcp';
 
 export interface CodexToolAdapterOptions {
   codexHome?: string;
@@ -24,6 +30,8 @@ interface CodexConfigLookup {
 
 interface CodexMcpServerConfig {
   url?: string;
+  command?: string;
+  args?: string[];
 }
 
 export function createCodexToolAdapter(options: CodexToolAdapterOptions = {}): ToolAdapter {
@@ -56,20 +64,21 @@ export function createCodexToolAdapter(options: CodexToolAdapterOptions = {}): T
     async isConfigured(projectRoot: string) {
       const config = await findCodexMcpServerConfig(projectRoot, serverName, options);
 
-      return config?.server?.url !== undefined;
+      return config?.server?.url !== undefined || config?.server?.command !== undefined;
     },
     async configure(input: ConfigureInput): Promise<ConfigureResult> {
       const scope = input.scope ?? 'user';
       const targetPath = resolveCodexConfigPath(input.projectRoot, scope, options);
       const current = await readTextFile(targetPath);
-      const next = upsertCodexMcpServer(current, serverName, input.mcpUrl);
+      const next = upsertCodexMcpServer(current, serverName, input.mcpUrl, input.mcpCommand);
       const changed = next !== current;
+      const target = describeMcpTarget(input.mcpUrl, input.mcpCommand);
 
       if (input.dryRun) {
         return {
           changed,
           targetPath,
-          message: changed ? `Would configure codex for ${input.mcpUrl}` : `codex is already configured for ${input.mcpUrl}`
+          message: changed ? `Would configure codex for ${target}` : `codex is already configured for ${target}`
         };
       }
 
@@ -81,7 +90,7 @@ export function createCodexToolAdapter(options: CodexToolAdapterOptions = {}): T
       return {
         changed,
         targetPath,
-        message: changed ? `Configured codex for ${input.mcpUrl}` : `codex is already configured for ${input.mcpUrl}`
+        message: changed ? `Configured codex for ${target}` : `codex is already configured for ${target}`
       };
     },
     async remove(input: RemoveInput): Promise<void> {
@@ -113,17 +122,17 @@ export function createCodexToolAdapter(options: CodexToolAdapterOptions = {}): T
           id: 'adapter.codex.mcp-config',
           status: 'warn',
           message: 'Codex dev-mesh MCP server is not configured.',
-          fixHint: `Run dmx init --global --tool codex --mcp-url ${DEFAULT_LOCAL_MCP_URL} --yes.`
+          fixHint: 'Run dmx init --global --tool codex --yes.'
         });
         return checks;
       }
 
-      if (configured.server?.url === undefined) {
+      if (configured.server?.url === undefined && configured.server?.command === undefined) {
         checks.push({
           id: 'adapter.codex.mcp-config',
           status: 'error',
-          message: `Codex dev-mesh MCP server exists in ${configured.targetPath} but does not define a url.`,
-          fixHint: `Re-run dmx init --global --tool codex --mcp-url ${DEFAULT_LOCAL_MCP_URL} --yes.`
+          message: `Codex dev-mesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
+          fixHint: 'Re-run dmx init --global --tool codex --yes.'
         });
         return checks;
       }
@@ -238,9 +247,14 @@ async function readTextFile(path: string): Promise<string> {
   }
 }
 
-function upsertCodexMcpServer(content: string, serverName: string, mcpUrl: string): string {
+function upsertCodexMcpServer(
+  content: string,
+  serverName: string,
+  mcpUrl: string,
+  mcpCommand?: McpCommandConfig
+): string {
   const header = createMcpServerSectionHeader(serverName);
-  const section = [header, `url = "${escapeTomlString(mcpUrl)}"`, ''];
+  const section = createCodexMcpServerSection(header, mcpUrl, mcpCommand);
   const withoutExisting = removeTomlSection(content, header).trimEnd();
 
   if (!withoutExisting) {
@@ -277,14 +291,41 @@ function readCodexMcpServer(content: string, serverName: string): CodexMcpServer
   const server: CodexMcpServerConfig = {};
 
   for (const line of lines.slice(start + 1, end)) {
-    const value = readTomlStringValue(line, 'url');
+    const url = readTomlStringValue(line, 'url');
+    const command = readTomlStringValue(line, 'command');
+    const args = readTomlStringArrayValue(line, 'args');
 
-    if (value !== undefined) {
-      server.url = value;
+    if (url !== undefined) {
+      server.url = url;
+    }
+
+    if (command !== undefined) {
+      server.command = command;
+    }
+
+    if (args !== undefined) {
+      server.args = args;
     }
   }
 
   return server;
+}
+
+function createCodexMcpServerSection(
+  header: string,
+  mcpUrl: string,
+  mcpCommand?: McpCommandConfig
+): string[] {
+  if (mcpCommand === undefined) {
+    return [header, `url = "${escapeTomlString(mcpUrl)}"`, ''];
+  }
+
+  return [
+    header,
+    `command = "${escapeTomlString(mcpCommand.command)}"`,
+    `args = [${(mcpCommand.args ?? []).map((value) => `"${escapeTomlString(value)}"`).join(', ')}]`,
+    ''
+  ];
 }
 
 function createMcpServerSectionHeader(serverName: string): string {
@@ -313,6 +354,33 @@ function readTomlStringValue(line: string, key: string): string | undefined {
   }
 
   return unescapeTomlString(match[1]);
+}
+
+function readTomlStringArrayValue(line: string, key: string): string[] | undefined {
+  const match = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*\\[(.*)\\]\\s*(?:#.*)?$`).exec(line);
+
+  if (match?.[1] === undefined) {
+    return undefined;
+  }
+
+  const values: string[] = [];
+  const pattern = /"((?:\\"|\\\\|[^"])*)"/g;
+  let item = pattern.exec(match[1]);
+
+  while (item !== null) {
+    values.push(unescapeTomlString(item[1] ?? ''));
+    item = pattern.exec(match[1]);
+  }
+
+  return values;
+}
+
+function describeMcpTarget(mcpUrl: string, mcpCommand?: McpCommandConfig): string {
+  if (mcpCommand === undefined) {
+    return mcpUrl;
+  }
+
+  return `${mcpCommand.command} ${(mcpCommand.args ?? []).join(' ')}`.trim();
 }
 
 function escapeTomlString(value: string): string {

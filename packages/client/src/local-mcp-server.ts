@@ -10,6 +10,7 @@ import type {
 import type { CaptureProjectTaskInput } from '@mcp-dev-mesh/local-store';
 import {
   registerMeshTools,
+  type MeshToolHandlers,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
   type MeshRateKnowledgeInput,
@@ -18,12 +19,22 @@ import {
 import type { DevMeshClientRuntime } from './runtime.js';
 
 export function createLocalMeshMcpServer(runtime: DevMeshClientRuntime): McpServer {
+  return createLocalMeshMcpServerWithHandlers(createLocalMeshToolHandlers(runtime));
+}
+
+export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers): McpServer {
   const mcp = new McpServer({
     name: 'mcp-dev-mesh-local',
     version: '0.1.0'
   });
 
-  registerMeshTools(mcp, {
+  registerMeshTools(mcp, handlers);
+
+  return mcp;
+}
+
+export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): MeshToolHandlers {
+  return {
     searchContext: (input) => runtime.searchContext(toContextPackInput(input)),
     captureKnowledge: (input) => runtime.captureKnowledge(toCaptureInput(input)),
     captureTask: (input) => runtime.captureTask(toTaskCaptureInput(input)),
@@ -41,9 +52,7 @@ export function createLocalMeshMcpServer(runtime: DevMeshClientRuntime): McpServ
         limit: input.limit
       });
     }
-  });
-
-  return mcp;
+  };
 }
 
 function toContextPackInput(input: MeshSearchContextInput): BuildContextPackInput {

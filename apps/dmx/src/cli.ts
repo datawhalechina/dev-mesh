@@ -8,6 +8,7 @@ import { registerJoinCommand } from './commands/join.js';
 import { registerProxyCommand } from './commands/proxy.js';
 import { registerRateCommand } from './commands/rate.js';
 import { registerSearchCommand } from './commands/search.js';
+import { registerServeCommand } from './commands/serve.js';
 import { registerStatusCommand } from './commands/status.js';
 
 export function createDmxProgram(): Command {
@@ -25,6 +26,7 @@ export function createDmxProgram(): Command {
   registerIndexCommand(program);
   registerDoctorCommand(program);
   registerProxyCommand(program);
+  registerServeCommand(program);
 
   return program;
 }

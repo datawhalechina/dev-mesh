@@ -83,8 +83,15 @@ export interface DetectResult {
 export interface ConfigureInput {
   projectRoot: string;
   mcpUrl: string;
+  mcpCommand?: McpCommandConfig;
   scope?: 'user' | 'project';
   dryRun?: boolean;
+}
+
+export interface McpCommandConfig {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
 }
 
 export interface ConfigureResult {

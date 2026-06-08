@@ -20,8 +20,10 @@ pnpm --filter mcp-dev-mesh dev -- init --root C:\path\to\project --name local
 ## 全局客户端配置
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --mcp-url http://127.0.0.1:8722/mcp --yes
+pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --yes
 ```
+
+`dmx init` 会把支持的 MCP host 配置为运行 `dmx serve --mcp`。
 
 ## 加入 Hub
 
@@ -29,7 +31,13 @@ pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --
 pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 --root C:\path\to\project --group default --name local --token devmesh-local-invite
 ```
 
-## 本地 MCP proxy
+## 本地 MCP launcher
+
+```powershell
+pnpm --filter mcp-dev-mesh dev -- serve --mcp --root C:\path\to\project --name local
+```
+
+## HTTP MCP proxy 调试
 
 ```powershell
 pnpm --filter mcp-dev-mesh dev -- proxy --root C:\path\to\project --name local --port 8722

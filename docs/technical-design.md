@@ -150,7 +150,7 @@ mcp-dev-mesh/
 | Server HTTP | Koa2 |
 | 管理后台 | Vue 3 + Element Plus（或同级成熟 UI 组件库） |
 | Client CLI | Node.js + Commander 或 Clipanion |
-| Client daemon | Node.js long-running process，Windows Service / launchd / systemd |
+| Client daemon | Node.js detached child process，按项目由 stdio launcher 按需启动 |
 | 项目本地知识库 | 项目根目录 `.dev-mesh/`，SQLite + JSONL event log + 可重建检索索引 |
 | 客户端全局状态 | `~/.dev-mesh/`，保存设备身份、工具配置状态和跨项目缓存 |
 | 服务端主存储 | PostgreSQL |
@@ -753,12 +753,13 @@ Prefer concise summaries with provenance, confidence, weight, rating, and links 
 
 Mesh Client 是安装在每个开发者机器上的本地代理：
 
-- 暴露本地 MCP Proxy：`http://127.0.0.1:8722/mcp`
-- `dmx init --global` 完成本机初始化、daemon 注册、工具扫描和 MCP 注册
+- 暴露 stdio MCP launcher：`dmx serve --mcp`
+- launcher 按项目复用或拉起共享 daemon，daemon 内部提供本地 Streamable HTTP MCP endpoint
+- `dmx init --global` 完成本机初始化、工具扫描和 stdio MCP 注册
 - 一键加入指定 IP 或域名的 Mesh Server，并通过 group 隔离团队或项目集
 - 通过 `--name` 绑定成员显示名称，作为知识作者和经验来源
 - 未 join 时作为 local-only 本地知识库使用，仍可自动检索和沉淀本地 `.dev-mesh/`
-- 后台 daemon 默认随用户登录自启动
+- 后台 daemon 由前台 MCP launcher 按需 detached spawn，空闲后自动退出
 - 自动扫描并配置 Codex、Claude Code、opencode
 - Codex 打开项目时自动初始化或复用 `.dev-mesh/` 本地知识库
 - 默认自动引用相关知识、自动沉淀经验、自动启动同步
@@ -779,6 +780,7 @@ dmx init --global --tools codex,claude,opencode --yes
 dmx join 192.168.1.10:8721 --group frontend-team --name 小云 --token <invite-token>
 dmx join https://dev-mesh.company.com --group frontend-team --name 小云 --handle xiaoyun --token <invite-token>
 dmx init .
+dmx serve --mcp --root .
 dmx proxy --root . --port 8722
 dmx configure codex --scope user
 dmx configure claude --scope project
@@ -839,7 +841,7 @@ dmx config set automation.auto_sync false --project .
 
 ### 6.3 NPM 一键安装、全局初始化和加入群组
 
-推荐安装方式是 NPM。`npm install -g mcp-dev-mesh` 安装 `dmx` 命令；`dmx init --global` 完成本机初始化、启动 daemon、扫描已安装编程工具并注册 MCP；`dmx join` 只负责加入远端服务器的指定 group。未执行 `dmx join` 时，Dev Mesh 仍然以 local-only 模式运行，作为本地项目知识库使用。
+推荐安装方式是 NPM。`npm install -g mcp-dev-mesh` 安装 `dmx` 命令；`dmx init --global` 完成本机初始化、扫描已安装编程工具，并把 MCP host 配置为启动 `dmx serve --mcp`；`dmx join` 只负责加入远端服务器的指定 group。未执行 `dmx join` 时，Dev Mesh 仍然以 local-only 模式运行，作为本地项目知识库使用。
 
 Windows PowerShell：
 
@@ -868,13 +870,13 @@ npm install -g mcp-dev-mesh && dmx init --global --yes && dmx join https://dev-m
 ```text
 1. 用户运行 dmx init --global。
 2. 客户端创建或迁移 ~/.dev-mesh/config.toml。
-3. 客户端注册用户级自启动 daemon，并启动本地 MCP Proxy。
+3. 客户端准备 stdio MCP launcher 命令：dmx serve --mcp --root <project>。
 4. 客户端扫描本机已安装的编程工具：Codex、Claude Code、opencode。
 5. 客户端打开 TUI 选择页面，展示 detected / not found / already configured 状态。
 6. 用户选择要注册 MCP 的工具和 scope，默认选中已安装且未配置的工具。
-7. 客户端调用各工具 adapter，把 dev-mesh MCP 指向 http://127.0.0.1:8722/mcp。
+7. 客户端调用各工具 adapter，把 dev-mesh MCP 写成 stdio command/args。
 8. 客户端开启 auto_init、auto_reference、auto_capture；auto_sync 在未 join 时保持待机。
-9. 客户端执行 dmx doctor，验证本地 MCP Proxy 和各工具配置。
+9. 客户端执行 dmx doctor，验证 stdio launcher / daemon 状态和各工具配置。
 10. 用户此时即使不 join，也可以在项目中自动创建 .dev-mesh/、沉淀本地知识并自动引用本地知识。
 ```
 
@@ -888,13 +890,10 @@ Detected tools:
   [x] Claude Code  installed, already configured  scope: user
   [ ] opencode     not found
 
-Options:
-  [x] Start daemon on login
-  [x] Auto init project .dev-mesh
-  [x] Auto reference local knowledge
-  [x] Auto capture project knowledge
+Automation: auto_init, auto_reference, auto_capture, and auto_sync are enabled by default.
+MCP hosts run dmx serve --mcp; the launcher starts or reuses the project daemon on demand.
 
-Press Enter to apply, Space to toggle, q to cancel.
+Keys: ↑/↓ move, Space toggle, s scope, Enter apply, q cancel.
 ```
 
 当前实现进度：
@@ -903,7 +902,7 @@ Press Enter to apply, Space to toggle, q to cancel.
 - `packages/client` 负责工具别名归一化、默认选择、内置 adapter 检查和全局配置写入；`apps/dmx` 只做 CLI 参数收集。
 - `~/.dev-mesh/config.toml` 已写入 `[tools]` 的 Codex / Claude Code / opencode 选择状态，`identity.json` 已记录 `selectedTools`、`localProxyUrl` 和每个 adapter 的 detected/configured/message/targetPath。
 - `dmx join <server> --group <groupKey> --name <displayName>` 已支持 well-known discovery、invite token join、全局 `[[servers]]` / `[[groups]]` 写入和 join 后 `auto_sync` 开启；access token 只写入本机 `identity.json`，不写入 TOML。
-- `dmx doctor` 已提供 store、privacy、sync、adapter 四类诊断，输出结构化 `checks`、`summary` 和可执行 `fixHint`；诊断逻辑位于 `packages/client`，CLI 只负责参数映射和输出。
+- `dmx doctor` 已提供 store、privacy、sync、proxy/daemon、adapter 五类诊断，输出结构化 `checks`、`summary` 和可执行 `fixHint`；诊断逻辑位于 `packages/client`，CLI 只负责参数映射和输出。
 - join 相关实现已按职责拆分：CLI 命令在 `apps/dmx/src/commands/join.ts`，client 编排在 `packages/client/src/join.ts`，HTTP discovery/join 在 `packages/client/src/join-http.ts`，全局配置落盘在 `packages/client/src/join-config.ts`，共享类型在 `packages/client/src/join-types.ts`。
 - Codex、Claude Code 和 opencode adapter 已支持 detect、user/project scope configure、remove 和 doctor，并在测试中通过临时 HOME / config 目录隔离真实用户配置。TUI 已支持 detected/configured 状态展示、键盘 toggle、scope 切换和取消。
 
@@ -949,7 +948,6 @@ auto_init = true
 auto_reference = true
 auto_capture = true
 auto_sync = true
-daemon_autostart = true
 
 [redaction]
 enabled = true
@@ -2109,8 +2107,10 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 
 当前实现状态：
 
-- `@mcp-dev-mesh/client` 已提供 Koa2 + 官方 MCP TypeScript SDK Streamable HTTP transport 的本地 proxy。
-- `dmx proxy --root . --port 8722` 会启动 `http://127.0.0.1:8722/mcp`，并在首次 MCP 会话时幂等创建或复用项目 `.dev-mesh/`。
+- `@mcp-dev-mesh/client` 已提供 stdio launcher、项目级 daemon 和 Koa2 + 官方 MCP TypeScript SDK Streamable HTTP transport 的本地 proxy。
+- `dmx serve --mcp --root .` 会作为 MCP host 的前台 stdio 入口，按需复用或 detached spawn 项目 daemon，并在 daemon 冷启动或不可用时降级为本进程执行。
+- daemon 通过 `.dev-mesh/daemon.pid` 做项目级锁，并把运行状态写入 `.dev-mesh/daemon.json`；空闲超过阈值后自动退出。
+- `dmx proxy --root . --port 8722` 仍可直接启动 `http://127.0.0.1:8722/mcp`，用于调试或嵌入。
 - 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`。
 - 本地 proxy 不依赖 `packages/server`，只通过 `packages/mcp-contracts` 共享 tool schema，避免 client/server 反向耦合。
 
@@ -2523,13 +2523,13 @@ CI 门禁：
 
 - NPM package `mcp-dev-mesh`
 - `dmx` CLI
-- `@mcp-dev-mesh/client` 提供可嵌入的 local proxy / daemon runtime
+- `@mcp-dev-mesh/client` 提供可嵌入的 stdio launcher、local proxy 和 daemon runtime
 - `@mcp-dev-mesh/agent` 提供 `buildContextPack`、自动引用策略和沉淀 orchestration API
 - `dmx init --global`
 - tool selector for Codex / Claude Code / opencode（已支持 flags、CI 默认、TUI 状态展示、键盘 toggle 和 scope 切换）
 - local-only mode
 - `dmx join <ip> --group <groupKey> --name <displayName>`（已支持 well-known discovery、invite join、全局连接记录和 CLI 集成测试）
-- 本地 MCP Proxy（已支持 `dmx proxy`、Koa2、官方 MCP SDK Streamable HTTP transport 和 local-store capture/search）
+- 本地 MCP 入口（已支持 `dmx serve --mcp` stdio launcher、按需 daemon、`dmx proxy`、Koa2、官方 MCP SDK Streamable HTTP transport 和 local-store capture/search）
 - `.dev-mesh/` local store manager
 - Codex 打开项目时自动 `ensureProjectStore`
 - 默认 `auto_init`、`auto_reference`、`auto_capture`，join 后开启 `auto_sync`
@@ -2541,7 +2541,7 @@ CI 门禁：
 - `dmx doctor`
 - 本地 SQLite 缓存
 - `dmx init --global`、`dmx join`、`dmx doctor` integration test
-- local MCP proxy capture/search integration test（已覆盖 client 嵌入式 proxy 和 `dmx proxy` 启动）
+- local MCP proxy capture/search integration test（已覆盖 stdio launcher 拉起 daemon、client 嵌入式 proxy 和 `dmx proxy` 启动）
 - adapter configure/remove/doctor integration test with temporary HOME
 - custom Agent 二次开发示例
 

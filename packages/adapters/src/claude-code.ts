@@ -3,11 +3,17 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import type { ConfigureInput, ConfigureResult, DoctorCheck, RemoveInput, ToolAdapter } from '@mcp-dev-mesh/extension-api';
+import type {
+  ConfigureInput,
+  ConfigureResult,
+  DoctorCheck,
+  McpCommandConfig,
+  RemoveInput,
+  ToolAdapter
+} from '@mcp-dev-mesh/extension-api';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_CLAUDE_MCP_SERVER_NAME = 'dev-mesh';
-const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:8722/mcp';
 
 export interface ClaudeCodeToolAdapterOptions {
   command?: string;
@@ -19,6 +25,8 @@ export interface ClaudeCodeToolAdapterOptions {
 interface ClaudeMcpServerConfig {
   type?: string;
   url?: string;
+  command?: string;
+  args?: string[];
 }
 
 interface ClaudeConfigLookup {
@@ -57,22 +65,21 @@ export function createClaudeCodeToolAdapter(options: ClaudeCodeToolAdapterOption
     async isConfigured(projectRoot: string) {
       const config = await findClaudeMcpServerConfig(projectRoot, serverName, options);
 
-      return config?.server?.url !== undefined;
+      return config?.server?.url !== undefined || config?.server?.command !== undefined;
     },
     async configure(input: ConfigureInput): Promise<ConfigureResult> {
       const scope = input.scope ?? 'user';
       const targetPath = resolveClaudeConfigPath(input.projectRoot, scope, options);
       const current = await readJsonObject(targetPath);
-      const next = upsertClaudeMcpServer(current, serverName, input.mcpUrl);
+      const next = upsertClaudeMcpServer(current, serverName, input.mcpUrl, input.mcpCommand);
       const changed = JSON.stringify(next) !== JSON.stringify(current);
+      const target = describeMcpTarget(input.mcpUrl, input.mcpCommand);
 
       if (input.dryRun) {
         return {
           changed,
           targetPath,
-          message: changed
-            ? `Would configure claude-code for ${input.mcpUrl}`
-            : `claude-code is already configured for ${input.mcpUrl}`
+          message: changed ? `Would configure claude-code for ${target}` : `claude-code is already configured for ${target}`
         };
       }
 
@@ -84,9 +91,7 @@ export function createClaudeCodeToolAdapter(options: ClaudeCodeToolAdapterOption
       return {
         changed,
         targetPath,
-        message: changed
-          ? `Configured claude-code for ${input.mcpUrl}`
-          : `claude-code is already configured for ${input.mcpUrl}`
+        message: changed ? `Configured claude-code for ${target}` : `claude-code is already configured for ${target}`
       };
     },
     async remove(input: RemoveInput): Promise<void> {
@@ -116,17 +121,17 @@ export function createClaudeCodeToolAdapter(options: ClaudeCodeToolAdapterOption
           id: 'adapter.claude-code.mcp-config',
           status: 'warn',
           message: 'Claude Code dev-mesh MCP server is not configured.',
-          fixHint: `Run dmx init --global --tool claude --mcp-url ${DEFAULT_LOCAL_MCP_URL} --yes.`
+          fixHint: 'Run dmx init --global --tool claude --yes.'
         });
         return checks;
       }
 
-      if (configured.server?.url === undefined) {
+      if (configured.server?.url === undefined && configured.server?.command === undefined) {
         checks.push({
           id: 'adapter.claude-code.mcp-config',
           status: 'error',
-          message: `Claude Code dev-mesh MCP server exists in ${configured.targetPath} but does not define a url.`,
-          fixHint: `Re-run dmx init --global --tool claude --mcp-url ${DEFAULT_LOCAL_MCP_URL} --yes.`
+          message: `Claude Code dev-mesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
+          fixHint: 'Re-run dmx init --global --tool claude --yes.'
         });
         return checks;
       }
@@ -258,15 +263,23 @@ async function writeJsonObject(path: string, value: Record<string, unknown>): Pr
 function upsertClaudeMcpServer(
   config: Record<string, unknown>,
   serverName: string,
-  mcpUrl: string
+  mcpUrl: string,
+  mcpCommand?: McpCommandConfig
 ): Record<string, unknown> {
   const next = cloneJsonObject(config);
   const mcpServers = readObject(next.mcpServers);
 
-  mcpServers[serverName] = {
-    type: 'http',
-    url: mcpUrl
-  };
+  mcpServers[serverName] =
+    mcpCommand === undefined
+      ? {
+          type: 'http',
+          url: mcpUrl
+        }
+      : {
+          type: 'stdio',
+          command: mcpCommand.command,
+          args: mcpCommand.args ?? []
+        };
   next.mcpServers = mcpServers;
 
   return next;
@@ -302,7 +315,23 @@ function readClaudeMcpServer(config: Record<string, unknown>, serverName: string
     result.url = server.url;
   }
 
+  if (typeof server.command === 'string') {
+    result.command = server.command;
+  }
+
+  if (Array.isArray(server.args) && server.args.every((value) => typeof value === 'string')) {
+    result.args = server.args;
+  }
+
   return result;
+}
+
+function describeMcpTarget(mcpUrl: string, mcpCommand?: McpCommandConfig): string {
+  if (mcpCommand === undefined) {
+    return mcpUrl;
+  }
+
+  return `${mcpCommand.command} ${(mcpCommand.args ?? []).join(' ')}`.trim();
 }
 
 function readObject(value: unknown): Record<string, unknown> {

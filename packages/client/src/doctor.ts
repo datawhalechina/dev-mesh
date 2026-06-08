@@ -1,6 +1,7 @@
 import { DEFAULT_LOCAL_PROXY_URL, getGlobalConfigPaths } from './global-config.js';
 import { checkAdapters } from './doctor-adapters.js';
 import { checkPrivacy } from './doctor-privacy.js';
+import { checkProxy } from './doctor-proxy.js';
 import { checkProjectStore } from './doctor-store.js';
 import { checkSync } from './doctor-sync.js';
 import { summarizeChecks } from './doctor-summary.js';
@@ -26,6 +27,7 @@ export async function runDevMeshDoctor(options: DevMeshDoctorOptions = {}): Prom
     ...(await checkProjectStore(context)),
     ...(await checkPrivacy(context)),
     ...(await checkSync(context)),
+    ...(await checkProxy(context)),
     ...(await checkAdapters(context))
   ];
 

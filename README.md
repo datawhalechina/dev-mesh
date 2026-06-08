@@ -15,13 +15,13 @@
 ## 当前能力
 
 - `pnpm` workspace monorepo
-- `apps/dmx`：`dmx` CLI，本地 init/capture/search/status/rate/inbox/index/doctor/proxy、全局 init 工具选择和远端 group join
+- `apps/dmx`：`dmx` CLI，本地 init/capture/search/status/rate/inbox/index/doctor/serve/proxy、全局 init 工具选择和远端 group join
 - `apps/mesh-server`：Koa2 Hub Server 启动入口
 - `apps/web-admin`：Vue 3 + Element Plus 管理后台
 - `apps/website`：VitePress 项目官网和使用文档
 - `packages/core`：知识条目、PARA、质量信号、搜索和评分
 - `packages/agent`：Context Pack 构建
-- `packages/client`：本地 runtime、local-only 组合和 Koa2 + 官方 MCP SDK 本地 proxy
+- `packages/client`：本地 runtime、local-only 组合、stdio launcher、按需 daemon 和 Koa2 + 官方 MCP SDK 本地 proxy
 - `packages/server`：Koa2 Hub HTTP API、官方 MCP SDK Streamable HTTP `/mcp` 和工具调用映射
 - `packages/local-store`：`.dev-mesh/` bootstrap、JSONL 本地存储、事件日志、review queue、ratings 和 SQLite FTS 索引
 - `packages/mcp-contracts`：MCP tools schema 和注册函数
@@ -116,7 +116,7 @@ pnpm dev:website
 启动本地 MCP Proxy：
 
 ```bash
-pnpm dev:client -- proxy --root . --port 8722
+pnpm dev:client -- serve --mcp --root .
 ```
 
 默认地址：
@@ -154,6 +154,7 @@ pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --
 ```
 
 该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `dev-mesh` MCP server 配置。
+默认写入的是 stdio MCP 命令：`dmx serve --mcp --root <project>`。MCP host 启动这个前台 launcher 后，launcher 会按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。
 
 加入开发期 Hub Server 的 group：
 
@@ -167,13 +168,19 @@ pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 \
 
 `dmx join` 会先读取 `/.well-known/dev-mesh`，再调用 `/api/v1/join`。成功后会在全局 `config.toml` 写入 `[[servers]]` 和 `[[groups]]`，并把 access token 保存在本机 `identity.json`，不会写入可检查或可分享的 TOML 配置。
 
-启动当前项目的本地 MCP Proxy：
+启动当前项目的 stdio MCP launcher：
+
+```bash
+pnpm --filter mcp-dev-mesh dev -- serve --mcp --root . --name local
+```
+
+直接启动当前项目的 HTTP MCP Proxy 调试入口：
 
 ```bash
 pnpm --filter mcp-dev-mesh dev -- proxy --root . --name local --port 8722
 ```
 
-`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`。它使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport，暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
+`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
 
 初始化项目本地知识库：
 
@@ -250,7 +257,7 @@ pnpm --filter mcp-dev-mesh dev -- index rebuild --root .
 pnpm --filter mcp-dev-mesh dev -- doctor --root .
 ```
 
-`dmx doctor` 会检查本地 store、privacy 配置、sync 身份和内置 adapter 状态，并在风险项上给出 `fixHint`。
+`dmx doctor` 会检查本地 store、privacy 配置、sync 身份、stdio launcher/daemon 状态和内置 adapter 状态，并在风险项上给出 `fixHint`。
 
 ## `.dev-mesh/` 本地知识库
 
@@ -285,7 +292,20 @@ pnpm --filter mcp-dev-mesh dev -- doctor --root .
 
 ## 本地 MCP Proxy
 
-本地 proxy 由 `packages/client` 提供，可作为库嵌入，也可通过 `dmx proxy` 启动：
+本地 MCP 入口由 `packages/client` 提供。推荐让 MCP host 启动 stdio launcher：
+
+```bash
+dmx serve --mcp --root .
+```
+
+launcher 会按需拉起项目级 daemon，daemon 状态写入：
+
+```text
+.dev-mesh/daemon.pid
+.dev-mesh/daemon.json
+```
+
+HTTP proxy 仍可作为库嵌入，也可通过 `dmx proxy` 启动：
 
 ```text
 GET  /healthz
@@ -304,7 +324,7 @@ mesh_search_member_experience
 mesh_resolve_term
 ```
 
-集成测试覆盖 SDK client 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_search_context`，并验证默认写入当前项目 store。
+集成测试覆盖 stdio launcher 启动 daemon、SDK client 调用 `tools/list` / `mesh_capture_knowledge`，以及 HTTP proxy 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_search_context`，并验证默认写入当前项目 store。
 
 ## HTTP API Skeleton
 
@@ -476,7 +496,7 @@ pnpm typecheck:examples
 
 阶段 5 分布式 Mesh 已完成，当前进入发布前验证和生产化准备：
 
-- 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
+- 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx serve --mcp` stdio launcher、按需项目 daemon、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
 - 已完成 Git snapshot provider、filesystem snapshot provider 和 MCP tool call provider，能采集 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数、工具调用成功/失败信号，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
 - 已完成 rule-based extractor，能把 provider raw event 生成带 risk 和 evidence metadata 的 `task_progress`、`command`、`pitfall` 等 extract proposal。
 - 已完成内置 redactor 的 secret、PII、URL token、Authorization、cookie、private key 和 sensitive path 脱敏。

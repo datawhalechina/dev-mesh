@@ -4,11 +4,17 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { applyEdits, modify, parse, type FormattingOptions, type JSONPath } from 'jsonc-parser';
-import type { ConfigureInput, ConfigureResult, DoctorCheck, RemoveInput, ToolAdapter } from '@mcp-dev-mesh/extension-api';
+import type {
+  ConfigureInput,
+  ConfigureResult,
+  DoctorCheck,
+  McpCommandConfig,
+  RemoveInput,
+  ToolAdapter
+} from '@mcp-dev-mesh/extension-api';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_OPENCODE_MCP_SERVER_NAME = 'dev-mesh';
-const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:8722/mcp';
 const OPENCODE_CONFIG_FILENAME = 'opencode.json';
 const OPENCODE_JSONC_CONFIG_FILENAME = 'opencode.jsonc';
 const OPENCODE_PERMISSION_KEY = 'dev-mesh_*';
@@ -30,6 +36,7 @@ interface OpencodeMcpServerConfig {
   enabled?: boolean;
   type?: string;
   url?: string;
+  command?: string[];
 }
 
 interface OpencodeConfigLookup {
@@ -68,22 +75,21 @@ export function createOpencodeToolAdapter(options: OpencodeToolAdapterOptions = 
     async isConfigured(projectRoot: string) {
       const config = await findOpencodeMcpServerConfig(projectRoot, serverName, options);
 
-      return config?.server?.url !== undefined;
+      return config?.server?.url !== undefined || config?.server?.command !== undefined;
     },
     async configure(input: ConfigureInput): Promise<ConfigureResult> {
       const scope = input.scope ?? 'user';
       const targetPath = await resolveOpencodeConfigPath(input.projectRoot, scope, options);
       const current = await readJsoncFile(targetPath);
-      const next = upsertOpencodeMcpServer(current, serverName, input.mcpUrl);
+      const next = upsertOpencodeMcpServer(current, serverName, input.mcpUrl, input.mcpCommand);
       const changed = next !== current;
+      const target = describeMcpTarget(input.mcpUrl, input.mcpCommand);
 
       if (input.dryRun) {
         return {
           changed,
           targetPath,
-          message: changed
-            ? `Would configure opencode for ${input.mcpUrl}`
-            : `opencode is already configured for ${input.mcpUrl}`
+          message: changed ? `Would configure opencode for ${target}` : `opencode is already configured for ${target}`
         };
       }
 
@@ -95,7 +101,7 @@ export function createOpencodeToolAdapter(options: OpencodeToolAdapterOptions = 
       return {
         changed,
         targetPath,
-        message: changed ? `Configured opencode for ${input.mcpUrl}` : `opencode is already configured for ${input.mcpUrl}`
+        message: changed ? `Configured opencode for ${target}` : `opencode is already configured for ${target}`
       };
     },
     async remove(input: RemoveInput): Promise<void> {
@@ -125,17 +131,17 @@ export function createOpencodeToolAdapter(options: OpencodeToolAdapterOptions = 
           id: 'adapter.opencode.mcp-config',
           status: 'warn',
           message: 'opencode dev-mesh MCP server is not configured.',
-          fixHint: `Run dmx init --global --tool opencode --mcp-url ${DEFAULT_LOCAL_MCP_URL} --yes.`
+          fixHint: 'Run dmx init --global --tool opencode --yes.'
         });
         return checks;
       }
 
-      if (configured.server?.url === undefined) {
+      if (configured.server?.url === undefined && configured.server?.command === undefined) {
         checks.push({
           id: 'adapter.opencode.mcp-config',
           status: 'error',
-          message: `opencode dev-mesh MCP server exists in ${configured.targetPath} but does not define a url.`,
-          fixHint: `Re-run dmx init --global --tool opencode --mcp-url ${DEFAULT_LOCAL_MCP_URL} --yes.`
+          message: `opencode dev-mesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
+          fixHint: 'Re-run dmx init --global --tool opencode --yes.'
         });
         return checks;
       }
@@ -306,12 +312,23 @@ async function readJsoncFile(path: string): Promise<string> {
   }
 }
 
-function upsertOpencodeMcpServer(content: string, serverName: string, mcpUrl: string): string {
-  let next = applyJsoncEdit(content, ['mcp', serverName], {
-    type: 'remote',
-    url: mcpUrl,
-    enabled: true
-  });
+function upsertOpencodeMcpServer(
+  content: string,
+  serverName: string,
+  mcpUrl: string,
+  mcpCommand?: McpCommandConfig
+): string {
+  let next = applyJsoncEdit(
+    content,
+    ['mcp', serverName],
+    mcpCommand === undefined
+      ? {
+          type: 'remote',
+          url: mcpUrl,
+          enabled: true
+        }
+      : createLocalOpencodeMcpServer(mcpCommand)
+  );
 
   next = applyJsoncEdit(next, ['permission', OPENCODE_PERMISSION_KEY], 'ask');
 
@@ -359,7 +376,33 @@ function readOpencodeMcpServer(content: string, serverName: string): OpencodeMcp
     result.url = server.url;
   }
 
+  if (Array.isArray(server.command) && server.command.every((value) => typeof value === 'string')) {
+    result.command = server.command;
+  }
+
   return result;
+}
+
+function createLocalOpencodeMcpServer(mcpCommand: McpCommandConfig): Record<string, unknown> {
+  const server: Record<string, unknown> = {
+    type: 'local',
+    command: [mcpCommand.command, ...(mcpCommand.args ?? [])],
+    enabled: true
+  };
+
+  if (mcpCommand.env !== undefined) {
+    server.environment = mcpCommand.env;
+  }
+
+  return server;
+}
+
+function describeMcpTarget(mcpUrl: string, mcpCommand?: McpCommandConfig): string {
+  if (mcpCommand === undefined) {
+    return mcpUrl;
+  }
+
+  return `${mcpCommand.command} ${(mcpCommand.args ?? []).join(' ')}`.trim();
 }
 
 function parseJsoncObject(content: string): Record<string, unknown> {

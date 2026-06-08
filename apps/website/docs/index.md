@@ -30,7 +30,7 @@ aside: false
       </div>
       <div>
         <span>本地入口</span>
-        <strong>dmx proxy</strong>
+        <strong>dmx serve</strong>
       </div>
       <div>
         <span>团队同步</span>

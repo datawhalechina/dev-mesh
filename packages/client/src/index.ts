@@ -25,6 +25,24 @@ export {
   listenLocalMcpProxy
 } from './local-proxy.js';
 export type { LocalMcpProxyListenOptions, LocalMcpProxyOptions } from './local-proxy.js';
+export {
+  DAEMON_PID_FILENAME,
+  DAEMON_STATE_FILENAME,
+  DEFAULT_DAEMON_IDLE_MS,
+  DEFAULT_DAEMON_STARTUP_WAIT_MS,
+  DEV_MESH_DAEMON_INTERNAL_ENV,
+  ensureLocalMcpDaemon,
+  inspectLocalMcpDaemon,
+  readLocalMcpDaemonState,
+  runLocalMcpDaemon,
+  serveLocalMcpStdio
+} from './local-mcp-daemon.js';
+export type {
+  LocalMcpDaemonCommand,
+  LocalMcpDaemonOptions,
+  LocalMcpDaemonState,
+  LocalMcpDaemonStatus
+} from './local-mcp-daemon.js';
 export { createDevMeshClientRuntime } from './runtime.js';
 export type {
   CaptureRawEventResult,

@@ -40,6 +40,7 @@ describe('dmx CLI global init', () => {
       const toolByKey = Object.fromEntries(initJson.tools.map((tool) => [tool.key, tool]));
       const config = await readFile(join(globalRoot, 'config.toml'), 'utf8');
       const identity = JSON.parse(await readFile(join(globalRoot, 'identity.json'), 'utf8')) as GlobalIdentityOutput;
+      const expectedCommand = 'dmx serve --mcp';
 
       expect(initJson).toMatchObject({
         globalRoot,
@@ -51,21 +52,21 @@ describe('dmx CLI global init', () => {
         adapterId: 'codex',
         selected: true,
         configured: true,
-        message: `Configured codex for ${mcpUrl}`,
+        message: expect.stringContaining(expectedCommand),
         targetPath: join(codexHome, 'config.toml')
       });
       expect(toolByKey.claude).toMatchObject({
         adapterId: 'claude-code',
         selected: true,
         configured: true,
-        message: `Configured claude-code for ${mcpUrl}`,
+        message: expect.stringContaining(expectedCommand),
         targetPath: join(claudeHome, '.claude.json')
       });
       expect(toolByKey.opencode).toMatchObject({
         adapterId: 'opencode',
         selected: true,
         configured: true,
-        message: `Configured opencode for ${mcpUrl}`,
+        message: expect.stringContaining(expectedCommand),
         targetPath: join(opencodeConfigHome, 'opencode', 'opencode.json')
       });
       expect(config).toContain(`local_proxy_url = "${mcpUrl}"`);
@@ -79,10 +80,15 @@ describe('dmx CLI global init', () => {
         selectedTools: ['codex', 'claude', 'opencode']
       });
       expect(identity.tools).toEqual(initJson.tools);
-      await expect(readFile(join(codexHome, 'config.toml'), 'utf8')).resolves.toContain(`url = "${mcpUrl}"`);
-      await expect(readFile(join(claudeHome, '.claude.json'), 'utf8')).resolves.toContain(`"url": "${mcpUrl}"`);
+      await expect(readFile(join(codexHome, 'config.toml'), 'utf8')).resolves.toContain('command = "dmx"');
+      await expect(readFile(join(codexHome, 'config.toml'), 'utf8')).resolves.toContain('"serve"');
+      await expect(readFile(join(claudeHome, '.claude.json'), 'utf8')).resolves.toContain('"type": "stdio"');
+      await expect(readFile(join(claudeHome, '.claude.json'), 'utf8')).resolves.toContain('"command": "dmx"');
       await expect(readFile(join(opencodeConfigHome, 'opencode', 'opencode.json'), 'utf8')).resolves.toContain(
-        `"url": "${mcpUrl}"`
+        '"type": "local"'
+      );
+      await expect(readFile(join(opencodeConfigHome, 'opencode', 'opencode.json'), 'utf8')).resolves.toContain(
+        '"command": ['
       );
     } finally {
       await rm(globalRoot, { recursive: true, force: true });
@@ -113,7 +119,9 @@ describe('dmx CLI global init', () => {
       expect(config).toContain('auto_capture = true');
       expect(config).toContain('auto_sync = true');
       expect(codexConfig).toContain(`[mcp_servers.dev-mesh]`);
-      expect(codexConfig).toContain(`url = "${mcpUrl}"`);
+      expect(codexConfig).toContain('command = "dmx"');
+      expect(codexConfig).toContain('"serve"');
+      expect(codexConfig).toContain('"--mcp"');
     } finally {
       await rm(globalRoot, { recursive: true, force: true });
       await rm(codexHome, { recursive: true, force: true });

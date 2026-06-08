@@ -45,7 +45,8 @@ async function runInitCommand(options: InitCommandOptions): Promise<void> {
           };
     const initOptions: InitGlobalConfigOptions = {
       mcpUrl: options.mcpUrl,
-      projectRoot: options.root
+      projectRoot: options.root,
+      mcpCommand: createDmxServeMcpCommand(options)
     };
 
     if (selection?.tools !== undefined) {
@@ -146,6 +147,7 @@ export function renderGlobalInitTui(state: GlobalInitTuiState): string {
     ...rows,
     '',
     'Automation: auto_init, auto_reference, auto_capture, and auto_sync are enabled by default.',
+    'MCP hosts run dmx serve --mcp; the launcher starts or reuses the project daemon on demand.',
     '',
     'Keys: ↑/↓ move, Space toggle, s scope, Enter apply, q cancel.',
     ...error,
@@ -387,6 +389,13 @@ function parseScopeOption(value: string): GlobalToolScope {
   }
 
   throw new Error(`Unknown scope "${value}". Expected one of: user, project.`);
+}
+
+function createDmxServeMcpCommand(options: InitCommandOptions): { command: string; args: string[] } {
+  return {
+    command: 'dmx',
+    args: ['serve', '--mcp', '--root', options.root, '--name', options.name]
+  };
 }
 
 interface InitCommandOptions {

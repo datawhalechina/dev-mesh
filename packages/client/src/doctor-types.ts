@@ -1,7 +1,7 @@
 import type { ProjectConfig } from '@mcp-dev-mesh/local-store';
 
 export type DevMeshDoctorStatus = 'ok' | 'warn' | 'error';
-export type DevMeshDoctorCategory = 'adapter' | 'store' | 'sync' | 'privacy';
+export type DevMeshDoctorCategory = 'adapter' | 'store' | 'sync' | 'privacy' | 'proxy';
 
 export interface DevMeshDoctorOptions {
   projectRoot?: string;

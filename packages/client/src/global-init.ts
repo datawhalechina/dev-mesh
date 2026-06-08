@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { createBuiltInAdapters, type BuiltInToolAdapterId } from '@mcp-dev-mesh/adapters';
+import type { McpCommandConfig } from '@mcp-dev-mesh/extension-api';
 import { DEFAULT_LOCAL_PROXY_URL, escapeToml, getGlobalConfigPaths } from './global-config.js';
 
 export type GlobalToolKey = 'codex' | 'claude' | 'opencode';
@@ -26,6 +27,7 @@ export interface InitGlobalConfigOptions {
   tools?: string[];
   toolScopes?: Partial<Record<GlobalToolKey, GlobalToolScope>>;
   configureTools?: boolean;
+  mcpCommand?: McpCommandConfig;
 }
 
 export interface InspectGlobalToolsOptions {
@@ -68,14 +70,20 @@ export async function initGlobalConfig(
   const projectRoot = options.projectRoot ?? process.cwd();
   const selectedTools = normalizeGlobalTools(options.tools);
   const toolScopes = normalizeGlobalToolScopes(options.toolScopes);
-  const tools = await inspectGlobalTools({
+  const inspectOptions: InspectGlobalToolsInternalOptions = {
     selectedTools,
     mcpUrl,
     projectRoot,
     toolScopes,
     configureTools: options.configureTools ?? true,
     checkConfiguredForAll: false
-  });
+  };
+
+  if (options.mcpCommand !== undefined) {
+    inspectOptions.mcpCommand = options.mcpCommand;
+  }
+
+  const tools = await inspectGlobalTools(inspectOptions);
 
   await mkdir(globalRoot, { recursive: true });
   await writeFile(configPath, createGlobalConfigToml(displayName, mcpUrl, selectedTools), 'utf8');
@@ -176,15 +184,18 @@ function normalizeGlobalTools(tools?: string[]): GlobalToolKey[] {
   return GLOBAL_TOOL_DEFINITIONS.filter((definition) => selected.has(definition.key)).map((definition) => definition.key);
 }
 
-async function inspectGlobalTools(options: {
+interface InspectGlobalToolsInternalOptions {
   selectedTools: GlobalToolKey[];
   mcpUrl: string;
   projectRoot: string;
   toolScopes: Record<GlobalToolKey, GlobalToolScope>;
+  mcpCommand?: McpCommandConfig;
   configureTools: boolean;
   checkConfiguredForAll: boolean;
-}): Promise<GlobalToolStatus[]> {
-  const { selectedTools, mcpUrl, projectRoot, toolScopes, configureTools, checkConfiguredForAll } = options;
+}
+
+async function inspectGlobalTools(options: InspectGlobalToolsInternalOptions): Promise<GlobalToolStatus[]> {
+  const { selectedTools, mcpUrl, projectRoot, toolScopes, mcpCommand, configureTools, checkConfiguredForAll } = options;
   const selected = new Set(selectedTools);
   const adapters = new Map(createBuiltInAdapters().map((adapter) => [adapter.id, adapter]));
   const statuses: GlobalToolStatus[] = [];
@@ -229,7 +240,8 @@ async function inspectGlobalTools(options: {
         projectRoot,
         mcpUrl,
         scope,
-        dryRun: !configureTools
+        dryRun: !configureTools,
+        ...(mcpCommand !== undefined ? { mcpCommand } : {})
       });
 
       if (configureTools) {
