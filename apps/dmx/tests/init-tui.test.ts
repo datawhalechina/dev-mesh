@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   createGlobalInitDefaultTools,
+  createGlobalInitResultSummary,
   createGlobalInitStatusSummary,
-  createGlobalInitToolChoices
+  createGlobalInitToolChoices,
+  createGlobalInitToolsSummary,
+  createProjectInitResultSummary
 } from '../src/commands/init.js';
-import type { GlobalToolStatus } from '@mcp-dev-mesh/client';
+import type { GlobalInitResult, GlobalToolStatus } from '@mcp-dev-mesh/client';
 
 describe('global init TUI helpers', () => {
   it('builds Clack choices with detected/configured hints', () => {
@@ -70,6 +73,52 @@ describe('global init TUI helpers', () => {
 
     expect(summary).toContain('Codex        installed, not configured (user)');
     expect(summary).toContain('opencode     not found (user)');
+  });
+
+  it('formats global init result summaries without dumping JSON', () => {
+    const result: GlobalInitResult = {
+      globalRoot: 'C:\\Users\\xiaoyun\\.dev-mesh',
+      configPath: 'C:\\Users\\xiaoyun\\.dev-mesh\\config.toml',
+      identityPath: 'C:\\Users\\xiaoyun\\.dev-mesh\\identity.json',
+      selectedTools: ['codex'],
+      tools: [
+        toolStatus({
+          key: 'codex',
+          displayName: 'Codex',
+          selected: true,
+          detected: true,
+          configured: true,
+          targetPath: 'C:\\Users\\xiaoyun\\.codex\\config.toml'
+        }),
+        toolStatus({
+          key: 'opencode',
+          displayName: 'opencode',
+          selected: false
+        })
+      ]
+    };
+
+    expect(createGlobalInitResultSummary(result)).toContain('Selected tools: codex');
+    expect(createGlobalInitResultSummary(result)).toContain(
+      'Automation: auto_init, auto_reference, auto_capture, auto_sync'
+    );
+    expect(createGlobalInitToolsSummary(result.tools)).toBe(
+      'Codex        configured (user) -> C:\\Users\\xiaoyun\\.codex\\config.toml'
+    );
+  });
+
+  it('formats project init result summaries', () => {
+    expect(
+      createProjectInitResultSummary({
+        projectRoot: 'C:\\repo',
+        storeRoot: 'C:\\repo\\.dev-mesh',
+        paths: {
+          config: 'C:\\repo\\.dev-mesh\\config.toml',
+          eventsDir: 'C:\\repo\\.dev-mesh\\events',
+          knowledgeDir: 'C:\\repo\\.dev-mesh\\knowledge'
+        }
+      })
+    ).toContain('Store root: C:\\repo\\.dev-mesh');
   });
 });
 

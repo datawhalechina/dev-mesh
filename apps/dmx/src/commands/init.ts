@@ -1,14 +1,16 @@
-import { cancel, intro, isCancel, log, multiselect, note, outro, select } from '@clack/prompts';
+import { cancel, intro, isCancel, log, multiselect, note, outro, select, spinner } from '@clack/prompts';
 import type { Command } from 'commander';
 import {
   createDevMeshClientRuntime,
   initGlobalConfig,
   inspectGlobalToolStatuses,
+  type GlobalInitResult,
   type GlobalToolScope,
   type GlobalToolStatus,
   type GlobalToolKey,
   type InitGlobalConfigOptions
 } from '@mcp-dev-mesh/client';
+import { isCiEnvironment, shouldUseTuiOutput } from './shared.js';
 
 export function registerInitCommand(program: Command): void {
   program
@@ -20,6 +22,7 @@ export function registerInitCommand(program: Command): void {
     .option('--name <displayName>', 'member display name', 'local')
     .option('--mcp-url <url>', 'local MCP proxy URL', 'http://127.0.0.1:8722/mcp')
     .option('--yes', 'use defaults without prompting')
+    .option('--json', 'print machine-readable JSON')
     .option('--tool <tool>', 'MCP host tool to register; repeatable', collectOption, [])
     .option('--tools <tools>', 'comma-separated MCP host tools')
     .option('--scope <scope>', 'MCP host configuration scope for selected tools: user or project', parseScopeOption, 'user')
@@ -27,13 +30,15 @@ export function registerInitCommand(program: Command): void {
 }
 
 async function runInitCommand(options: InitCommandOptions): Promise<void> {
+  const tuiOutput = shouldUseTuiOutput({ json: options.json });
+
   if (shouldRunGlobalInit(options)) {
     const explicitTools = collectGlobalToolOptions(options.tool, options.tools);
     const selection =
       explicitTools === undefined
         ? await promptGlobalTools(
             compactPromptGlobalToolsOptions({
-              yes: options.yes,
+              yes: options.yes || options.json,
               mcpUrl: options.mcpUrl,
               projectRoot: options.root,
               defaultScope: options.scope
@@ -57,19 +62,34 @@ async function runInitCommand(options: InitCommandOptions): Promise<void> {
       initOptions.toolScopes = selection.toolScopes;
     }
 
+    const initSpinner = tuiOutput ? spinner() : undefined;
+    initSpinner?.start('Writing Dev Mesh global config');
     const result = await initGlobalConfig(options.name, initOptions);
+    initSpinner?.stop('Global config ready');
 
-    console.log(JSON.stringify(result, null, 2));
+    if (tuiOutput) {
+      printGlobalInitResult(result, { showIntro: !didUseGlobalInitTui(selection) });
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+
     return;
   }
 
+  const initSpinner = tuiOutput ? spinner() : undefined;
+  initSpinner?.start('Preparing project store');
   const runtime = createDevMeshClientRuntime({
     projectRoot: options.root,
     memberName: options.name
   });
   const store = await runtime.ensureProjectStore();
+  initSpinner?.stop('Project store ready');
 
-  console.log(JSON.stringify(store, null, 2));
+  if (tuiOutput) {
+    printProjectInitResult(store);
+  } else {
+    console.log(JSON.stringify(store, null, 2));
+  }
 }
 
 function collectOption(value: string, previous: string[]): string[] {
@@ -87,7 +107,7 @@ function collectGlobalToolOptions(tool: string[] = [], tools?: string): string[]
 }
 
 async function promptGlobalTools(options: PromptGlobalToolsOptions): Promise<GlobalInitSelection | undefined> {
-  if (options.yes || process.env.CI === '1' || !process.stdin.isTTY || !process.stdout.isTTY) {
+  if (options.yes || isCiEnvironment() || !process.stdin.isTTY || !process.stdout.isTTY) {
     return undefined;
   }
 
@@ -153,12 +173,36 @@ async function runGlobalInitTui(statuses: GlobalToolStatus[]): Promise<GlobalIni
     toolScopes[tool] = scope;
   }
 
-  outro('Dev Mesh will configure the selected MCP hosts.');
+  log.info('Configuring selected MCP hosts.');
 
   return {
     tools: selectedTools,
-    toolScopes
+    toolScopes,
+    usedTui: true
   };
+}
+
+function printGlobalInitResult(result: GlobalInitResult, options: { showIntro?: boolean } = {}): void {
+  if (options.showIntro) {
+    intro('Dev Mesh init');
+  }
+
+  note(createGlobalInitResultSummary(result), 'Global config');
+  note(createGlobalInitToolsSummary(result.tools), 'MCP hosts');
+
+  const attention = createGlobalInitAttentionSummary(result.tools);
+
+  if (attention.length > 0) {
+    note(attention, 'Needs attention');
+  }
+
+  outro('Open a project with your MCP host to start automatic local knowledge capture.');
+}
+
+function printProjectInitResult(store: ProjectInitResult): void {
+  intro('Dev Mesh init');
+  note(createProjectInitResultSummary(store), 'Project store');
+  outro('This project is ready for local knowledge capture.');
 }
 
 export function createGlobalInitToolChoices(statuses: GlobalToolStatus[]): GlobalInitToolChoice[] {
@@ -183,6 +227,67 @@ export function createGlobalInitStatusSummary(statuses: GlobalToolStatus[]): str
   return statuses
     .map((status) => `${status.displayName.padEnd(12, ' ')} ${describeToolStatus(status)} (${status.scope})`)
     .join('\n');
+}
+
+export function createGlobalInitResultSummary(result: GlobalInitResult): string {
+  const selectedTools = result.selectedTools.length > 0 ? result.selectedTools.join(', ') : 'none';
+
+  return [
+    `Global root: ${result.globalRoot}`,
+    `Config: ${result.configPath}`,
+    `Identity: ${result.identityPath}`,
+    `Selected tools: ${selectedTools}`,
+    'Automation: auto_init, auto_reference, auto_capture, auto_sync'
+  ].join('\n');
+}
+
+export function createGlobalInitToolsSummary(tools: GlobalToolStatus[]): string {
+  const selectedTools = tools.filter((tool) => tool.selected);
+
+  if (selectedTools.length === 0) {
+    return 'No MCP host tools selected.';
+  }
+
+  return selectedTools.map(formatGlobalToolResult).join('\n');
+}
+
+export function createProjectInitResultSummary(store: ProjectInitResult): string {
+  return [
+    `Project root: ${store.projectRoot}`,
+    `Store root: ${store.storeRoot}`,
+    `Config: ${store.paths.config}`,
+    `Knowledge: ${store.paths.knowledgeDir}`,
+    `Events: ${store.paths.eventsDir}`
+  ].join('\n');
+}
+
+function createGlobalInitAttentionSummary(tools: GlobalToolStatus[]): string {
+  return tools
+    .filter((tool) => tool.selected && (!tool.configured || tool.reason !== undefined))
+    .map((tool) => {
+      const reason = tool.reason ?? 'The MCP host configuration was not confirmed.';
+
+      return `${tool.displayName}: ${reason}`;
+    })
+    .join('\n');
+}
+
+function formatGlobalToolResult(tool: GlobalToolStatus): string {
+  const target = tool.targetPath === undefined ? '' : ` -> ${tool.targetPath}`;
+
+  return `${tool.displayName.padEnd(12, ' ')} ${describeToolResult(tool)} (${tool.scope})${target}`;
+}
+
+function describeToolResult(tool: GlobalToolStatus): string {
+  if (tool.configured) {
+    return 'configured';
+  }
+
+  if (tool.detected) {
+    return 'detected, not configured';
+  }
+
+  return 'not found';
 }
 
 function describeToolStatus(item: Pick<GlobalToolStatus, 'detected' | 'configured'>): string {
@@ -284,6 +389,7 @@ interface InitCommandOptions {
   name: string;
   mcpUrl: string;
   yes?: boolean;
+  json?: boolean;
   tool?: string[];
   tools?: string;
   scope: GlobalToolScope;
@@ -318,10 +424,25 @@ interface PromptGlobalToolsOptions {
 interface GlobalInitSelection {
   tools: GlobalToolKey[];
   toolScopes: Partial<Record<GlobalToolKey, GlobalToolScope>>;
+  usedTui?: boolean;
+}
+
+function didUseGlobalInitTui(selection: GlobalInitSelection | { tools: string[] } | undefined): boolean {
+  return selection !== undefined && 'usedTui' in selection && selection.usedTui === true;
 }
 
 export interface GlobalInitToolChoice {
   value: GlobalToolKey;
   label: string;
   hint: string;
+}
+
+interface ProjectInitResult {
+  projectRoot: string;
+  storeRoot: string;
+  paths: {
+    config: string;
+    eventsDir: string;
+    knowledgeDir: string;
+  };
 }

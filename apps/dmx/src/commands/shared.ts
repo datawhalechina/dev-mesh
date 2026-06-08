@@ -40,6 +40,26 @@ export function createRateOptions(reason?: string): { reason?: string } {
   };
 }
 
+export function shouldUseTuiOutput(options: { json?: boolean | undefined } = {}): boolean {
+  if (options.json) {
+    return false;
+  }
+
+  return !isCiEnvironment() && process.stdout.isTTY === true;
+}
+
+export function isCiEnvironment(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.CI;
+
+  if (value === undefined) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  return normalized.length > 0 && normalized !== '0' && normalized !== 'false';
+}
+
 export function requireInboxId(id: string | undefined, action: string): string {
   if (!id) {
     throw new Error(`Expected an inbox item id for inbox ${action}.`);

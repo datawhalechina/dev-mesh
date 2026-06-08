@@ -137,7 +137,7 @@ Website: http://127.0.0.1:3000
 dmx init
 ```
 
-该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `dev-mesh` MCP server 配置。默认全局自动化策略启用 `auto_init`、`auto_reference`、`auto_capture` 和 `auto_sync`。
+该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `dev-mesh` MCP server 配置。真实终端中完成后会继续用 TUI 展示写入结果；CI、管道重定向或显式 `--json` 时输出结构化 JSON。默认全局自动化策略启用 `auto_init`、`auto_reference`、`auto_capture` 和 `auto_sync`。
 
 当前仓库开发期也可以通过 workspace dev script 运行：
 
@@ -257,7 +257,7 @@ pnpm --filter mcp-dev-mesh dev -- index rebuild --root .
 pnpm --filter mcp-dev-mesh dev -- doctor --root .
 ```
 
-`dmx doctor` 会检查本地 store、privacy 配置、sync 身份、daemon sync 状态、stdio launcher/daemon 状态和内置 adapter 状态，并在风险项上给出 `fixHint`。
+`dmx doctor` 会检查本地 store、privacy 配置、sync 身份、daemon sync 状态、stdio launcher/daemon 状态和内置 adapter 状态。真实终端中会用 Clack TUI 按类别展示检查结果和修复建议；需要机器读取时可使用 `dmx doctor --json`。
 
 ## `.dev-mesh/` 本地知识库
 
