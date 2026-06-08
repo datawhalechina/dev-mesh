@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { registerCaptureCommand } from './commands/capture.js';
 import { registerDoctorCommand } from './commands/doctor.js';
@@ -14,7 +17,7 @@ import { registerStatusCommand } from './commands/status.js';
 export function createDmxProgram(): Command {
   const program = new Command();
 
-  program.name('dmx').description('MCP Dev Mesh local-first CLI').version('0.1.3');
+  program.name('dmx').description('MCP Dev Mesh local-first CLI').version(readDmxPackageVersion());
 
   registerInitCommand(program);
   registerJoinCommand(program);
@@ -33,4 +36,15 @@ export function createDmxProgram(): Command {
 
 export async function runCli(argv = process.argv): Promise<void> {
   await createDmxProgram().parseAsync(argv);
+}
+
+function readDmxPackageVersion(): string {
+  const packagePath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+  const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as { version?: unknown };
+
+  if (typeof pkg.version !== 'string' || pkg.version.length === 0) {
+    throw new Error(`Unable to read dmx package version from ${packagePath}.`);
+  }
+
+  return pkg.version;
 }
