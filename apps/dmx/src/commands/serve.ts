@@ -15,7 +15,9 @@ export function registerServeCommand(program: Command): void {
     .option('--mcp', 'serve stdio MCP for host tools')
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
+    .option('--global-root <path>', 'global Dev Mesh root')
     .option('--daemon-idle-ms <number>', 'background daemon idle timeout in milliseconds', parseIntOption)
+    .option('--daemon-sync-interval-ms <number>', 'background daemon sync interval in milliseconds', parseIntOption)
     .action(runServeCommand);
 }
 
@@ -49,6 +51,14 @@ function createDaemonOptions(options: ServeCommandOptions): LocalMcpDaemonOption
     daemonOptions.idleMs = options.daemonIdleMs;
   }
 
+  if (options.daemonSyncIntervalMs !== undefined) {
+    daemonOptions.syncIntervalMs = options.daemonSyncIntervalMs;
+  }
+
+  if (options.globalRoot !== undefined) {
+    daemonOptions.globalRoot = options.globalRoot;
+  }
+
   return daemonOptions;
 }
 
@@ -69,5 +79,7 @@ interface ServeCommandOptions {
   mcp?: boolean;
   root: string;
   name: string;
+  globalRoot?: string;
   daemonIdleMs?: number;
+  daemonSyncIntervalMs?: number;
 }

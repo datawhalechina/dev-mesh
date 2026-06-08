@@ -171,6 +171,9 @@ importers:
       '@mcp-dev-mesh/mcp-contracts':
         specifier: workspace:*
         version: link:../mcp-contracts
+      '@mcp-dev-mesh/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@mcp-dev-mesh/shared':
         specifier: workspace:*
         version: link:../shared

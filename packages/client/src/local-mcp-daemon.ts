@@ -20,6 +20,10 @@ import {
 } from './local-mcp-server.js';
 import { createLocalMcpProxy } from './local-proxy.js';
 import { createDevMeshClientRuntime } from './runtime.js';
+import {
+  DEFAULT_DAEMON_SYNC_INTERVAL_MS,
+  startDaemonSyncWorker
+} from './daemon-sync.js';
 
 export const DEV_MESH_DAEMON_INTERNAL_ENV = 'DEV_MESH_DAEMON_INTERNAL';
 export const DAEMON_PID_FILENAME = 'daemon.pid';
@@ -37,8 +41,10 @@ export interface LocalMcpDaemonOptions {
   memberName?: string;
   command?: LocalMcpDaemonCommand;
   env?: NodeJS.ProcessEnv;
+  globalRoot?: string;
   startupWaitMs?: number;
   idleMs?: number;
+  syncIntervalMs?: number;
 }
 
 export interface LocalMcpDaemonState {
@@ -46,6 +52,7 @@ export interface LocalMcpDaemonState {
   projectRoot: string;
   mcpUrl: string;
   healthUrl: string;
+  syncStatusPath: string;
   startedAt: string;
   version: string;
 }
@@ -99,15 +106,31 @@ export async function runLocalMcpDaemon(options: LocalMcpDaemonOptions = {}): Pr
     host: '127.0.0.1',
     port: 0
   });
+  const paths = daemonPaths(projectRoot);
+  const syncOptions = {
+    projectRoot,
+    intervalMs: options.syncIntervalMs ?? DEFAULT_DAEMON_SYNC_INTERVAL_MS,
+    onError(error: unknown) {
+      process.stderr.write(`Dev Mesh daemon sync skipped: ${serializeError(error)}\n`);
+    }
+  };
+
+  if (options.globalRoot !== undefined) {
+    Object.assign(syncOptions, {
+      globalRoot: options.globalRoot
+    });
+  }
+
+  const syncWorker = startDaemonSyncWorker(syncOptions);
   const state: LocalMcpDaemonState = {
     pid: process.pid,
     projectRoot,
     mcpUrl: `${baseUrl}/mcp`,
     healthUrl: `${baseUrl}/healthz`,
+    syncStatusPath: paths.syncStatusPath,
     startedAt: new Date().toISOString(),
     version: DAEMON_VERSION
   };
-  const paths = daemonPaths(projectRoot);
   let lastActivityAt = Date.now();
   let settled = false;
 
@@ -127,6 +150,7 @@ export async function runLocalMcpDaemon(options: LocalMcpDaemonOptions = {}): Pr
       process.off('SIGINT', shutdown);
       process.off('SIGTERM', shutdown);
       clearInterval(idleTimer);
+      syncWorker.stop();
       proxy
         .close()
         .then(() => releaseDaemonFiles(projectRoot))
@@ -380,13 +404,14 @@ async function releaseDaemonFiles(projectRoot: string): Promise<void> {
   await rm(paths.statePath, { force: true });
 }
 
-function daemonPaths(projectRoot: string): { root: string; pidPath: string; statePath: string } {
+function daemonPaths(projectRoot: string): { root: string; pidPath: string; statePath: string; syncStatusPath: string } {
   const root = join(projectRoot, DEV_MESH_DIR);
 
   return {
     root,
     pidPath: join(root, DAEMON_PID_FILENAME),
-    statePath: join(root, DAEMON_STATE_FILENAME)
+    statePath: join(root, DAEMON_STATE_FILENAME),
+    syncStatusPath: join(root, 'sync', 'status.json')
   };
 }
 
@@ -445,12 +470,20 @@ function compactDaemonOptions(options: LocalMcpDaemonOptions): LocalMcpDaemonOpt
     next.env = options.env;
   }
 
+  if (options.globalRoot !== undefined) {
+    next.globalRoot = options.globalRoot;
+  }
+
   if (options.startupWaitMs !== undefined) {
     next.startupWaitMs = options.startupWaitMs;
   }
 
   if (options.idleMs !== undefined) {
     next.idleMs = options.idleMs;
+  }
+
+  if (options.syncIntervalMs !== undefined) {
+    next.syncIntervalMs = options.syncIntervalMs;
   }
 
   return next;

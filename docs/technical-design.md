@@ -2110,6 +2110,8 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 - `@mcp-dev-mesh/client` 已提供 stdio launcher、项目级 daemon 和 Koa2 + 官方 MCP TypeScript SDK Streamable HTTP transport 的本地 proxy。
 - `dmx serve --mcp --root .` 会作为 MCP host 的前台 stdio 入口，按需复用或 detached spawn 项目 daemon，并在 daemon 冷启动或不可用时降级为本进程执行。
 - daemon 通过 `.dev-mesh/daemon.pid` 做项目级锁，并把运行状态写入 `.dev-mesh/daemon.json`；空闲超过阈值后自动退出。
+- daemon 负责远端共享同步：当项目 `auto_sync = true` 且本机 `identity.json` 存在 joined server 时，daemon 会把 `.dev-mesh/events/*.jsonl` 事件签名后增量 push 到 Hub，并按 pull cursor 拉取同 group 事件。
+- 客户端同步游标写入 `.dev-mesh/sync/cursors.json`，最近一次 daemon sync 状态写入 `.dev-mesh/sync/status.json`，`dmx doctor` 会读取该状态报告远端错误和本地待推送事件数量。
 - `dmx proxy --root . --port 8722` 仍可直接启动 `http://127.0.0.1:8722/mcp`，用于调试或嵌入。
 - 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`。
 - 本地 proxy 不依赖 `packages/server`，只通过 `packages/mcp-contracts` 共享 tool schema，避免 client/server 反向耦合。

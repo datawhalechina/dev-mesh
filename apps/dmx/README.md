@@ -21,8 +21,8 @@ dmx proxy --root . --port 8722
 dmx doctor --root .
 ```
 
-`dmx init` scans supported MCP host tools, lets you select them in a TUI, writes their MCP configuration, and enables local auto-init/auto-reference/auto-capture settings. MCP hosts are configured to run `dmx serve --mcp`; that foreground launcher starts or reuses the project daemon on demand and falls back to local execution if the daemon is not ready.
+`dmx init` scans supported MCP host tools, lets you select them in a TUI, writes their MCP configuration, and enables local auto-init/auto-reference/auto-capture settings. MCP hosts are configured to run `dmx serve --mcp`; that foreground launcher starts or reuses the project daemon on demand and falls back to local execution if the daemon is not ready. After `dmx join`, the same project daemon also performs automatic Hub sync when `auto_sync` is enabled.
 
 `dmx proxy` still starts the Streamable HTTP MCP endpoint directly and is useful for debugging or embedding.
 
-The CLI writes local project data under `.dev-mesh/` and keeps secrets under `.dev-mesh/secrets/`.
+The CLI writes local project data under `.dev-mesh/`, stores sync cursors/status under `.dev-mesh/sync/`, and keeps secrets under `.dev-mesh/secrets/`.

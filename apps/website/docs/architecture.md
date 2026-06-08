@@ -29,7 +29,7 @@ packages/
 
 ## 本地优先
 
-项目知识先落到 `.dev-mesh`，因此它可以跟随仓库被检查、迁移和同步。本地 proxy 负责把 AI 客户端的 MCP 调用转换为项目级运行时操作。
+项目知识先落到 `.dev-mesh`，因此它可以跟随仓库被检查、迁移和同步。本地 proxy 负责把 AI 客户端的 MCP 调用转换为项目级运行时操作。MCP host 启动的是前台 `dmx serve --mcp` launcher；launcher 按需拉起项目 daemon，daemon 负责本地 MCP 转发和 Hub 自动同步。
 
 ## Hub Server
 
@@ -46,7 +46,8 @@ Hub Server 提供团队化能力：
 
 ```text
 AI 客户端
-  -> 本地 MCP proxy
+  -> dmx serve --mcp launcher
+  -> 项目 daemon / 本地 MCP proxy
   -> packages/client runtime
   -> .dev-mesh 本地知识库
   -> Hub Server 同步和团队检索

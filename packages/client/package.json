@@ -23,6 +23,7 @@
     "@mcp-dev-mesh/extractor": "workspace:*",
     "@mcp-dev-mesh/local-store": "workspace:*",
     "@mcp-dev-mesh/mcp-contracts": "workspace:*",
+    "@mcp-dev-mesh/protocol": "workspace:*",
     "@mcp-dev-mesh/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "1.29.0",
     "koa": "2",

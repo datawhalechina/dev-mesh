@@ -43,6 +43,15 @@ export type {
   LocalMcpDaemonState,
   LocalMcpDaemonStatus
 } from './local-mcp-daemon.js';
+export {
+  DAEMON_SYNC_REMOTE_EVENTS_DIR,
+  DAEMON_SYNC_STATUS_FILENAME,
+  DEFAULT_DAEMON_SYNC_INTERVAL_MS,
+  readDaemonSyncStatus,
+  runDaemonSyncOnce,
+  startDaemonSyncWorker
+} from './daemon-sync.js';
+export type { DaemonSyncOptions, DaemonSyncRemoteStatus, DaemonSyncStatus, DaemonSyncWorker } from './daemon-sync.js';
 export { createDevMeshClientRuntime } from './runtime.js';
 export type {
   CaptureRawEventResult,

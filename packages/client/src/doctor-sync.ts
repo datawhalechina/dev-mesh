@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { getGlobalConfigPaths, readJsonFile } from './global-config.js';
+import { readDaemonSyncStatus } from './daemon-sync.js';
 import type { DevMeshDoctorCheck, DoctorContext, GlobalIdentity } from './doctor-types.js';
 
 export async function checkSync(context: DoctorContext): Promise<DevMeshDoctorCheck[]> {
@@ -34,6 +35,7 @@ export async function checkSync(context: DoctorContext): Promise<DevMeshDoctorCh
   }
 
   checks.push(await checkGlobalConfigTokenLeak(paths.configPath));
+  checks.push(await checkDaemonSyncStatus(context));
 
   return checks;
 }
@@ -66,4 +68,47 @@ async function checkGlobalConfigTokenLeak(configPath: string): Promise<DevMeshDo
       message: 'Global config is not initialized yet; no sync credentials are configured.'
     };
   }
+}
+
+async function checkDaemonSyncStatus(context: DoctorContext): Promise<DevMeshDoctorCheck> {
+  const status = await readDaemonSyncStatus(context.projectRoot);
+
+  if (status === undefined) {
+    return {
+      id: 'sync.daemon',
+      category: 'sync',
+      status: 'ok',
+      message: 'Daemon sync has not run yet; dmx serve --mcp will start it on demand.'
+    };
+  }
+
+  const remoteCount = status.remotes.length;
+  const queued = status.remotes.reduce((sum, remote) => sum + Math.max(0, remote.queuedLocalEvents), 0);
+  const errors = status.remotes.filter((remote) => remote.lastError !== undefined);
+
+  if (errors.length > 0) {
+    return {
+      id: 'sync.daemon',
+      category: 'sync',
+      status: 'warn',
+      message: `Daemon sync checked ${remoteCount} remote(s), queued ${queued} local event(s), and reported ${errors.length} error(s).`,
+      fixHint: 'Check .dev-mesh/sync/status.json for the latest remote sync error.'
+    };
+  }
+
+  if (!status.enabled) {
+    return {
+      id: 'sync.daemon',
+      category: 'sync',
+      status: 'ok',
+      message: status.message
+    };
+  }
+
+  return {
+    id: 'sync.daemon',
+    category: 'sync',
+    status: 'ok',
+    message: `Daemon sync checked ${remoteCount} remote(s) and has ${queued} queued local event(s).`
+  };
 }
