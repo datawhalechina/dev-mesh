@@ -872,7 +872,7 @@ npm install -g mcp-dev-mesh && dmx init --global --yes && dmx join https://dev-m
 2. 客户端创建或迁移 ~/.dev-mesh/config.toml。
 3. 客户端准备 stdio MCP launcher 命令：默认写入 `dmx serve --mcp --name <name>`，由 MCP host 的当前工作目录决定项目根；只有显式传 `--root <project>` 时才固定项目根。
 4. 客户端扫描本机已安装的编程工具：Codex、Claude Code、opencode。
-5. 客户端打开 TUI 选择页面，展示 detected / not found / already configured 状态。
+5. 客户端打开基于 Clack prompts 的 TUI 选择页面，展示 detected / not found / already configured 状态。
 6. 用户选择要注册 MCP 的工具和 scope，默认选中已安装且未配置的工具。
 7. 客户端调用各工具 adapter，把 dev-mesh MCP 写成 stdio command/args。
 8. 客户端开启 auto_init、auto_reference、auto_capture；auto_sync 在未 join 时保持待机。

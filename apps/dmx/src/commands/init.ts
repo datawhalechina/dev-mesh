@@ -1,4 +1,4 @@
-import { clearScreenDown, cursorTo, emitKeypressEvents } from 'node:readline';
+import { cancel, intro, isCancel, log, multiselect, note, outro, select } from '@clack/prompts';
 import type { Command } from 'commander';
 import {
   createDevMeshClientRuntime,
@@ -100,207 +100,92 @@ async function promptGlobalTools(options: PromptGlobalToolsOptions): Promise<Glo
       opencode: options.defaultScope
     }
   });
-  const state = createGlobalInitTuiState(statuses);
 
-  return runGlobalInitTui(state, process.stdin, process.stdout);
+  return runGlobalInitTui(statuses);
 }
 
-export function createGlobalInitTuiState(statuses: GlobalToolStatus[]): GlobalInitTuiState {
+async function runGlobalInitTui(statuses: GlobalToolStatus[]): Promise<GlobalInitSelection> {
+  intro('Dev Mesh init');
+  note(createGlobalInitStatusSummary(statuses), 'Detected MCP hosts');
+  log.info('Automation defaults: auto_init, auto_reference, auto_capture, and auto_sync are enabled.');
+  log.info('MCP hosts will run dmx serve --mcp; the launcher starts or reuses the project daemon.');
+
+  const selectedTools = await multiselect<GlobalToolKey>({
+    message: 'Select MCP host tools to configure',
+    options: createGlobalInitToolChoices(statuses),
+    initialValues: createGlobalInitDefaultTools(statuses),
+    required: true,
+    maxItems: 6
+  });
+
+  if (isCancel(selectedTools)) {
+    cancel('Global init cancelled.');
+    throw new Error('Global init cancelled.');
+  }
+
+  const toolScopes: Partial<Record<GlobalToolKey, GlobalToolScope>> = {};
+  const byKey = new Map(statuses.map((status) => [status.key, status]));
+
+  for (const tool of selectedTools) {
+    const status = byKey.get(tool);
+    const scope = await select<GlobalToolScope>({
+      message: `${status?.displayName ?? tool} configuration scope`,
+      options: [
+        {
+          value: 'user',
+          label: 'User config',
+          hint: 'Available across projects'
+        },
+        {
+          value: 'project',
+          label: 'Project config',
+          hint: 'Writes into the current project'
+        }
+      ],
+      initialValue: status?.scope ?? 'user'
+    });
+
+    if (isCancel(scope)) {
+      cancel('Global init cancelled.');
+      throw new Error('Global init cancelled.');
+    }
+
+    toolScopes[tool] = scope;
+  }
+
+  outro('Dev Mesh will configure the selected MCP hosts.');
+
   return {
-    cursor: 0,
-    items: statuses.map((status) => {
-      const item: GlobalInitTuiItem = {
-        key: status.key,
-        displayName: status.displayName,
-        detected: status.detected,
-        configured: status.configured,
-        selected: status.detected || status.configured,
-        scope: status.scope
-      };
-
-      if (status.reason !== undefined) {
-        item.reason = status.reason;
-      }
-
-      return item;
-    })
+    tools: selectedTools,
+    toolScopes
   };
 }
 
-export function renderGlobalInitTui(state: GlobalInitTuiState): string {
-  const rows = state.items.map((item, index) => {
-    const cursor = index === state.cursor ? '>' : ' ';
-    const checked = item.selected ? 'x' : ' ';
-    const name = item.displayName.padEnd(12, ' ');
-    const status = describeToolStatus(item).padEnd(29, ' ');
-    const scope = `scope: ${item.scope}`;
-
-    return `${cursor} [${checked}] ${name} ${status} ${scope}`;
-  });
-
-  const error = state.error === undefined ? [] : ['', state.error];
-
-  return [
-    'Dev Mesh Global Init',
-    '',
-    'Detected tools:',
-    ...rows,
-    '',
-    'Automation: auto_init, auto_reference, auto_capture, and auto_sync are enabled by default.',
-    'MCP hosts run dmx serve --mcp; the launcher starts or reuses the project daemon on demand.',
-    '',
-    'Keys: ↑/↓ move, Space toggle, s scope, Enter apply, q cancel.',
-    ...error,
-    ''
-  ].join('\n');
-}
-
-export function applyGlobalInitTuiKey(
-  state: GlobalInitTuiState,
-  key: GlobalInitTuiKey
-): { state: GlobalInitTuiState; selection?: GlobalInitSelection; cancelled?: boolean } {
-  const next = cloneTuiState(state);
-  delete next.error;
-
-  if (key === 'up') {
-    next.cursor = (next.cursor - 1 + next.items.length) % next.items.length;
-    return { state: next };
-  }
-
-  if (key === 'down') {
-    next.cursor = (next.cursor + 1) % next.items.length;
-    return { state: next };
-  }
-
-  const item = next.items[next.cursor];
-
-  if (item === undefined) {
-    return { state: next };
-  }
-
-  if (key === 'space') {
-    item.selected = !item.selected;
-    return { state: next };
-  }
-
-  if (key === 'scope') {
-    item.scope = item.scope === 'user' ? 'project' : 'user';
-    return { state: next };
-  }
-
-  if (key === 'cancel') {
-    return { state: next, cancelled: true };
-  }
-
-  if (key === 'enter') {
-    const selected = next.items.filter((candidate) => candidate.selected);
-
-    if (selected.length === 0) {
-      next.error = 'Select at least one MCP host tool before applying.';
-      return { state: next };
-    }
+export function createGlobalInitToolChoices(statuses: GlobalToolStatus[]): GlobalInitToolChoice[] {
+  return statuses.map((status) => {
+    const hint = [describeToolStatus(status), `scope: ${status.scope}`, status.reason]
+      .filter((value): value is string => value !== undefined && value.length > 0)
+      .join(' | ');
 
     return {
-      state: next,
-      selection: {
-        tools: selected.map((candidate) => candidate.key),
-        toolScopes: Object.fromEntries(selected.map((candidate) => [candidate.key, candidate.scope]))
-      }
+      value: status.key,
+      label: status.displayName,
+      hint
     };
-  }
-
-  return { state: next };
-}
-
-async function runGlobalInitTui(
-  initialState: GlobalInitTuiState,
-  input: NodeJS.ReadStream,
-  output: NodeJS.WriteStream
-): Promise<GlobalInitSelection> {
-  let state = initialState;
-  const rawMode = input.isTTY && typeof input.setRawMode === 'function';
-
-  emitKeypressEvents(input);
-
-  if (rawMode) {
-    input.setRawMode(true);
-  }
-
-  return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      input.off('keypress', onKeypress);
-
-      if (rawMode) {
-        input.setRawMode(false);
-      }
-    };
-
-    const render = () => {
-      cursorTo(output, 0, 0);
-      clearScreenDown(output);
-      output.write(renderGlobalInitTui(state));
-    };
-
-    const onKeypress = (_chunk: string, key: KeypressInfo = {}) => {
-      const action = toGlobalInitTuiKey(key);
-
-      if (action === undefined) {
-        return;
-      }
-
-      const result = applyGlobalInitTuiKey(state, action);
-      state = result.state;
-
-      if (result.cancelled) {
-        cleanup();
-        output.write('\n');
-        reject(new Error('Global init cancelled.'));
-        return;
-      }
-
-      if (result.selection !== undefined) {
-        cleanup();
-        output.write('\n');
-        resolve(result.selection);
-        return;
-      }
-
-      render();
-    };
-
-    input.on('keypress', onKeypress);
-    render();
   });
 }
 
-function toGlobalInitTuiKey(key: KeypressInfo): GlobalInitTuiKey | undefined {
-  if (key.ctrl === true && key.name === 'c') {
-    return 'cancel';
-  }
-
-  switch (key.name) {
-    case 'up':
-    case 'k':
-      return 'up';
-    case 'down':
-    case 'j':
-      return 'down';
-    case 'space':
-      return 'space';
-    case 's':
-      return 'scope';
-    case 'return':
-    case 'enter':
-      return 'enter';
-    case 'q':
-    case 'escape':
-      return 'cancel';
-    default:
-      return undefined;
-  }
+export function createGlobalInitDefaultTools(statuses: GlobalToolStatus[]): GlobalToolKey[] {
+  return statuses.filter((status) => status.detected || status.configured).map((status) => status.key);
 }
 
-function describeToolStatus(item: GlobalInitTuiItem): string {
+export function createGlobalInitStatusSummary(statuses: GlobalToolStatus[]): string {
+  return statuses
+    .map((status) => `${status.displayName.padEnd(12, ' ')} ${describeToolStatus(status)} (${status.scope})`)
+    .join('\n');
+}
+
+function describeToolStatus(item: Pick<GlobalToolStatus, 'detected' | 'configured'>): string {
   if (item.detected && item.configured) {
     return 'installed, already configured';
   }
@@ -314,19 +199,6 @@ function describeToolStatus(item: GlobalInitTuiItem): string {
   }
 
   return 'not found';
-}
-
-function cloneTuiState(state: GlobalInitTuiState): GlobalInitTuiState {
-  const next: GlobalInitTuiState = {
-    cursor: state.cursor,
-    items: state.items.map((item) => ({ ...item }))
-  };
-
-  if (state.error !== undefined) {
-    next.error = state.error;
-  }
-
-  return next;
 }
 
 function compactPromptGlobalToolsOptions(options: {
@@ -448,25 +320,8 @@ interface GlobalInitSelection {
   toolScopes: Partial<Record<GlobalToolKey, GlobalToolScope>>;
 }
 
-export interface GlobalInitTuiState {
-  cursor: number;
-  error?: string;
-  items: GlobalInitTuiItem[];
-}
-
-interface GlobalInitTuiItem {
-  key: GlobalToolKey;
-  displayName: string;
-  selected: boolean;
-  detected: boolean;
-  configured: boolean;
-  scope: GlobalToolScope;
-  reason?: string;
-}
-
-type GlobalInitTuiKey = 'up' | 'down' | 'space' | 'scope' | 'enter' | 'cancel';
-
-interface KeypressInfo {
-  name?: string;
-  ctrl?: boolean;
+export interface GlobalInitToolChoice {
+  value: GlobalToolKey;
+  label: string;
+  hint: string;
 }

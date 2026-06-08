@@ -24,6 +24,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@clack/prompts": "^1.5.1",
     "@koa/router": "^15.6.0",
     "@modelcontextprotocol/sdk": "1.29.0",
     "commander": "15.0.0",

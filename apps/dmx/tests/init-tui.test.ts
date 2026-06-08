@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { applyGlobalInitTuiKey, createGlobalInitTuiState, renderGlobalInitTui } from '../src/commands/init.js';
+import {
+  createGlobalInitDefaultTools,
+  createGlobalInitStatusSummary,
+  createGlobalInitToolChoices
+} from '../src/commands/init.js';
 import type { GlobalToolStatus } from '@mcp-dev-mesh/client';
 
-describe('global init TUI state', () => {
-  it('renders detected/configured status and supports selection and scope keys', () => {
-    const state = createGlobalInitTuiState([
+describe('global init TUI helpers', () => {
+  it('builds Clack choices with detected/configured hints', () => {
+    const statuses = [
       toolStatus({
         key: 'codex',
         displayName: 'Codex',
@@ -16,7 +20,45 @@ describe('global init TUI state', () => {
         adapterId: 'claude-code',
         displayName: 'Claude Code',
         detected: true,
-        configured: true
+        configured: true,
+        scope: 'project'
+      }),
+      toolStatus({
+        key: 'opencode',
+        displayName: 'opencode',
+        detected: false,
+        configured: false,
+        reason: 'opencode CLI was not found.'
+      })
+    ];
+
+    expect(createGlobalInitDefaultTools(statuses)).toEqual(['codex', 'claude']);
+    expect(createGlobalInitToolChoices(statuses)).toEqual([
+      {
+        value: 'codex',
+        label: 'Codex',
+        hint: 'installed, not configured | scope: user'
+      },
+      {
+        value: 'claude',
+        label: 'Claude Code',
+        hint: 'installed, already configured | scope: project'
+      },
+      {
+        value: 'opencode',
+        label: 'opencode',
+        hint: 'not found | scope: user | opencode CLI was not found.'
+      }
+    ]);
+  });
+
+  it('formats a compact detected tool summary', () => {
+    const summary = createGlobalInitStatusSummary([
+      toolStatus({
+        key: 'codex',
+        displayName: 'Codex',
+        detected: true,
+        configured: false
       }),
       toolStatus({
         key: 'opencode',
@@ -26,46 +68,8 @@ describe('global init TUI state', () => {
       })
     ]);
 
-    expect(renderGlobalInitTui(state)).toContain('[x] Codex        installed, not configured');
-    expect(renderGlobalInitTui(state)).toContain('[x] Claude Code  installed, already configured');
-    expect(renderGlobalInitTui(state)).toContain('[ ] opencode     not found');
-    expect(renderGlobalInitTui(state)).toContain('auto_capture');
-
-    const moved = applyGlobalInitTuiKey(state, 'down').state;
-    const scoped = applyGlobalInitTuiKey(moved, 'scope').state;
-    const toggled = applyGlobalInitTuiKey(scoped, 'space').state;
-    const applied = applyGlobalInitTuiKey(toggled, 'enter');
-
-    expect(scoped.items[1]).toMatchObject({
-      key: 'claude',
-      scope: 'project'
-    });
-    expect(toggled.items[1]).toMatchObject({
-      key: 'claude',
-      selected: false
-    });
-    expect(applied.selection).toEqual({
-      tools: ['codex'],
-      toolScopes: {
-        codex: 'user'
-      }
-    });
-  });
-
-  it('keeps the TUI open when no MCP host tools are selected', () => {
-    const state = createGlobalInitTuiState([
-      toolStatus({
-        key: 'codex',
-        displayName: 'Codex',
-        detected: true,
-        configured: false
-      })
-    ]);
-    const unselected = applyGlobalInitTuiKey(state, 'space').state;
-    const applied = applyGlobalInitTuiKey(unselected, 'enter');
-
-    expect(applied.selection).toBeUndefined();
-    expect(applied.state.error).toContain('Select at least one');
+    expect(summary).toContain('Codex        installed, not configured (user)');
+    expect(summary).toContain('opencode     not found (user)');
   });
 });
 
