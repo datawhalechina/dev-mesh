@@ -98,6 +98,9 @@ export type MeshSearchMemberExperienceInput = z.infer<typeof meshSearchMemberExp
 export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
 export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
 
+const assistantLedCaptureReminder =
+  'IMPORTANT: Do not wait for the user to ask for knowledge capture. Before you answer the user at the end of any meaningful coding, debugging, review, design, setup, or documentation task, quickly decide whether you learned durable project knowledge. If yes, summarize it yourself and call mesh_capture_knowledge or mesh_capture_task before the final response.';
+
 export interface MeshToolHandlers {
   searchContext(input: MeshSearchContextInput): Promise<unknown>;
   captureKnowledge(input: MeshCaptureKnowledgeInput): Promise<unknown>;
@@ -114,7 +117,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Search project context',
       description:
-        'Search DevMesh project knowledge before starting or continuing non-trivial work so you can reuse prior decisions, conventions, pitfalls, commands, and handoffs.',
+        'IMPORTANT: For non-trivial project work, search DevMesh knowledge before starting or continuing so you can reuse prior decisions, conventions, pitfalls, commands, and handoffs. After using the returned context, keep watching for new durable knowledge to capture.',
       inputSchema: meshSearchContextInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.searchContext(meshSearchContextInputSchema.parse(args)))
@@ -125,7 +128,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Capture knowledge',
       description:
-        'When your current conversation, code reading, edit, command, review, or debugging work reveals durable project knowledge, decide yourself whether it is worth preserving and call this tool. Capture only summarized decisions, conventions, pitfalls, commands, or handoffs; do not store secrets, raw private transcript text, or noisy step-by-step logs.',
+        `${assistantLedCaptureReminder} Use this tool for durable decisions, conventions, pitfalls, commands, architecture notes, debugging lessons, setup/deployment steps, or handoffs discovered from the current conversation, code reading, edits, command output, reviews, or tests. Capture concise summaries only; do not store secrets, raw private transcript text, credentials, large source blocks, or noisy step-by-step logs.`,
       inputSchema: meshCaptureKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.captureKnowledge(meshCaptureKnowledgeInputSchema.parse(args)))
@@ -136,7 +139,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Capture task progress',
       description:
-        'When a meaningful task starts, changes state, finishes, or needs a handoff, decide yourself whether the current task state should be preserved and call this tool with a concise summary of what changed and what remains.',
+        `${assistantLedCaptureReminder} Use this tool when a meaningful task starts, changes state, finishes, is blocked, or needs a handoff. Summarize what changed, what remains, verification status, and any next action that future assistants or teammates should know.`,
       inputSchema: meshCaptureTaskInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.captureTask(meshCaptureTaskInputSchema.parse(args)))
@@ -157,7 +160,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_search_member_experience',
     {
       title: 'Search member experience',
-      description: 'Search project knowledge by member identity.',
+      description:
+        'Search project knowledge by member identity when the user mentions a teammate, prior owner, or person-specific experience. Reuse relevant findings, and capture any new durable follow-up knowledge you infer from the current work.',
       inputSchema: meshSearchMemberExperienceInputSchema.shape
     },
     async (args) =>
@@ -168,7 +172,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_resolve_term',
     {
       title: 'Resolve term',
-      description: 'Resolve a project glossary term before assuming local vocabulary, product names, or team-specific concepts.',
+      description:
+        'Resolve a project glossary term before assuming local vocabulary, product names, or team-specific concepts. If the current task clarifies or corrects a term, summarize the durable glossary insight with mesh_capture_knowledge.',
       inputSchema: meshResolveTermInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.resolveTerm(meshResolveTermInputSchema.parse(args)))
@@ -179,7 +184,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Scan project knowledge',
       description:
-        'On demand, scan the current project for high-signal Git and filesystem context when you decide a project-wide sweep would help. Inspect the returned highlights and relevant files yourself, then call mesh_capture_knowledge or mesh_capture_task only for durable knowledge worth keeping.',
+        `${assistantLedCaptureReminder} On demand, scan the current project for high-signal Git and filesystem context when you decide a project-wide sweep would help. Inspect the returned highlights and relevant files yourself; do not store raw scan output. Capture only durable conclusions worth keeping.`,
       inputSchema: meshScanProjectKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.scanProjectKnowledge(meshScanProjectKnowledgeInputSchema.parse(args)))

@@ -52,10 +52,14 @@ describe('MCP tool contract schemas', () => {
   });
 
   it('registers the expected public tools', async () => {
-    const registered: Array<{ name: string; callback: (args: unknown) => Promise<unknown> }> = [];
+    const registered: Array<{
+      name: string;
+      config: { description?: string };
+      callback: (args: unknown) => Promise<unknown>;
+    }> = [];
     const fakeServer = {
-      registerTool(name: string, _config: unknown, callback: (args: unknown) => Promise<unknown>) {
-        registered.push({ name, callback });
+      registerTool(name: string, config: { description?: string }, callback: (args: unknown) => Promise<unknown>) {
+        registered.push({ name, config, callback });
       }
     };
     const handlers: MeshToolHandlers = {
@@ -79,6 +83,13 @@ describe('MCP tool contract schemas', () => {
       'mesh_resolve_term',
       'mesh_scan_project_knowledge'
     ]);
+
+    const toolDescriptions = Object.fromEntries(registered.map((tool) => [tool.name, tool.config.description ?? '']));
+
+    expect(toolDescriptions.mesh_capture_knowledge).toContain('Do not wait for the user');
+    expect(toolDescriptions.mesh_capture_knowledge).toContain('before the final response');
+    expect(toolDescriptions.mesh_capture_task).toContain('Summarize what changed');
+    expect(toolDescriptions.mesh_scan_project_knowledge).toContain('Capture only durable conclusions');
 
     const result = await registered[0]?.callback({ query: 'auth' });
     expect(result).toEqual({
