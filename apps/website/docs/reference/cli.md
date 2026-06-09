@@ -57,6 +57,7 @@ pnpm --filter devmesh dev -- proxy --root C:\path\to\project --name local --port
 pnpm --filter devmesh dev -- capture --root C:\path\to\project --name local --title "Decision" --summary "Persist project knowledge." --type decision --layer canonical --tag smoke
 pnpm --filter devmesh dev -- search --root C:\path\to\project --query "project knowledge"
 pnpm --filter devmesh dev -- graph explore --root C:\path\to\project --query "project knowledge" --depth 2
+pnpm --filter devmesh dev -- visualize --root C:\path\to\project --query "project knowledge"
 ```
 
 ## 诊断

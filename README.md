@@ -234,6 +234,13 @@ pnpm --filter devmesh dev -- search "focused tests" --root .
 pnpm --filter devmesh dev -- graph explore --root . --query "focused tests" --depth 2
 ```
 
+生成并打开本地知识图谱可视化：
+
+```bash
+pnpm --filter devmesh dev -- visualize --root . --query "focused tests"
+pnpm --filter devmesh dev -- graph visualize --root . --query "focused tests" --no-open
+```
+
 查看本地状态：
 
 ```bash

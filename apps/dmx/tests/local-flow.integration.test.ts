@@ -41,6 +41,19 @@ describe('dmx CLI local flow', () => {
       const status = await runDmx(['status', '--root', projectRoot]);
       const index = await runDmx(['index', 'rebuild', '--root', projectRoot]);
       const graph = await runDmx(['graph', 'explore', '--root', projectRoot, '--query', 'focused tests', '--depth', '1']);
+      const graphHtmlPath = join(projectRoot, 'graph.html');
+      const visualize = await runDmx([
+        'visualize',
+        '--root',
+        projectRoot,
+        '--query',
+        'focused tests',
+        '--depth',
+        '1',
+        '--output',
+        graphHtmlPath,
+        '--no-open'
+      ]);
 
       const initJson = JSON.parse(init.stdout);
       const captureJson = JSON.parse(capture.stdout);
@@ -51,6 +64,7 @@ describe('dmx CLI local flow', () => {
       const graphJson = JSON.parse(graph.stdout);
       const indexManifest = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'index', 'manifest.json'), 'utf8'));
       const graphIndex = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'index', 'graph.json'), 'utf8'));
+      const graphHtml = await readFile(graphHtmlPath, 'utf8');
       const ratingsJsonl = await readFile(
         join(
           projectRoot,
@@ -117,6 +131,10 @@ describe('dmx CLI local flow', () => {
         ])
       );
       expect(graphIndex.sourceItemCount).toBe(1);
+      expect(visualize.stdout).toContain(graphHtmlPath);
+      expect(graphHtml).toContain('DevMesh Knowledge Graph');
+      expect(graphHtml).toContain('Run focused tests');
+      expect(graphHtml).toContain(`knowledge:${captureJson.id}`);
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
