@@ -5,8 +5,8 @@ import {
   type DevMeshCore,
   type KnowledgeItem,
   type RateKnowledgeInput
-} from '@mcp-dev-mesh/core';
-import { nowIso } from '@mcp-dev-mesh/shared';
+} from '@devmesh/core';
+import { nowIso } from '@devmesh/shared';
 import { appendProjectEvent } from './events.js';
 import { appendJsonLine, getKnowledgeRatingFile } from './files.js';
 import { ensureProjectStore, projectKeyOptions, readProjectKey } from './project-store.js';

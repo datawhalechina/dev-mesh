@@ -17,11 +17,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image: mcp-dev-mesh-server
+          - image: devmesh-server
             dockerfile: apps/mesh-server/Dockerfile
-          - image: mcp-dev-mesh-web-admin
+          - image: devmesh-web-admin
             dockerfile: apps/web-admin/Dockerfile
-          - image: mcp-dev-mesh-website
+          - image: devmesh-website
             dockerfile: apps/website/Dockerfile
     steps:
       - name: Checkout

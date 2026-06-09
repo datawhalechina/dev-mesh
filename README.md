@@ -137,7 +137,7 @@ Website: http://127.0.0.1:3000
 dmx init
 ```
 
-该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `dev-mesh` MCP server 配置。真实终端中完成后会继续用 TUI 展示写入结果；CI、管道重定向或显式 `--json` 时输出结构化 JSON。默认全局自动化策略启用 `auto_init`、`auto_reference`、`auto_capture` 和 `auto_sync`。
+该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `devmesh` MCP server 配置。真实终端中完成后会继续用 TUI 展示写入结果；CI、管道重定向或显式 `--json` 时输出结构化 JSON。默认全局自动化策略启用 `auto_init`、`auto_reference`、`auto_capture` 和 `auto_sync`。
 
 当前仓库开发期也可以通过 workspace dev script 运行：
 
@@ -153,7 +153,7 @@ pnpm --filter devmesh dev -- init --global --yes --tool codex --tool opencode
 pnpm --filter devmesh dev -- init --global --tools codex,claude,opencode --mcp-url http://127.0.0.1:8722/mcp --yes
 ```
 
-该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `dev-mesh` MCP server 配置。
+该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `devmesh` MCP server 配置。
 默认写入的是 stdio MCP launcher 命令，语义等同于 `dmx serve --mcp --name <name>`；生产安装场景会尽量写成当前 Node 可执行文件直接运行 CLI 入口，避免经过 npm 生成的 shell shim（Windows 上尤其要避开 `dmx.cmd` 弹出控制台窗口）。配置不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。daemon 会在 `auto_capture = true` 时后台采集 Git / filesystem 开发信号，写入 `.dev-mesh/events/` 和 `.dev-mesh/capture/status.json`；`mesh_list_development_signals` 会把这些信号交给 Codex、Claude Code 或 opencode 自己总结，再由工具调用 `mesh_capture_knowledge` / `mesh_capture_task` 沉淀高质量知识。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
 
 加入开发期 Hub Server 的 group：
@@ -166,7 +166,7 @@ pnpm --filter devmesh dev -- join http://127.0.0.1:8721 \
   --yes
 ```
 
-`dmx join` 会先读取 `/.well-known/dev-mesh`，再调用 `/api/v1/join`。成功后会在全局 `config.toml` 写入 `[[servers]]` 和 `[[groups]]`，并把 access token 保存在本机 `identity.json`，不会写入可检查或可分享的 TOML 配置。
+`dmx join` 会先读取 `/.well-known/devmesh`，再调用 `/api/v1/join`。成功后会在全局 `config.toml` 写入 `[[servers]]` 和 `[[groups]]`，并把 access token 保存在本机 `identity.json`，不会写入可检查或可分享的 TOML 配置。
 
 启动当前项目的 stdio MCP launcher：
 
@@ -341,7 +341,7 @@ mesh_scan_project_knowledge
 
 ```text
 GET  /healthz
-GET  /.well-known/dev-mesh
+GET  /.well-known/devmesh
 GET  /api/v1/groups
 POST /api/v1/join
 POST /api/v1/auth/rotate
@@ -472,8 +472,8 @@ pnpm docker:up
 Agent context pack：
 
 ```ts
-import { createAgentContextService } from '@mcp-dev-mesh/agent';
-import { createDevMeshCore } from '@mcp-dev-mesh/core';
+import { createAgentContextService } from '@devmesh/agent';
+import { createDevMeshCore } from '@devmesh/core';
 
 const core = createDevMeshCore({ projectRoot: process.cwd() });
 const agent = createAgentContextService({ core });

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import { createKnowledgeId } from '@mcp-dev-mesh/core';
-import { nowIso } from '@mcp-dev-mesh/shared';
+import { createKnowledgeId } from '@devmesh/core';
+import { nowIso } from '@devmesh/shared';
 import { appendJsonLine } from './files.js';
 import { ensureProjectStore, projectKeyOptions, readProjectKey } from './project-store.js';
 import type { DevMeshEvent } from './types.js';

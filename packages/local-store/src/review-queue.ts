@@ -1,5 +1,5 @@
-import { createKnowledgeId, createKnowledgeItem, type CaptureKnowledgeInput } from '@mcp-dev-mesh/core';
-import { DevMeshError, nowIso } from '@mcp-dev-mesh/shared';
+import { createKnowledgeId, createKnowledgeItem, type CaptureKnowledgeInput } from '@devmesh/core';
+import { DevMeshError, nowIso } from '@devmesh/shared';
 import { appendProjectEvent } from './events.js';
 import { appendJsonLine, createKnowledgeIdForLayer, getPendingQueueFile, getRejectedQueueFile, readJsonl, writeJsonl } from './files.js';
 import { ensureProjectStore, readProjectConfigFile } from './project-store.js';

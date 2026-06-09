@@ -1,5 +1,5 @@
-import { createKnowledgeId, type DevMeshCore, type KnowledgeItem, type RateKnowledgeInput } from '@mcp-dev-mesh/core';
-import { nowIso } from '@mcp-dev-mesh/shared';
+import { createKnowledgeId, type DevMeshCore, type KnowledgeItem, type RateKnowledgeInput } from '@devmesh/core';
+import { nowIso } from '@devmesh/shared';
 import { appendProjectEvent } from './events.js';
 import { appendJsonLine, getKnowledgeUsageFile } from './files.js';
 import { ensureProjectStore, projectKeyOptions, readProjectKey } from './project-store.js';

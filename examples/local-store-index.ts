@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createKnowledgeItem } from '@mcp-dev-mesh/core';
-import { JsonlKnowledgeRepository, rebuildProjectIndex, searchProjectIndex } from '@mcp-dev-mesh/local-store';
+import { createKnowledgeItem } from '@devmesh/core';
+import { JsonlKnowledgeRepository, rebuildProjectIndex, searchProjectIndex } from '@devmesh/local-store';
 
 const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-index-example-'));
 

@@ -1,4 +1,4 @@
-import type { ProjectConfig } from '@mcp-dev-mesh/local-store';
+import type { ProjectConfig } from '@devmesh/local-store';
 
 export type DevMeshDoctorStatus = 'ok' | 'warn' | 'error';
 export type DevMeshDoctorCategory = 'adapter' | 'capture' | 'store' | 'sync' | 'privacy' | 'proxy';

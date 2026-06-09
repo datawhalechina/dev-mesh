@@ -1,6 +1,6 @@
-import { createDevMeshCore } from '@mcp-dev-mesh/core';
-import { JsonlKnowledgeRepository } from '@mcp-dev-mesh/local-store';
-import { createHubServer, listenMeshServer } from '@mcp-dev-mesh/server';
+import { createDevMeshCore } from '@devmesh/core';
+import { JsonlKnowledgeRepository } from '@devmesh/local-store';
+import { createHubServer, listenMeshServer } from '@devmesh/server';
 
 export async function startEmbeddedDevMeshServer(projectRoot: string, port = 8721): Promise<string> {
   const core = createDevMeshCore({

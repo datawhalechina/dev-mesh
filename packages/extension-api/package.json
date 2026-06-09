@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/extension-api",
+  "name": "@devmesh/extension-api",
   "version": "0.1.0",
   "private": true,
   "type": "module",

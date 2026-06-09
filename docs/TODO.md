@@ -38,7 +38,7 @@
 - [x] 增加 HTTP join/groups/projects integration test。
 - [x] 将 Server HTTP 层切换为 Koa2，MCP `/mcp` 保持使用官方 MCP TypeScript SDK Streamable HTTP transport。
 - [x] 移除旧 Fastify 兼容实现和依赖。
-- [x] 增加 Koa Server integration test，覆盖 `/healthz`、`/.well-known/dev-mesh`、groups、join、projects、admin API 和 `/mcp` Streamable HTTP。
+- [x] 增加 Koa Server integration test，覆盖 `/healthz`、`/.well-known/devmesh`、groups、join、projects、admin API 和 `/mcp` Streamable HTTP。
 
 ## 阶段 2：Mesh Client
 

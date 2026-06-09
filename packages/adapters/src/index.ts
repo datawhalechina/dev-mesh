@@ -1,4 +1,4 @@
-import type { ToolAdapter } from '@mcp-dev-mesh/extension-api';
+import type { ToolAdapter } from '@devmesh/extension-api';
 import { createClaudeCodeToolAdapter, type ClaudeCodeToolAdapterOptions } from './claude-code.js';
 import { createCodexToolAdapter, type CodexToolAdapterOptions } from './codex.js';
 import { createOpencodeToolAdapter, type OpencodeToolAdapterOptions } from './opencode.js';

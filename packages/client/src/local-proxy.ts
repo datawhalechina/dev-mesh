@@ -133,7 +133,7 @@ function createLocalProxyRouter(
 
     ctx.body = {
       status: 'ok',
-      service: 'mcp-dev-mesh-local-proxy',
+      service: 'devmesh-local-proxy',
       version: '0.1.0',
       projectRoot: runtime.projectRoot,
       mcpUrl: `${baseUrl}/mcp`

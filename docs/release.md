@@ -67,7 +67,7 @@ The same commands are summarized in [`../deploy/README.md`](../deploy/README.md)
 `pnpm docker:smoke` waits for the stack and checks:
 
 - Hub Server `/healthz`.
-- Hub Server `/.well-known/dev-mesh`.
+- Hub Server `/.well-known/devmesh`.
 - Web Admin static shell.
 - Web Admin `/healthz` proxy.
 - Website home page.
@@ -98,17 +98,17 @@ node apps/mesh-server/dist/index.js --env-file ./mesh-server.env
 Build individual images from the repository root:
 
 ```bash
-docker build -f apps/mesh-server/Dockerfile -t mcp-dev-mesh-server:alpha .
-docker build -f apps/web-admin/Dockerfile -t mcp-dev-mesh-web-admin:alpha .
-docker build -f apps/website/Dockerfile -t mcp-dev-mesh-website:alpha .
+docker build -f apps/mesh-server/Dockerfile -t devmesh-server:alpha .
+docker build -f apps/web-admin/Dockerfile -t devmesh-web-admin:alpha .
+docker build -f apps/website/Dockerfile -t devmesh-website:alpha .
 ```
 
 The `Docker Images` GitHub workflow is manual-only for now, so `v*` tags can publish npm and GitHub Release artifacts without automatically publishing containers. When run manually, it publishes the three application images to GitHub Container Registry:
 
 ```text
-ghcr.io/<owner>/mcp-dev-mesh-server:<tag>
-ghcr.io/<owner>/mcp-dev-mesh-web-admin:<tag>
-ghcr.io/<owner>/mcp-dev-mesh-website:<tag>
+ghcr.io/<owner>/devmesh-server:<tag>
+ghcr.io/<owner>/devmesh-web-admin:<tag>
+ghcr.io/<owner>/devmesh-website:<tag>
 ```
 
 Tag rules for manual runs:
@@ -129,9 +129,9 @@ The `Release Artifacts` GitHub workflow runs `pnpm release:check`, packages non-
 Release assets:
 
 ```text
-mcp-dev-mesh-web-admin-<tag>.tar.gz
-mcp-dev-mesh-website-<tag>.tar.gz
-mcp-dev-mesh-deploy-<tag>.tar.gz
+devmesh-web-admin-<tag>.tar.gz
+devmesh-website-<tag>.tar.gz
+devmesh-deploy-<tag>.tar.gz
 ```
 
 The Web Admin and Website archives contain static files ready for any static host. The deploy archive contains `README.md`, `deploy/`, and this release guide.

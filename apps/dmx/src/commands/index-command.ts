@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { createDevMeshClientRuntime } from '@mcp-dev-mesh/client';
+import { createDevMeshClientRuntime } from '@devmesh/client';
 
 export function registerIndexCommand(program: Command): void {
   const index = program.command('index').description('Manage the local DevMesh index');

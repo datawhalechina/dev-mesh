@@ -1,5 +1,5 @@
 import { hostname } from 'node:os';
-import type { JoinRequest, JoinResponse } from '@mcp-dev-mesh/protocol';
+import type { JoinRequest, JoinResponse } from '@devmesh/protocol';
 import { getGlobalConfigPaths } from './global-config.js';
 import { persistJoinedServer } from './join-config.js';
 import { discoverJoinEndpoint, requestServerJoin } from './join-http.js';

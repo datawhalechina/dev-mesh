@@ -5,7 +5,7 @@ import {
   serveLocalMcpStdio,
   type LocalMcpDaemonCommand,
   type LocalMcpDaemonOptions
-} from '@mcp-dev-mesh/client';
+} from '@devmesh/client';
 import { parseIntOption } from './shared.js';
 
 export function registerServeCommand(program: Command): void {

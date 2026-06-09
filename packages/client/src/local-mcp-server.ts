@@ -1,13 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { BuildContextPackInput } from '@mcp-dev-mesh/agent';
+import type { BuildContextPackInput } from '@devmesh/agent';
 import type {
   CaptureKnowledgeInput,
   KnowledgeLayer,
   KnowledgeType,
   ParaRef,
   RateKnowledgeInput
-} from '@mcp-dev-mesh/core';
-import type { CaptureProjectTaskInput } from '@mcp-dev-mesh/local-store';
+} from '@devmesh/core';
+import type { CaptureProjectTaskInput } from '@devmesh/local-store';
 import {
   registerMeshTools,
   type MeshToolHandlers,
@@ -17,7 +17,7 @@ import {
   type MeshScanProjectKnowledgeInput,
   type MeshRateKnowledgeInput,
   type MeshSearchContextInput
-} from '@mcp-dev-mesh/mcp-contracts';
+} from '@devmesh/mcp-contracts';
 import type { DevMeshClientRuntime } from './runtime.js';
 
 export function createLocalMeshMcpServer(runtime: DevMeshClientRuntime): McpServer {
@@ -26,7 +26,7 @@ export function createLocalMeshMcpServer(runtime: DevMeshClientRuntime): McpServ
 
 export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers): McpServer {
   const mcp = new McpServer({
-    name: 'mcp-dev-mesh-local',
+    name: 'devmesh-local',
     version: '0.1.0'
   });
 

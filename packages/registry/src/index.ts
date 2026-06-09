@@ -11,7 +11,7 @@ import type {
   StorageBackend,
   SyncBackend,
   ToolAdapter
-} from '@mcp-dev-mesh/extension-api';
+} from '@devmesh/extension-api';
 
 export class DefaultExtensionRegistry implements ExtensionRegistry {
   private readonly components = new Map<ExtensionKind, ExtensionComponent[]>();

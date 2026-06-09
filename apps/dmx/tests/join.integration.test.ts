@@ -3,8 +3,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createDevMeshCore } from '@mcp-dev-mesh/core';
-import { createHubServer } from '@mcp-dev-mesh/server';
+import { createDevMeshCore } from '@devmesh/core';
+import { createHubServer } from '@devmesh/server';
 import { runDmx } from './run-dmx.js';
 
 describe('dmx CLI join', () => {

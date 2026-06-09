@@ -6,11 +6,11 @@ import {
   type BuildContextPackInput,
   type ContextPack,
   type ContextPackItem
-} from '@mcp-dev-mesh/agent';
-import { createDevMeshCore, type CaptureKnowledgeInput, type DevMeshCore, type RateKnowledgeInput } from '@mcp-dev-mesh/core';
-import type { Extractor, ExtractProposal, RawEvent, Redactor } from '@mcp-dev-mesh/extension-api';
-import { createRuleBasedExtractor, createSecretRedactor } from '@mcp-dev-mesh/extractor';
-import { createFileSystemCaptureProvider, createGitCaptureProvider } from '@mcp-dev-mesh/providers';
+} from '@devmesh/agent';
+import { createDevMeshCore, type CaptureKnowledgeInput, type DevMeshCore, type RateKnowledgeInput } from '@devmesh/core';
+import type { Extractor, ExtractProposal, RawEvent, Redactor } from '@devmesh/extension-api';
+import { createRuleBasedExtractor, createSecretRedactor } from '@devmesh/extractor';
+import { createFileSystemCaptureProvider, createGitCaptureProvider } from '@devmesh/providers';
 import {
   appendProjectEvent,
   ensureProjectStore,
@@ -35,7 +35,7 @@ import {
   type RateProjectKnowledgeOptions,
   type RejectPendingKnowledgeResult,
   type RebuildProjectIndexResult
-} from '@mcp-dev-mesh/local-store';
+} from '@devmesh/local-store';
 import {
   redactCaptureKnowledgeInput,
   redactCaptureProjectTaskInput,

@@ -111,8 +111,8 @@ describe('search backends', () => {
 
   it('exposes keyword and hybrid backends as built-ins', () => {
     expect(createBuiltInSearchBackends().map((backend) => backend.id)).toEqual([
-      'dev-mesh.search.keyword',
-      'dev-mesh.search.hybrid'
+      'devmesh.search.keyword',
+      'devmesh.search.hybrid'
     ]);
   });
 });

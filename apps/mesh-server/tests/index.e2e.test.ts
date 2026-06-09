@@ -22,7 +22,7 @@ describe('mesh-server e2e smoke', () => {
       expect(health.status).toBe(200);
       await expect(health.json()).resolves.toMatchObject({
         status: 'ok',
-        service: 'mcp-dev-mesh'
+        service: 'devmesh'
       });
 
       const mcp = await createMcpSession(`${baseUrl}/mcp`);

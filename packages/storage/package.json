@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/storage",
+  "name": "@devmesh/storage",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,9 +16,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mcp-dev-mesh/core": "workspace:*",
-    "@mcp-dev-mesh/extension-api": "workspace:*",
-    "@mcp-dev-mesh/server": "workspace:*",
+    "@devmesh/core": "workspace:*",
+    "@devmesh/extension-api": "workspace:*",
+    "@devmesh/server": "workspace:*",
     "pg": "^8.21.0"
   },
   "devDependencies": {

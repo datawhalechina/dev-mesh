@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/mesh-server",
+  "name": "@devmesh/mesh-server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,10 +9,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mcp-dev-mesh/core": "workspace:*",
-    "@mcp-dev-mesh/local-store": "workspace:*",
-    "@mcp-dev-mesh/server": "workspace:*",
-    "@mcp-dev-mesh/storage": "workspace:*",
+    "@devmesh/core": "workspace:*",
+    "@devmesh/local-store": "workspace:*",
+    "@devmesh/server": "workspace:*",
+    "@devmesh/storage": "workspace:*",
     "commander": "15.0.0",
     "pg": "^8.21.0"
   },

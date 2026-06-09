@@ -118,7 +118,7 @@ describe('dmx CLI global init', () => {
       });
       expect(config).toContain('auto_capture = true');
       expect(config).toContain('auto_sync = true');
-      expect(codexConfig).toContain(`[mcp_servers.dev-mesh]`);
+      expect(codexConfig).toContain(`[mcp_servers.devmesh]`);
       expect(codexConfig).toContain('command = "dmx"');
       expect(codexConfig).toContain('"serve"');
       expect(codexConfig).toContain('"--mcp"');

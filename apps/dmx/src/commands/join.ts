@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { joinServerGroup, type JoinServerOptions } from '@mcp-dev-mesh/client';
+import { joinServerGroup, type JoinServerOptions } from '@devmesh/client';
 
 export function registerJoinCommand(program: Command): void {
   program

@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import Koa, { type Context, type Middleware } from 'koa';
 import Router from '@koa/router';
 import bodyParser from 'koa-bodyparser';
-import type { DevMeshCore } from '@mcp-dev-mesh/core';
+import type { DevMeshCore } from '@devmesh/core';
 import {
   createDefaultWellKnown,
   type CreateProjectRequest,
@@ -14,7 +14,7 @@ import {
   type ProjectResponse,
   type ProjectsResponse,
   type SyncPushRequest
-} from '@mcp-dev-mesh/protocol';
+} from '@devmesh/protocol';
 import {
   createAdminGroup,
   createAdminGlossary,
@@ -207,14 +207,17 @@ function createHubRouter(
   router.get('/healthz', (ctx) => {
     ctx.body = {
       status: 'ok',
-      service: 'mcp-dev-mesh',
+      service: 'devmesh',
       version: '0.1.0'
     };
   });
 
-  router.get('/.well-known/dev-mesh', (ctx) => {
+  const sendWellKnown = (ctx: Context) => {
     ctx.body = createDefaultWellKnown(resolveBaseUrl(ctx, baseUrl));
-  });
+  };
+
+  router.get('/.well-known/devmesh', sendWellKnown);
+  router.get('/.well-known/dev-mesh', sendWellKnown);
 
   router.get('/api/v1/groups', (ctx) => {
     ctx.body = {

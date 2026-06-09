@@ -22,7 +22,7 @@ describe('dmx proxy command', () => {
       });
       expect(health.body).toMatchObject({
         status: 'ok',
-        service: 'mcp-dev-mesh-local-proxy',
+        service: 'devmesh-local-proxy',
         projectRoot,
         mcpUrl: startup.mcpUrl
       });

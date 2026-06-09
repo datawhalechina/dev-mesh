@@ -29,7 +29,7 @@ describe('createCodexToolAdapter', () => {
 
       const configPath = join(codexHome, 'config.toml');
       await expect(readFile(configPath, 'utf8')).resolves.toBe(
-        '[mcp_servers.dev-mesh]\nurl = "http://127.0.0.1:8722/mcp"\n'
+        '[mcp_servers.devmesh]\nurl = "http://127.0.0.1:8722/mcp"\n'
       );
 
       const second = await adapter.configure({
@@ -48,7 +48,7 @@ describe('createCodexToolAdapter', () => {
 
       expect(update.changed).toBe(true);
       await expect(readFile(configPath, 'utf8')).resolves.toBe(
-        '[mcp_servers.dev-mesh]\nurl = "http://127.0.0.1:9999/mcp"\n'
+        '[mcp_servers.devmesh]\nurl = "http://127.0.0.1:9999/mcp"\n'
       );
 
       await adapter.remove({
@@ -88,7 +88,7 @@ describe('createCodexToolAdapter', () => {
         'model = "gpt-5"\n\n[mcp_servers.other]\ncommand = "node"\n'
       );
       await expect(readFile(projectConfigPath, 'utf8')).resolves.toBe(
-        '[mcp_servers.dev-mesh]\nurl = "http://127.0.0.1:8722/mcp"\n'
+        '[mcp_servers.devmesh]\nurl = "http://127.0.0.1:8722/mcp"\n'
       );
       await expect(adapter.isConfigured(projectRoot)).resolves.toBe(true);
 

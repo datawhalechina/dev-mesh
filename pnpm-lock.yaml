@@ -63,10 +63,10 @@ importers:
         specifier: ^4.4.1
         version: 4.4.1
     devDependencies:
-      '@mcp-dev-mesh/client':
+      '@devmesh/client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@mcp-dev-mesh/core':
+      '@devmesh/core':
         specifier: workspace:*
         version: link:../../packages/core
       zod:
@@ -75,16 +75,16 @@ importers:
 
   apps/mesh-server:
     dependencies:
-      '@mcp-dev-mesh/core':
+      '@devmesh/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@mcp-dev-mesh/local-store':
+      '@devmesh/local-store':
         specifier: workspace:*
         version: link:../../packages/local-store
-      '@mcp-dev-mesh/server':
+      '@devmesh/server':
         specifier: workspace:*
         version: link:../../packages/server
-      '@mcp-dev-mesh/storage':
+      '@devmesh/storage':
         specifier: workspace:*
         version: link:../../packages/storage
       commander:
@@ -138,7 +138,7 @@ importers:
 
   packages/adapters:
     dependencies:
-      '@mcp-dev-mesh/extension-api':
+      '@devmesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
       jsonc-parser:
@@ -147,42 +147,42 @@ importers:
 
   packages/agent:
     dependencies:
-      '@mcp-dev-mesh/core':
+      '@devmesh/core':
         specifier: workspace:*
         version: link:../core
 
   packages/client:
     dependencies:
+      '@devmesh/adapters':
+        specifier: workspace:*
+        version: link:../adapters
+      '@devmesh/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@devmesh/core':
+        specifier: workspace:*
+        version: link:../core
+      '@devmesh/extractor':
+        specifier: workspace:*
+        version: link:../extractor
+      '@devmesh/local-store':
+        specifier: workspace:*
+        version: link:../local-store
+      '@devmesh/mcp-contracts':
+        specifier: workspace:*
+        version: link:../mcp-contracts
+      '@devmesh/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@devmesh/providers':
+        specifier: workspace:*
+        version: link:../providers
+      '@devmesh/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@koa/router':
         specifier: ^15.6.0
         version: 15.6.0(koa@2.16.4)
-      '@mcp-dev-mesh/adapters':
-        specifier: workspace:*
-        version: link:../adapters
-      '@mcp-dev-mesh/agent':
-        specifier: workspace:*
-        version: link:../agent
-      '@mcp-dev-mesh/core':
-        specifier: workspace:*
-        version: link:../core
-      '@mcp-dev-mesh/extractor':
-        specifier: workspace:*
-        version: link:../extractor
-      '@mcp-dev-mesh/local-store':
-        specifier: workspace:*
-        version: link:../local-store
-      '@mcp-dev-mesh/mcp-contracts':
-        specifier: workspace:*
-        version: link:../mcp-contracts
-      '@mcp-dev-mesh/protocol':
-        specifier: workspace:*
-        version: link:../protocol
-      '@mcp-dev-mesh/providers':
-        specifier: workspace:*
-        version: link:../providers
-      '@mcp-dev-mesh/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.4.3)
@@ -205,10 +205,10 @@ importers:
 
   packages/core:
     dependencies:
-      '@mcp-dev-mesh/extension-api':
+      '@devmesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
-      '@mcp-dev-mesh/shared':
+      '@devmesh/shared':
         specifier: workspace:*
         version: link:../shared
 
@@ -216,16 +216,16 @@ importers:
 
   packages/extractor:
     dependencies:
-      '@mcp-dev-mesh/extension-api':
+      '@devmesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
 
   packages/local-store:
     dependencies:
-      '@mcp-dev-mesh/core':
+      '@devmesh/core':
         specifier: workspace:*
         version: link:../core
-      '@mcp-dev-mesh/shared':
+      '@devmesh/shared':
         specifier: workspace:*
         version: link:../shared
 
@@ -242,48 +242,48 @@ importers:
 
   packages/providers:
     dependencies:
-      '@mcp-dev-mesh/extension-api':
+      '@devmesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
 
   packages/quality:
     dependencies:
-      '@mcp-dev-mesh/extension-api':
+      '@devmesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
 
   packages/registry:
     dependencies:
-      '@mcp-dev-mesh/extension-api':
+      '@devmesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
 
   packages/search:
     dependencies:
-      '@mcp-dev-mesh/extension-api':
+      '@devmesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
 
   packages/server:
     dependencies:
+      '@devmesh/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@devmesh/core':
+        specifier: workspace:*
+        version: link:../core
+      '@devmesh/local-store':
+        specifier: workspace:*
+        version: link:../local-store
+      '@devmesh/mcp-contracts':
+        specifier: workspace:*
+        version: link:../mcp-contracts
+      '@devmesh/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@koa/router':
         specifier: ^15.6.0
         version: 15.6.0(koa@2.16.4)
-      '@mcp-dev-mesh/agent':
-        specifier: workspace:*
-        version: link:../agent
-      '@mcp-dev-mesh/core':
-        specifier: workspace:*
-        version: link:../core
-      '@mcp-dev-mesh/local-store':
-        specifier: workspace:*
-        version: link:../local-store
-      '@mcp-dev-mesh/mcp-contracts':
-        specifier: workspace:*
-        version: link:../mcp-contracts
-      '@mcp-dev-mesh/protocol':
-        specifier: workspace:*
-        version: link:../protocol
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.4.3)
@@ -311,13 +311,13 @@ importers:
 
   packages/storage:
     dependencies:
-      '@mcp-dev-mesh/core':
+      '@devmesh/core':
         specifier: workspace:*
         version: link:../core
-      '@mcp-dev-mesh/extension-api':
+      '@devmesh/extension-api':
         specifier: workspace:*
         version: link:../extension-api
-      '@mcp-dev-mesh/server':
+      '@devmesh/server':
         specifier: workspace:*
         version: link:../server
       pg:

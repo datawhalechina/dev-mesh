@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/shared",
+  "name": "@devmesh/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",

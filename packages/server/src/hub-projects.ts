@@ -1,4 +1,4 @@
-import type { CreateProjectRequest, ProjectAccess, ProjectSummary, ServerGroupSummary } from '@mcp-dev-mesh/protocol';
+import type { CreateProjectRequest, ProjectAccess, ProjectSummary, ServerGroupSummary } from '@devmesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubResult, HubState } from './hub-model.js';
 import { countByGroup, hubError, ok, projectMapKey, slugHandle } from './hub-utils.js';

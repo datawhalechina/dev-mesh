@@ -1,4 +1,4 @@
-import type { ProjectAccess, ProjectSummary, SyncEvent } from '@mcp-dev-mesh/protocol';
+import type { ProjectAccess, ProjectSummary, SyncEvent } from '@devmesh/protocol';
 
 export const DEFAULT_LOCAL_INVITE_TOKEN = 'devmesh-local-invite';
 export const DEFAULT_GROUP_KEY = 'default';

@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { CaptureProvider, RawEvent } from '@mcp-dev-mesh/extension-api';
+import type { CaptureProvider, RawEvent } from '@devmesh/extension-api';
 import { describe, expect, it } from 'vitest';
 import { createDevMeshClientRuntime } from '../src/index.js';
 import { runDaemonAutoCaptureOnce } from '../src/daemon-auto-capture.js';
@@ -78,7 +78,7 @@ describe('daemon auto capture', () => {
 
 function createStaticProvider(event: RawEvent): CaptureProvider {
   return {
-    id: 'dev-mesh.provider.test-static',
+    id: 'devmesh.provider.test-static',
     kind: 'capture-provider',
     capabilities: ['capture.filesystem'],
     priority: 1,

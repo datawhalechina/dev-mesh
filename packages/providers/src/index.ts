@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import type { CaptureContext, CaptureProvider, RawEvent } from '@mcp-dev-mesh/extension-api';
+import type { CaptureContext, CaptureProvider, RawEvent } from '@devmesh/extension-api';
 
 const execFileAsync = promisify(execFile);
 
@@ -126,7 +126,7 @@ interface McpToolErrorSummary {
 
 export function createGitCaptureProvider(options: GitCaptureProviderOptions = {}): CaptureProvider {
   return {
-    id: 'dev-mesh.provider.git',
+    id: 'devmesh.provider.git',
     kind: 'capture-provider',
     capabilities: ['capture.git'],
     priority: 50,
@@ -164,7 +164,7 @@ export function createGitCaptureProvider(options: GitCaptureProviderOptions = {}
 
 export function createFileSystemCaptureProvider(options: FileSystemCaptureProviderOptions = {}): CaptureProvider {
   return {
-    id: 'dev-mesh.provider.filesystem',
+    id: 'devmesh.provider.filesystem',
     kind: 'capture-provider',
     capabilities: ['capture.filesystem'],
     priority: 40,
@@ -207,7 +207,7 @@ export function createFileSystemCaptureProvider(options: FileSystemCaptureProvid
 
 export function createMcpToolCallCaptureProvider(options: McpToolCallCaptureProviderOptions = {}): CaptureProvider {
   return {
-    id: 'dev-mesh.provider.mcp-tool',
+    id: 'devmesh.provider.mcp-tool',
     kind: 'capture-provider',
     capabilities: ['capture.mcp-tool'],
     priority: 35,

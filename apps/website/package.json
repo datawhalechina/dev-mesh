@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/website",
+  "name": "@devmesh/website",
   "version": "0.1.0",
   "private": true,
   "type": "module",

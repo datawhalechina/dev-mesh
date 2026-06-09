@@ -58,7 +58,7 @@ describe('local MCP proxy', () => {
 
       expect(health.body).toMatchObject({
         status: 'ok',
-        service: 'mcp-dev-mesh-local-proxy',
+        service: 'devmesh-local-proxy',
         projectRoot,
         mcpUrl: `${url}/mcp`
       });

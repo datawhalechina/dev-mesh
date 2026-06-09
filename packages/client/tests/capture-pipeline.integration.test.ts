@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createMcpToolCallCaptureProvider } from '@mcp-dev-mesh/providers';
+import { createMcpToolCallCaptureProvider } from '@devmesh/providers';
 import { describe, expect, it } from 'vitest';
 import { createDevMeshClientRuntime } from '../src/index.js';
 

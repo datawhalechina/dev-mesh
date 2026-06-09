@@ -33,7 +33,7 @@ export function invariant(
   }
 }
 
-export function createConsoleLogger(namespace = 'dev-mesh'): Logger {
+export function createConsoleLogger(namespace = 'devmesh'): Logger {
   const write = (level: LogLevel, message: string, meta?: Record<string, unknown>) => {
     const suffix = meta ? ` ${JSON.stringify(meta)}` : '';
     const line = `[${namespace}] ${level}: ${message}${suffix}`;

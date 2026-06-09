@@ -14,7 +14,7 @@ export default defineConfig({
     nav: [
       { text: '文档', link: '/intro' },
       { text: '快速开始', link: '/getting-started' },
-      { text: 'GitHub', link: 'https://github.com/mcp-dev-mesh/mcp-context-mesh' },
+      { text: 'GitHub', link: 'https://github.com/devmesh/mcp-context-mesh' },
     ],
     sidebar: [
       {
@@ -37,7 +37,7 @@ export default defineConfig({
       },
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/mcp-dev-mesh/mcp-context-mesh' },
+      { icon: 'github', link: 'https://github.com/devmesh/mcp-context-mesh' },
     ],
     footer: {
       message: 'Local-first context memory for AI-assisted engineering teams.',

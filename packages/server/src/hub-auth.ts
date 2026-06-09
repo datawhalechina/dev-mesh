@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { JoinRequest, JoinResponse } from '@mcp-dev-mesh/protocol';
+import type { JoinRequest, JoinResponse } from '@devmesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
 import { ACCESS_TOKEN_TTL_MS, type HubAuthContext, type HubResult, type HubState } from './hub-model.js';
 import { hubError, isExpired, ok, slugHandle } from './hub-utils.js';

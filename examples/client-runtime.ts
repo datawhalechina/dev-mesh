@@ -1,9 +1,9 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createDevMeshClientRuntime } from '@mcp-dev-mesh/client';
-import type { BuildContextPackInput } from '@mcp-dev-mesh/agent';
-import type { CaptureKnowledgeInput } from '@mcp-dev-mesh/core';
+import { createDevMeshClientRuntime } from '@devmesh/client';
+import type { BuildContextPackInput } from '@devmesh/agent';
+import type { CaptureKnowledgeInput } from '@devmesh/core';
 
 const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-client-example-'));
 

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { DEV_MESH_DIR, ensureProjectStore } from '@mcp-dev-mesh/local-store';
+import { DEV_MESH_DIR, ensureProjectStore } from '@devmesh/local-store';
 import type {
   MeshCaptureKnowledgeInput,
   MeshCaptureTaskInput,
@@ -15,7 +15,7 @@ import type {
   MeshSearchContextInput,
   MeshSearchMemberExperienceInput,
   MeshToolHandlers
-} from '@mcp-dev-mesh/mcp-contracts';
+} from '@devmesh/mcp-contracts';
 import {
   createLocalMeshMcpServerWithHandlers,
   createLocalMeshToolHandlers
@@ -310,7 +310,7 @@ async function callDaemonOrLocal(
 
 async function callDaemonTool(mcpUrl: string, toolName: DaemonToolName, input: Record<string, unknown>): Promise<unknown> {
   const client = new Client({
-    name: 'mcp-dev-mesh-stdio-proxy',
+    name: 'devmesh-stdio-proxy',
     version: DAEMON_VERSION
   });
   const transport = new StreamableHTTPClientTransport(new URL(mcpUrl));
@@ -407,7 +407,7 @@ async function healthzOk(healthUrl: string): Promise<boolean> {
     });
     const body = (await response.json()) as { status?: unknown; service?: unknown };
 
-    return response.ok && body.status === 'ok' && body.service === 'mcp-dev-mesh-local-proxy';
+    return response.ok && body.status === 'ok' && body.service === 'devmesh-local-proxy';
   } catch {
     return false;
   } finally {

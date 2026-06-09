@@ -1,4 +1,4 @@
-import type { IndexInput, SearchBackend, SearchCandidate, SearchInput } from '@mcp-dev-mesh/extension-api';
+import type { IndexInput, SearchBackend, SearchCandidate, SearchInput } from '@devmesh/extension-api';
 
 interface IndexedDocument {
   id: string;
@@ -23,7 +23,7 @@ export function createKeywordSearchBackend(): SearchBackend {
   const documents = new Map<string, IndexedDocument>();
 
   return {
-    id: 'dev-mesh.search.keyword',
+    id: 'devmesh.search.keyword',
     kind: 'search-backend',
     capabilities: ['search.keyword'],
     priority: 10,
@@ -56,7 +56,7 @@ export function createHybridSearchBackend(options: HybridSearchBackendOptions = 
   const documents = new Map<string, IndexedHybridDocument>();
 
   return {
-    id: 'dev-mesh.search.hybrid',
+    id: 'devmesh.search.hybrid',
     kind: 'search-backend',
     capabilities: ['search.hybrid', 'search.keyword', 'search.vector', 'search.member-experience'],
     priority: 30,

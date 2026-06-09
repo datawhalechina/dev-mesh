@@ -6,8 +6,8 @@ import type {
   KnowledgeItem,
   KnowledgeLayer,
   SearchKnowledgeInput
-} from '@mcp-dev-mesh/core';
-import type { JoinResponse, ProjectAclMember, ProjectAclRole, ProjectAclVisibility, ProjectSummary } from '@mcp-dev-mesh/protocol';
+} from '@devmesh/core';
+import type { JoinResponse, ProjectAclMember, ProjectAclRole, ProjectAclVisibility, ProjectSummary } from '@devmesh/protocol';
 import {
   ACCESS_TOKEN_TTL_MS,
   DEFAULT_ADMIN_INVITE_TTL_MS,
@@ -102,7 +102,7 @@ export async function createAdminOverview(
   const knowledgeItems = await core.listKnowledge({});
 
   return {
-    service: 'mcp-dev-mesh',
+    service: 'devmesh',
     version: '0.1.0',
     baseUrl,
     mcpUrl: `${baseUrl.replace(/\/$/, '')}/mcp`,

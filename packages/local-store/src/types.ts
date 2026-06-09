@@ -6,7 +6,7 @@ import type {
   MemberIdentity,
   ParaRef,
   RateKnowledgeInput
-} from '@mcp-dev-mesh/core';
+} from '@devmesh/core';
 
 export const DEV_MESH_DIR = '.dev-mesh';
 export const PROJECT_STORE_SCHEMA_VERSION = 1;

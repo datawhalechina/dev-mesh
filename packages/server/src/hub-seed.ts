@@ -1,4 +1,4 @@
-import type { ProjectSummary } from '@mcp-dev-mesh/protocol';
+import type { ProjectSummary } from '@devmesh/protocol';
 import {
   DEFAULT_GROUP_KEY,
   DEFAULT_LOCAL_INVITE_TOKEN,

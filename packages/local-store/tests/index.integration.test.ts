@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createDevMeshCore } from '@mcp-dev-mesh/core';
+import { createDevMeshCore } from '@devmesh/core';
 import {
   captureProjectKnowledge,
   JsonlKnowledgeRepository,

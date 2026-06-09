@@ -4,7 +4,7 @@ import {
   DEFAULT_LOCAL_PROXY_PORT,
   createLocalMcpProxy,
   type LocalMcpProxy
-} from '@mcp-dev-mesh/client';
+} from '@devmesh/client';
 import { parseIntOption } from './shared.js';
 
 export function registerProxyCommand(program: Command): void {

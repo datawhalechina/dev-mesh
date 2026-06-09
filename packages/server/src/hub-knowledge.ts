@@ -1,5 +1,5 @@
-import type { DevMeshCore, KnowledgeItem } from '@mcp-dev-mesh/core';
-import type { ProjectSummary } from '@mcp-dev-mesh/protocol';
+import type { DevMeshCore, KnowledgeItem } from '@devmesh/core';
+import type { ProjectSummary } from '@devmesh/protocol';
 import type { HubAuthContext } from './hub-model.js';
 
 export interface HubProjectBrief {

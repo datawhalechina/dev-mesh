@@ -1,7 +1,7 @@
 import { access, appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { createKnowledgeId, type KnowledgeLayer } from '@mcp-dev-mesh/core';
-import { nowIso } from '@mcp-dev-mesh/shared';
+import { createKnowledgeId, type KnowledgeLayer } from '@devmesh/core';
+import { nowIso } from '@devmesh/shared';
 
 export function getKnowledgeFile(knowledgeDir: string, layer: KnowledgeLayer): string {
   if (layer === 'raw') {

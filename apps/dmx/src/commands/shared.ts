@@ -1,4 +1,4 @@
-import type { ParaCategory } from '@mcp-dev-mesh/core';
+import type { ParaCategory } from '@devmesh/core';
 
 export function parseIntOption(value: string): number {
   const parsed = Number.parseInt(value, 10);

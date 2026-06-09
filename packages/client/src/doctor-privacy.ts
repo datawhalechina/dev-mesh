@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DEV_MESH_DIR } from '@mcp-dev-mesh/local-store';
+import { DEV_MESH_DIR } from '@devmesh/local-store';
 import { compactChecks } from './doctor-summary.js';
 import type { DevMeshDoctorCheck, DoctorContext } from './doctor-types.js';
 

@@ -5,7 +5,7 @@ import {
   type KnowledgeItem,
   type KnowledgeRepository,
   type SearchKnowledgeInput
-} from '@mcp-dev-mesh/core';
+} from '@devmesh/core';
 import { appendJsonLine, getKnowledgeFile } from './files.js';
 import { filterAndRankKnowledgeItems, filterKnowledgeItems, loadProjectKnowledgeItems } from './knowledge-files.js';
 import { ensureProjectStore } from './project-store.js';

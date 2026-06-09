@@ -22,13 +22,13 @@ pnpm build
 开发模式：
 
 ```powershell
-pnpm --filter @mcp-dev-mesh/mesh-server dev -- --host 127.0.0.1 --port 8721
+pnpm --filter @devmesh/mesh-server dev -- --host 127.0.0.1 --port 8721
 ```
 
 如果已经准备了 env 文件：
 
 ```powershell
-pnpm --filter @mcp-dev-mesh/mesh-server dev -- --env-file .\mesh-server.env
+pnpm --filter @devmesh/mesh-server dev -- --env-file .\mesh-server.env
 ```
 
 生产构建后也可以直接运行：

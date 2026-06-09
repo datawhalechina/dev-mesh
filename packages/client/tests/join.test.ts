@@ -23,7 +23,7 @@ describe('joinServerGroup', () => {
         body
       });
 
-      if (url === 'http://mesh.test/.well-known/dev-mesh') {
+      if (url === 'http://mesh.test/.well-known/devmesh') {
         return jsonResponse({
           serverName: 'Test Mesh',
           serverId: 'mesh_test',
@@ -89,7 +89,7 @@ describe('joinServerGroup', () => {
         expiresAt: '2026-06-13T00:00:00.000Z'
       });
       expect(requests.map((request) => request.url)).toEqual([
-        'http://mesh.test/.well-known/dev-mesh',
+        'http://mesh.test/.well-known/devmesh',
         'http://mesh.test/api/v1/join'
       ]);
       expect(requests[1]?.init?.method).toBe('POST');
@@ -122,6 +122,87 @@ describe('joinServerGroup', () => {
         accessToken: 'mesh_secret_token',
         syncSigningSecret: 'sync_secret_value'
       });
+    } finally {
+      await rm(globalRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to the legacy well-known path for existing alpha servers', async () => {
+    const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-client-join-legacy-'));
+    const requests: string[] = [];
+
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      requests.push(url);
+
+      if (url === 'http://mesh.test/.well-known/devmesh') {
+        return jsonResponse(
+          {
+            error: {
+              code: 'not_found',
+              message: 'Not found.'
+            }
+          },
+          { status: 404 }
+        );
+      }
+
+      if (url === 'http://mesh.test/.well-known/dev-mesh') {
+        return jsonResponse({
+          serverName: 'Test Mesh',
+          serverId: 'mesh_test',
+          baseUrl: 'http://mesh.test',
+          mcpUrl: 'http://mesh.test/mcp',
+          groups: {
+            required: true,
+            defaultJoinMode: 'invite'
+          },
+          install: {
+            npmPackage: 'devmesh',
+            command: 'npm install -g devmesh'
+          },
+          minClientVersion: '0.1.0'
+        });
+      }
+
+      if (url === 'http://mesh.test/api/v1/join') {
+        return jsonResponse({
+          memberId: 'member_default_xiaoyun',
+          clientId: 'client_default_xiaoyun_abc123',
+          groupKey: 'default',
+          accessToken: 'mesh_secret_token',
+          syncSigningSecret: 'sync_secret_value',
+          expiresAt: '2026-06-13T00:00:00.000Z'
+        });
+      }
+
+      return jsonResponse(
+        {
+          error: {
+            code: 'not_found',
+            message: `Unexpected URL ${url}`
+          }
+        },
+        { status: 404 }
+      );
+    });
+
+    try {
+      await joinServerGroup({
+        globalRoot,
+        serverUrl: 'mesh.test/',
+        groupKey: 'default',
+        displayName: 'Xiaoyun',
+        handle: 'xiaoyun',
+        inviteToken: 'inv_default'
+      });
+
+      expect(requests).toEqual([
+        'http://mesh.test/.well-known/devmesh',
+        'http://mesh.test/.well-known/dev-mesh',
+        'http://mesh.test/api/v1/join'
+      ]);
     } finally {
       await rm(globalRoot, { recursive: true, force: true });
     }

@@ -27,7 +27,7 @@ describe('web-admin API client', () => {
       'fetch',
       vi.fn(async () =>
         jsonResponse({
-          service: 'mcp-dev-mesh',
+          service: 'devmesh',
           version: '0.1.0',
           baseUrl: 'http://127.0.0.1:8721',
           mcpUrl: 'http://127.0.0.1:8721/mcp',
@@ -48,7 +48,7 @@ describe('web-admin API client', () => {
     );
 
     await expect(fetchAdminOverview()).resolves.toMatchObject({
-      service: 'mcp-dev-mesh',
+      service: 'devmesh',
       counts: {
         projects: 3
       }

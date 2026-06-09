@@ -6,74 +6,74 @@ const repoRoot = join(import.meta.dirname, '..', '..', '..');
 const packagesRoot = join(repoRoot, 'packages');
 
 const forbiddenByPackage: Record<string, string[]> = {
-  '@mcp-dev-mesh/shared': [
-    '@mcp-dev-mesh/extension-api',
-    '@mcp-dev-mesh/core',
-    '@mcp-dev-mesh/agent',
-    '@mcp-dev-mesh/client',
-    '@mcp-dev-mesh/server',
-    '@mcp-dev-mesh/local-store',
-    '@mcp-dev-mesh/mcp-contracts',
-    '@mcp-dev-mesh/protocol',
-    '@mcp-dev-mesh/adapters',
-    '@mcp-dev-mesh/providers',
-    '@mcp-dev-mesh/extractor',
-    '@mcp-dev-mesh/quality',
-    '@mcp-dev-mesh/search',
-    '@mcp-dev-mesh/storage',
-    '@mcp-dev-mesh/registry'
+  '@devmesh/shared': [
+    '@devmesh/extension-api',
+    '@devmesh/core',
+    '@devmesh/agent',
+    '@devmesh/client',
+    '@devmesh/server',
+    '@devmesh/local-store',
+    '@devmesh/mcp-contracts',
+    '@devmesh/protocol',
+    '@devmesh/adapters',
+    '@devmesh/providers',
+    '@devmesh/extractor',
+    '@devmesh/quality',
+    '@devmesh/search',
+    '@devmesh/storage',
+    '@devmesh/registry'
   ],
-  '@mcp-dev-mesh/extension-api': [
-    '@mcp-dev-mesh/core',
-    '@mcp-dev-mesh/agent',
-    '@mcp-dev-mesh/client',
-    '@mcp-dev-mesh/server',
-    '@mcp-dev-mesh/local-store',
-    '@mcp-dev-mesh/mcp-contracts',
-    '@mcp-dev-mesh/protocol',
-    '@mcp-dev-mesh/adapters',
-    '@mcp-dev-mesh/providers',
-    '@mcp-dev-mesh/extractor',
-    '@mcp-dev-mesh/quality',
-    '@mcp-dev-mesh/search',
-    '@mcp-dev-mesh/storage',
-    '@mcp-dev-mesh/registry'
+  '@devmesh/extension-api': [
+    '@devmesh/core',
+    '@devmesh/agent',
+    '@devmesh/client',
+    '@devmesh/server',
+    '@devmesh/local-store',
+    '@devmesh/mcp-contracts',
+    '@devmesh/protocol',
+    '@devmesh/adapters',
+    '@devmesh/providers',
+    '@devmesh/extractor',
+    '@devmesh/quality',
+    '@devmesh/search',
+    '@devmesh/storage',
+    '@devmesh/registry'
   ],
-  '@mcp-dev-mesh/protocol': [
-    '@mcp-dev-mesh/core',
-    '@mcp-dev-mesh/agent',
-    '@mcp-dev-mesh/client',
-    '@mcp-dev-mesh/server',
-    '@mcp-dev-mesh/local-store',
-    '@mcp-dev-mesh/mcp-contracts',
-    '@mcp-dev-mesh/adapters',
-    '@mcp-dev-mesh/providers',
-    '@mcp-dev-mesh/extractor',
-    '@mcp-dev-mesh/quality',
-    '@mcp-dev-mesh/search',
-    '@mcp-dev-mesh/storage',
-    '@mcp-dev-mesh/registry'
+  '@devmesh/protocol': [
+    '@devmesh/core',
+    '@devmesh/agent',
+    '@devmesh/client',
+    '@devmesh/server',
+    '@devmesh/local-store',
+    '@devmesh/mcp-contracts',
+    '@devmesh/adapters',
+    '@devmesh/providers',
+    '@devmesh/extractor',
+    '@devmesh/quality',
+    '@devmesh/search',
+    '@devmesh/storage',
+    '@devmesh/registry'
   ],
-  '@mcp-dev-mesh/core': [
-    '@mcp-dev-mesh/agent',
-    '@mcp-dev-mesh/client',
-    '@mcp-dev-mesh/server',
-    '@mcp-dev-mesh/local-store',
-    '@mcp-dev-mesh/mcp-contracts',
-    '@mcp-dev-mesh/protocol',
-    '@mcp-dev-mesh/adapters',
-    '@mcp-dev-mesh/providers',
-    '@mcp-dev-mesh/extractor',
-    '@mcp-dev-mesh/quality',
-    '@mcp-dev-mesh/search',
-    '@mcp-dev-mesh/storage',
-    '@mcp-dev-mesh/registry'
+  '@devmesh/core': [
+    '@devmesh/agent',
+    '@devmesh/client',
+    '@devmesh/server',
+    '@devmesh/local-store',
+    '@devmesh/mcp-contracts',
+    '@devmesh/protocol',
+    '@devmesh/adapters',
+    '@devmesh/providers',
+    '@devmesh/extractor',
+    '@devmesh/quality',
+    '@devmesh/search',
+    '@devmesh/storage',
+    '@devmesh/registry'
   ],
-  '@mcp-dev-mesh/agent': ['@mcp-dev-mesh/client', '@mcp-dev-mesh/server', '@mcp-dev-mesh/local-store'],
-  '@mcp-dev-mesh/local-store': ['@mcp-dev-mesh/agent', '@mcp-dev-mesh/client', '@mcp-dev-mesh/server'],
-  '@mcp-dev-mesh/mcp-contracts': ['@mcp-dev-mesh/client', '@mcp-dev-mesh/server'],
-  '@mcp-dev-mesh/client': ['@mcp-dev-mesh/server'],
-  '@mcp-dev-mesh/server': ['@mcp-dev-mesh/client']
+  '@devmesh/agent': ['@devmesh/client', '@devmesh/server', '@devmesh/local-store'],
+  '@devmesh/local-store': ['@devmesh/agent', '@devmesh/client', '@devmesh/server'],
+  '@devmesh/mcp-contracts': ['@devmesh/client', '@devmesh/server'],
+  '@devmesh/client': ['@devmesh/server'],
+  '@devmesh/server': ['@devmesh/client']
 };
 
 describe('workspace dependency direction', () => {
@@ -157,7 +157,7 @@ async function walkSourceFiles(dir: string): Promise<string[]> {
 }
 
 function findWorkspaceImports(content: string): string[] {
-  return [...content.matchAll(/['"](@mcp-dev-mesh\/[^'"]+)['"]/g)].map((match) => match[1]).filter(isString);
+  return [...content.matchAll(/['"](@devmesh\/[^'"]+)['"]/g)].map((match) => match[1]).filter(isString);
 }
 
 function isString(value: unknown): value is string {

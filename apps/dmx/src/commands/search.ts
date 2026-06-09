@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { createDevMeshClientRuntime } from '@mcp-dev-mesh/client';
+import { createDevMeshClientRuntime } from '@devmesh/client';
 import { parseIntOption } from './shared.js';
 
 export function registerSearchCommand(program: Command): void {

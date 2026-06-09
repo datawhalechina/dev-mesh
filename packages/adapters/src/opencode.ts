@@ -11,13 +11,13 @@ import type {
   McpCommandConfig,
   RemoveInput,
   ToolAdapter
-} from '@mcp-dev-mesh/extension-api';
+} from '@devmesh/extension-api';
 
 const execFileAsync = promisify(execFile);
-const DEFAULT_OPENCODE_MCP_SERVER_NAME = 'dev-mesh';
+const DEFAULT_OPENCODE_MCP_SERVER_NAME = 'devmesh';
 const OPENCODE_CONFIG_FILENAME = 'opencode.json';
 const OPENCODE_JSONC_CONFIG_FILENAME = 'opencode.jsonc';
-const OPENCODE_PERMISSION_KEY = 'dev-mesh_*';
+const OPENCODE_PERMISSION_KEY = 'devmesh_*';
 const JSON_FORMAT: FormattingOptions = {
   insertSpaces: true,
   tabSize: 2,
@@ -49,7 +49,7 @@ export function createOpencodeToolAdapter(options: OpencodeToolAdapterOptions = 
   const serverName = options.serverName ?? DEFAULT_OPENCODE_MCP_SERVER_NAME;
 
   return {
-    id: 'dev-mesh.adapter.opencode',
+    id: 'devmesh.adapter.opencode',
     kind: 'tool-adapter',
     capabilities: ['tool.detect', 'mcp.configure'],
     priority: 20,
@@ -130,7 +130,7 @@ export function createOpencodeToolAdapter(options: OpencodeToolAdapterOptions = 
         checks.push({
           id: 'adapter.opencode.mcp-config',
           status: 'warn',
-          message: 'opencode dev-mesh MCP server is not configured.',
+          message: 'opencode DevMesh MCP server is not configured.',
           fixHint: 'Run dmx init --global --tool opencode --yes.'
         });
         return checks;
@@ -140,7 +140,7 @@ export function createOpencodeToolAdapter(options: OpencodeToolAdapterOptions = 
         checks.push({
           id: 'adapter.opencode.mcp-config',
           status: 'error',
-          message: `opencode dev-mesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
+          message: `opencode DevMesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
           fixHint: 'Re-run dmx init --global --tool opencode --yes.'
         });
         return checks;
@@ -149,7 +149,7 @@ export function createOpencodeToolAdapter(options: OpencodeToolAdapterOptions = 
       checks.push({
         id: 'adapter.opencode.mcp-config',
         status: 'ok',
-        message: `opencode dev-mesh MCP server is configured in ${configured.targetPath}.`
+        message: `opencode DevMesh MCP server is configured in ${configured.targetPath}.`
       });
 
       return checks;

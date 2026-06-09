@@ -78,7 +78,7 @@ function createChecks(options) {
 
         const body = parseJson(response.body);
 
-        if (body.status !== 'ok' || body.service !== 'mcp-dev-mesh') {
+        if (body.status !== 'ok' || body.service !== 'devmesh') {
           return fail(response, 'unexpected health response body');
         }
 
@@ -87,7 +87,7 @@ function createChecks(options) {
     },
     {
       name: 'Hub discovery',
-      url: joinUrl(options.hubUrl, '/.well-known/dev-mesh'),
+      url: joinUrl(options.hubUrl, '/.well-known/devmesh'),
       async probe(url, requestTimeoutMs) {
         const response = await requestText(url, requestTimeoutMs);
 
@@ -134,7 +134,7 @@ function createChecks(options) {
 
         const body = parseJson(response.body);
 
-        if (body.status !== 'ok' || body.service !== 'mcp-dev-mesh') {
+        if (body.status !== 'ok' || body.service !== 'devmesh') {
           return fail(response, 'unexpected proxied health response body');
         }
 

@@ -1,4 +1,4 @@
-import type { KnowledgeItemLike } from '@mcp-dev-mesh/extension-api';
+import type { KnowledgeItemLike } from '@devmesh/extension-api';
 import { describe, expect, it } from 'vitest';
 import {
   createAdoptionScorer,
@@ -14,11 +14,11 @@ describe('built-in quality scorers', () => {
     const scorers = createBuiltInScorers();
 
     expect(scorers.map((scorer) => scorer.id)).toEqual([
-      'dev-mesh.quality.confidence',
-      'dev-mesh.quality.rating',
-      'dev-mesh.quality.adoption',
-      'dev-mesh.quality.freshness',
-      'dev-mesh.quality.source-trust'
+      'devmesh.quality.confidence',
+      'devmesh.quality.rating',
+      'devmesh.quality.adoption',
+      'devmesh.quality.freshness',
+      'devmesh.quality.source-trust'
     ]);
     expect(scorers.flatMap((scorer) => scorer.capabilities)).toEqual([
       'quality.score.confidence',

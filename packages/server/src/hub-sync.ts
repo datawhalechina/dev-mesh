@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import type { DevMeshCore, KnowledgeItem } from '@mcp-dev-mesh/core';
-import type { SyncEvent, SyncPullResponse, SyncPushRequest, SyncPushResponse } from '@mcp-dev-mesh/protocol';
+import type { DevMeshCore, KnowledgeItem } from '@devmesh/core';
+import type { SyncEvent, SyncPullResponse, SyncPushRequest, SyncPushResponse } from '@devmesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubKnowledgeEdge, HubResult, HubState, HubSyncEvent } from './hub-model.js';
 import { hubError, ok } from './hub-utils.js';

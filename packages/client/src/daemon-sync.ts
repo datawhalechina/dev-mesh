@@ -1,7 +1,7 @@
 import { createHash, createHmac } from 'node:crypto';
 import { appendFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { KnowledgeItem, KnowledgeLayer, KnowledgeVisibility, ParaCategory, QualitySignals } from '@mcp-dev-mesh/core';
+import type { KnowledgeItem, KnowledgeLayer, KnowledgeVisibility, ParaCategory, QualitySignals } from '@devmesh/core';
 import {
   ensureProjectStore,
   JsonlKnowledgeRepository,
@@ -9,8 +9,8 @@ import {
   type DevMeshEvent,
   type ProjectConfig,
   type ProjectStore
-} from '@mcp-dev-mesh/local-store';
-import type { ErrorResponse, SyncEvent, SyncPullResponse, SyncPushResponse } from '@mcp-dev-mesh/protocol';
+} from '@devmesh/local-store';
+import type { ErrorResponse, SyncEvent, SyncPullResponse, SyncPushResponse } from '@devmesh/protocol';
 import { getGlobalConfigPaths, readJsonFile } from './global-config.js';
 import type { JoinedServerRecord } from './join-types.js';
 

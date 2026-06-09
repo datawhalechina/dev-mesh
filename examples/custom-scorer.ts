@@ -1,4 +1,4 @@
-import type { DevMeshExtension, ExtensionRegistry, QualityScorer } from '@mcp-dev-mesh/extension-api';
+import type { DevMeshExtension, ExtensionRegistry, QualityScorer } from '@devmesh/extension-api';
 
 const domainFreshnessScorer: QualityScorer = {
   id: 'company.domain-freshness-scorer',

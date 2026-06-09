@@ -30,7 +30,7 @@ describe('createClaudeCodeToolAdapter', () => {
       const configPath = join(homeDir, '.claude.json');
       await expect(readJson(configPath)).resolves.toMatchObject({
         mcpServers: {
-          'dev-mesh': {
+          'devmesh': {
             type: 'http',
             url: 'http://127.0.0.1:8722/mcp'
           }
@@ -54,7 +54,7 @@ describe('createClaudeCodeToolAdapter', () => {
       expect(update.changed).toBe(true);
       await expect(readJson(configPath)).resolves.toMatchObject({
         mcpServers: {
-          'dev-mesh': {
+          'devmesh': {
             type: 'http',
             url: 'http://127.0.0.1:9999/mcp'
           }
@@ -123,7 +123,7 @@ describe('createClaudeCodeToolAdapter', () => {
       });
       await expect(readJson(projectConfigPath)).resolves.toMatchObject({
         mcpServers: {
-          'dev-mesh': {
+          'devmesh': {
             type: 'http',
             url: 'http://127.0.0.1:8722/mcp'
           }

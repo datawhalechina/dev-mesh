@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDoctorCategorySummary, createDoctorOverview } from '../src/commands/doctor.js';
-import type { DevMeshDoctorResult } from '@mcp-dev-mesh/client';
+import type { DevMeshDoctorResult } from '@devmesh/client';
 
 describe('doctor TUI helpers', () => {
   it('formats the doctor overview as readable text', () => {

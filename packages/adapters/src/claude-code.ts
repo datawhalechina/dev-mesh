@@ -10,10 +10,10 @@ import type {
   McpCommandConfig,
   RemoveInput,
   ToolAdapter
-} from '@mcp-dev-mesh/extension-api';
+} from '@devmesh/extension-api';
 
 const execFileAsync = promisify(execFile);
-const DEFAULT_CLAUDE_MCP_SERVER_NAME = 'dev-mesh';
+const DEFAULT_CLAUDE_MCP_SERVER_NAME = 'devmesh';
 
 export interface ClaudeCodeToolAdapterOptions {
   command?: string;
@@ -39,7 +39,7 @@ export function createClaudeCodeToolAdapter(options: ClaudeCodeToolAdapterOption
   const serverName = options.serverName ?? DEFAULT_CLAUDE_MCP_SERVER_NAME;
 
   return {
-    id: 'dev-mesh.adapter.claude-code',
+    id: 'devmesh.adapter.claude-code',
     kind: 'tool-adapter',
     capabilities: ['tool.detect', 'mcp.configure'],
     priority: 20,
@@ -120,7 +120,7 @@ export function createClaudeCodeToolAdapter(options: ClaudeCodeToolAdapterOption
         checks.push({
           id: 'adapter.claude-code.mcp-config',
           status: 'warn',
-          message: 'Claude Code dev-mesh MCP server is not configured.',
+          message: 'Claude Code DevMesh MCP server is not configured.',
           fixHint: 'Run dmx init --global --tool claude --yes.'
         });
         return checks;
@@ -130,7 +130,7 @@ export function createClaudeCodeToolAdapter(options: ClaudeCodeToolAdapterOption
         checks.push({
           id: 'adapter.claude-code.mcp-config',
           status: 'error',
-          message: `Claude Code dev-mesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
+          message: `Claude Code DevMesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
           fixHint: 'Re-run dmx init --global --tool claude --yes.'
         });
         return checks;
@@ -139,7 +139,7 @@ export function createClaudeCodeToolAdapter(options: ClaudeCodeToolAdapterOption
       checks.push({
         id: 'adapter.claude-code.mcp-config',
         status: 'ok',
-        message: `Claude Code dev-mesh MCP server is configured in ${configured.targetPath}.`
+        message: `Claude Code DevMesh MCP server is configured in ${configured.targetPath}.`
       });
 
       return checks;

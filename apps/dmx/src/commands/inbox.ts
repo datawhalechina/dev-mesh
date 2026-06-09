@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { createDevMeshClientRuntime } from '@mcp-dev-mesh/client';
+import { createDevMeshClientRuntime } from '@devmesh/client';
 import { requireInboxId } from './shared.js';
 
 export function registerInboxCommand(program: Command): void {

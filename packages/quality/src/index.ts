@@ -3,7 +3,7 @@ import type {
   QualityScoreInput,
   QualityScorePatch,
   QualityScorer
-} from '@mcp-dev-mesh/extension-api';
+} from '@devmesh/extension-api';
 
 export interface FreshnessScorerOptions {
   now?: () => Date;
@@ -19,7 +19,7 @@ export type AdoptionSignal =
 
 export function createConfidenceScorer(): QualityScorer<KnowledgeItemLike> {
   return {
-    id: 'dev-mesh.quality.confidence',
+    id: 'devmesh.quality.confidence',
     kind: 'quality-scorer',
     capabilities: ['quality.score.confidence'],
     priority: 60,
@@ -62,7 +62,7 @@ export function createConfidenceScorer(): QualityScorer<KnowledgeItemLike> {
 
 export function createRatingScorer(): QualityScorer<KnowledgeItemLike> {
   return {
-    id: 'dev-mesh.quality.rating',
+    id: 'devmesh.quality.rating',
     kind: 'quality-scorer',
     capabilities: ['quality.score.rating'],
     priority: 50,
@@ -94,7 +94,7 @@ export function createRatingScorer(): QualityScorer<KnowledgeItemLike> {
 
 export function createAdoptionScorer(): QualityScorer<KnowledgeItemLike> {
   return {
-    id: 'dev-mesh.quality.adoption',
+    id: 'devmesh.quality.adoption',
     kind: 'quality-scorer',
     capabilities: ['quality.score.adoption'],
     priority: 50,
@@ -123,7 +123,7 @@ export function createAdoptionScorer(): QualityScorer<KnowledgeItemLike> {
 
 export function createFreshnessScorer(options: FreshnessScorerOptions = {}): QualityScorer<KnowledgeItemLike> {
   return {
-    id: 'dev-mesh.quality.freshness',
+    id: 'devmesh.quality.freshness',
     kind: 'quality-scorer',
     capabilities: ['quality.score.freshness'],
     priority: 40,
@@ -165,7 +165,7 @@ export function createFreshnessScorer(options: FreshnessScorerOptions = {}): Qua
 
 export function createSourceTrustScorer(): QualityScorer<KnowledgeItemLike> {
   return {
-    id: 'dev-mesh.quality.source-trust',
+    id: 'devmesh.quality.source-trust',
     kind: 'quality-scorer',
     capabilities: ['quality.score.source-trust'],
     priority: 45,

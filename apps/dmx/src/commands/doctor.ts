@@ -7,7 +7,7 @@ import {
   type DevMeshDoctorOptions,
   type DevMeshDoctorResult,
   type DevMeshDoctorStatus
-} from '@mcp-dev-mesh/client';
+} from '@devmesh/client';
 import { shouldUseTuiOutput } from './shared.js';
 
 export function registerDoctorCommand(program: Command): void {

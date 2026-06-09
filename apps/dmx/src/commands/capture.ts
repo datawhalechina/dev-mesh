@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
-import type { CaptureKnowledgeInput, KnowledgeLayer, KnowledgeType, KnowledgeVisibility } from '@mcp-dev-mesh/core';
-import { createDevMeshClientRuntime } from '@mcp-dev-mesh/client';
+import type { CaptureKnowledgeInput, KnowledgeLayer, KnowledgeType, KnowledgeVisibility } from '@devmesh/core';
+import { createDevMeshClientRuntime } from '@devmesh/client';
 import { createReviewOptions, parsePara } from './shared.js';
 
 export function registerCaptureCommand(program: Command): void {

@@ -1,4 +1,4 @@
-import type { RawEvent } from '@mcp-dev-mesh/extension-api';
+import type { RawEvent } from '@devmesh/extension-api';
 import { describe, expect, it } from 'vitest';
 import { createRuleBasedExtractor } from '../src/index.js';
 

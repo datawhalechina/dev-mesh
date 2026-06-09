@@ -7,7 +7,7 @@ import {
   createGlobalInitToolsSummary,
   createProjectInitResultSummary
 } from '../src/commands/init.js';
-import type { GlobalInitResult, GlobalToolStatus } from '@mcp-dev-mesh/client';
+import type { GlobalInitResult, GlobalToolStatus } from '@devmesh/client';
 
 describe('global init TUI helpers', () => {
   it('builds Clack choices with detected/configured hints', () => {

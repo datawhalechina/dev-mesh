@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DEV_MESH_DIR, ensureProjectStore, readProjectConfig } from '@mcp-dev-mesh/local-store';
+import { DEV_MESH_DIR, ensureProjectStore, readProjectConfig } from '@devmesh/local-store';
 import type { DevMeshDoctorCheck, DoctorContext } from './doctor-types.js';
 
 export async function checkProjectStore(context: DoctorContext): Promise<DevMeshDoctorCheck[]> {

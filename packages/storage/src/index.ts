@@ -3,9 +3,9 @@ import type {
   KnowledgeItem,
   KnowledgeRepository,
   SearchKnowledgeInput
-} from '@mcp-dev-mesh/core';
-import { matchesKnowledgeFilter, rankKnowledgeItem } from '@mcp-dev-mesh/core';
-import type { RawEvent, StorageBackend } from '@mcp-dev-mesh/extension-api';
+} from '@devmesh/core';
+import { matchesKnowledgeFilter, rankKnowledgeItem } from '@devmesh/core';
+import type { RawEvent, StorageBackend } from '@devmesh/extension-api';
 import {
   createHubState,
   deserializeHubState,
@@ -13,7 +13,7 @@ import {
   type HubState,
   type HubStateOptions,
   type HubStatePersistenceStore
-} from '@mcp-dev-mesh/server';
+} from '@devmesh/server';
 
 export interface InMemoryStorageState {
   knowledgeItems: unknown[];
@@ -29,7 +29,7 @@ export function createInMemoryStorageBackend(): StorageBackend & { state: InMemo
   };
 
   return {
-    id: 'dev-mesh.storage.memory',
+    id: 'devmesh.storage.memory',
     kind: 'storage-backend',
     capabilities: ['storage.memory'],
     priority: 1,
@@ -349,7 +349,7 @@ export function createPostgresStorageBackend(
   const knowledgeItems = new PostgresKnowledgeRepository(db, options);
 
   return {
-    id: 'dev-mesh.storage.postgres',
+    id: 'devmesh.storage.postgres',
     kind: 'storage-backend',
     capabilities: ['storage.postgres', 'knowledge.repository'],
     priority: 10,

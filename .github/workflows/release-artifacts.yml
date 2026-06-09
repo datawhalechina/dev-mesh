@@ -53,13 +53,13 @@ jobs:
         run: |
           mkdir -p release
 
-          tar -czf "release/mcp-dev-mesh-web-admin-${{ steps.artifact.outputs.suffix }}.tar.gz" \
+          tar -czf "release/devmesh-web-admin-${{ steps.artifact.outputs.suffix }}.tar.gz" \
             -C apps/web-admin/dist .
 
-          tar -czf "release/mcp-dev-mesh-website-${{ steps.artifact.outputs.suffix }}.tar.gz" \
+          tar -czf "release/devmesh-website-${{ steps.artifact.outputs.suffix }}.tar.gz" \
             -C apps/website/docs/.vitepress/dist .
 
-          tar -czf "release/mcp-dev-mesh-deploy-${{ steps.artifact.outputs.suffix }}.tar.gz" \
+          tar -czf "release/devmesh-deploy-${{ steps.artifact.outputs.suffix }}.tar.gz" \
             README.md \
             deploy \
             docs/release.md

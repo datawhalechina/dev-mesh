@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { createDevMeshCore, createKnowledgeItem } from '@mcp-dev-mesh/core';
+import { createDevMeshCore, createKnowledgeItem } from '@devmesh/core';
 import {
   acceptPendingKnowledge,
   captureProjectKnowledge,
@@ -282,7 +282,7 @@ describe('local project store', () => {
         tags: ['task'],
         para: {
           category: 'projects',
-          key: 'dev-mesh'
+          key: 'devmesh'
         },
         createdBy: {
           displayName: 'Xiaoyun'

@@ -6,13 +6,13 @@ import type {
   RedactionInput,
   RedactionResult,
   Redactor
-} from '@mcp-dev-mesh/extension-api';
+} from '@devmesh/extension-api';
 
 type ExtractRisk = 'low' | 'medium' | 'high';
 
 export function createRuleBasedExtractor(): Extractor {
   return {
-    id: 'dev-mesh.extractor.rule-based',
+    id: 'devmesh.extractor.rule-based',
     kind: 'extractor',
     capabilities: ['extract.rule-based'],
     priority: 10,
@@ -520,7 +520,7 @@ function isNonEmptyString(value: string | undefined): value is string {
 
 export function createSecretRedactor(): Redactor {
   return {
-    id: 'dev-mesh.redactor.secrets',
+    id: 'devmesh.redactor.secrets',
     kind: 'redactor',
     capabilities: ['redact.secret', 'redact.credential', 'redact.sensitive-path'],
     priority: 100,

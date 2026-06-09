@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { ProjectSummary } from '@mcp-dev-mesh/protocol';
+import type { ProjectSummary } from '@devmesh/protocol';
 import type {
   HubAccessToken,
   HubAuditLog,

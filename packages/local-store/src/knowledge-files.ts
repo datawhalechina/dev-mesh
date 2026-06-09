@@ -4,7 +4,7 @@ import {
   type KnowledgeFilter,
   type KnowledgeItem,
   type SearchKnowledgeInput
-} from '@mcp-dev-mesh/core';
+} from '@devmesh/core';
 import { ensureProjectStore } from './project-store.js';
 import { readJsonl, walkKnowledgeItemFiles } from './files.js';
 

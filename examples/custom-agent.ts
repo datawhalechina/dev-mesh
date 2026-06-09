@@ -1,5 +1,5 @@
-import { createAgentContextService } from '@mcp-dev-mesh/agent';
-import { createDevMeshCore } from '@mcp-dev-mesh/core';
+import { createAgentContextService } from '@devmesh/agent';
+import { createDevMeshCore } from '@devmesh/core';
 
 const core = createDevMeshCore({
   projectRoot: process.cwd()

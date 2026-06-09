@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
-import { createBuiltInAdapters, type BuiltInToolAdapterId } from '@mcp-dev-mesh/adapters';
-import type { McpCommandConfig } from '@mcp-dev-mesh/extension-api';
+import { createBuiltInAdapters, type BuiltInToolAdapterId } from '@devmesh/adapters';
+import type { McpCommandConfig } from '@devmesh/extension-api';
 import { DEFAULT_LOCAL_PROXY_URL, escapeToml, getGlobalConfigPaths } from './global-config.js';
 
 export type GlobalToolKey = 'codex' | 'claude' | 'opencode';
@@ -201,7 +201,7 @@ async function inspectGlobalTools(options: InspectGlobalToolsInternalOptions): P
   const statuses: GlobalToolStatus[] = [];
 
   for (const definition of GLOBAL_TOOL_DEFINITIONS) {
-    const adapter = adapters.get(`dev-mesh.adapter.${definition.adapterId}`);
+    const adapter = adapters.get(`devmesh.adapter.${definition.adapterId}`);
     const isSelected = selected.has(definition.key);
     const scope = toolScopes[definition.key];
 

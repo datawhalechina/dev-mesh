@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { createDevMeshCore } from '@mcp-dev-mesh/core';
-import type { SyncEvent, SyncEventSignature } from '@mcp-dev-mesh/protocol';
+import { createDevMeshCore } from '@devmesh/core';
+import type { SyncEvent, SyncEventSignature } from '@devmesh/protocol';
 import {
   createHubState,
   DEFAULT_LOCAL_INVITE_TOKEN,

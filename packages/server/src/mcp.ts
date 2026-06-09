@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { createAgentContextService, type BuildContextPackInput } from '@mcp-dev-mesh/agent';
+import { createAgentContextService, type BuildContextPackInput } from '@devmesh/agent';
 import type {
   CaptureKnowledgeInput,
   DevMeshCore,
@@ -8,7 +8,7 @@ import type {
   KnowledgeVisibility,
   ParaRef,
   RateKnowledgeInput
-} from '@mcp-dev-mesh/core';
+} from '@devmesh/core';
 import {
   registerMeshTools,
   type MeshCaptureKnowledgeInput,
@@ -17,7 +17,7 @@ import {
   type MeshRateKnowledgeInput,
   type MeshScanProjectKnowledgeInput,
   type MeshSearchContextInput
-} from '@mcp-dev-mesh/mcp-contracts';
+} from '@devmesh/mcp-contracts';
 import {
   captureProjectKnowledge,
   captureProjectTask,
@@ -27,11 +27,11 @@ import {
   type CaptureProjectTaskInput,
   type CaptureProjectTaskResult,
   type RateProjectKnowledgeResult
-} from '@mcp-dev-mesh/local-store';
+} from '@devmesh/local-store';
 
 export function createMeshMcpServer(core: DevMeshCore): McpServer {
   const mcp = new McpServer({
-    name: 'mcp-dev-mesh',
+    name: 'devmesh',
     version: '0.1.0'
   });
   const agent = createAgentContextService({ core });

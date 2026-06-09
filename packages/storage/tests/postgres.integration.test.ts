@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
-import { createDevMeshCore } from '@mcp-dev-mesh/core';
+import { createDevMeshCore } from '@devmesh/core';
 import {
   createPostgresHubStateStore,
   migratePostgresKnowledgeRepository,

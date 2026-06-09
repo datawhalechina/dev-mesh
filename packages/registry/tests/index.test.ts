@@ -1,28 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import type { DevMeshExtension, SearchBackend, ToolAdapter } from '@mcp-dev-mesh/extension-api';
+import type { DevMeshExtension, SearchBackend, ToolAdapter } from '@devmesh/extension-api';
 import { createExtensionRegistry } from '../src/index.js';
 
 describe('DefaultExtensionRegistry', () => {
   it('resolves matching capabilities by priority and id', () => {
     const registry = createExtensionRegistry();
-    registry.registerSearchBackend(searchBackend('dev-mesh.search.beta', 10, ['search.keyword']));
-    registry.registerSearchBackend(searchBackend('dev-mesh.search.alpha', 10, ['search.keyword']));
-    registry.registerSearchBackend(searchBackend('dev-mesh.search.priority', 50, ['search.keyword']));
-    registry.registerSearchBackend(searchBackend('dev-mesh.search.vector', 100, ['search.vector']));
+    registry.registerSearchBackend(searchBackend('devmesh.search.beta', 10, ['search.keyword']));
+    registry.registerSearchBackend(searchBackend('devmesh.search.alpha', 10, ['search.keyword']));
+    registry.registerSearchBackend(searchBackend('devmesh.search.priority', 50, ['search.keyword']));
+    registry.registerSearchBackend(searchBackend('devmesh.search.vector', 100, ['search.vector']));
 
     const resolved = registry.resolve<SearchBackend>('search-backend', 'search.keyword');
 
     expect(resolved.map((backend) => backend.id)).toEqual([
-      'dev-mesh.search.priority',
-      'dev-mesh.search.alpha',
-      'dev-mesh.search.beta'
+      'devmesh.search.priority',
+      'devmesh.search.alpha',
+      'devmesh.search.beta'
     ]);
   });
 
   it('replaces duplicate component ids on re-registration', () => {
     const registry = createExtensionRegistry();
-    registry.registerSearchBackend(searchBackend('dev-mesh.search.keyword', 1, ['search.keyword']));
-    registry.registerSearchBackend(searchBackend('dev-mesh.search.keyword', 99, ['search.keyword']));
+    registry.registerSearchBackend(searchBackend('devmesh.search.keyword', 1, ['search.keyword']));
+    registry.registerSearchBackend(searchBackend('devmesh.search.keyword', 99, ['search.keyword']));
 
     const resolved = registry.resolve<SearchBackend>('search-backend', 'search.keyword');
 
@@ -33,12 +33,12 @@ describe('DefaultExtensionRegistry', () => {
   it('rejects registration under the wrong component kind', () => {
     const registry = createExtensionRegistry();
     const adapter = {
-      ...toolAdapter('dev-mesh.adapter.codex'),
+      ...toolAdapter('devmesh.adapter.codex'),
       kind: 'search-backend' as const
     };
 
     expect(() => registry.registerAdapter(adapter as unknown as ToolAdapter)).toThrow(
-      'Cannot register dev-mesh.adapter.codex as tool-adapter'
+      'Cannot register devmesh.adapter.codex as tool-adapter'
     );
   });
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
 import { Command } from 'commander';
-import { createDevMeshCore } from '@mcp-dev-mesh/core';
-import { JsonlKnowledgeRepository } from '@mcp-dev-mesh/local-store';
-import { createHubServer, listenMeshServer, type MeshServerOptions } from '@mcp-dev-mesh/server';
+import { createDevMeshCore } from '@devmesh/core';
+import { JsonlKnowledgeRepository } from '@devmesh/local-store';
+import { createHubServer, listenMeshServer, type MeshServerOptions } from '@devmesh/server';
 import {
   createPostgresHubStateStore,
   migratePostgresHubStateStore,
   migratePostgresKnowledgeRepository,
   PostgresKnowledgeRepository,
   type PostgresExecutor
-} from '@mcp-dev-mesh/storage';
+} from '@devmesh/storage';
 import { Pool } from 'pg';
 
 const program = new Command();

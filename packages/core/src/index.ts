@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { ExtensionRegistry } from '@mcp-dev-mesh/extension-api';
-import { clamp01, invariant, nowIso } from '@mcp-dev-mesh/shared';
+import type { ExtensionRegistry } from '@devmesh/extension-api';
+import { clamp01, invariant, nowIso } from '@devmesh/shared';
 
 export type KnowledgeLayer = 'raw' | 'extract' | 'canonical';
 export type ParaCategory = 'projects' | 'areas' | 'resources' | 'archives';

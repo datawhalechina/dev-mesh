@@ -25,7 +25,7 @@ DEV_MESH_HUB_STATE_PATH=.dev-mesh-server/hub-state.json
 启动：
 
 ```powershell
-pnpm --filter @mcp-dev-mesh/mesh-server dev -- --env-file .\mesh-server.env
+pnpm --filter @devmesh/mesh-server dev -- --env-file .\mesh-server.env
 ```
 
 构建后启动：

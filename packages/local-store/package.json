@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/local-store",
+  "name": "@devmesh/local-store",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mcp-dev-mesh/core": "workspace:*",
-    "@mcp-dev-mesh/shared": "workspace:*"
+    "@devmesh/core": "workspace:*",
+    "@devmesh/shared": "workspace:*"
   }
 }

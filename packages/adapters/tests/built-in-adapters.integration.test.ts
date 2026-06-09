@@ -28,9 +28,9 @@ describe('built-in adapters with temporary home directories', () => {
         }
       });
       const expectedTargetPaths = new Map([
-        ['dev-mesh.adapter.codex', join(codexHome, 'config.toml')],
-        ['dev-mesh.adapter.claude-code', join(claudeHome, '.claude.json')],
-        ['dev-mesh.adapter.opencode', join(opencodeConfigHome, 'opencode', 'opencode.json')]
+        ['devmesh.adapter.codex', join(codexHome, 'config.toml')],
+        ['devmesh.adapter.claude-code', join(claudeHome, '.claude.json')],
+        ['devmesh.adapter.opencode', join(opencodeConfigHome, 'opencode', 'opencode.json')]
       ]);
 
       for (const adapter of adapters) {

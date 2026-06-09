@@ -1,6 +1,6 @@
-import type { CaptureKnowledgeInput } from '@mcp-dev-mesh/core';
-import type { CaptureProjectTaskInput, EnqueuePendingKnowledgeOptions, RateProjectKnowledgeOptions } from '@mcp-dev-mesh/local-store';
-import type { RawEvent, Redactor } from '@mcp-dev-mesh/extension-api';
+import type { CaptureKnowledgeInput } from '@devmesh/core';
+import type { CaptureProjectTaskInput, EnqueuePendingKnowledgeOptions, RateProjectKnowledgeOptions } from '@devmesh/local-store';
+import type { RawEvent, Redactor } from '@devmesh/extension-api';
 
 export async function redactCaptureKnowledgeInput(
   input: CaptureKnowledgeInput,

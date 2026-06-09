@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { createDevMeshCore, type DevMeshCore } from '@mcp-dev-mesh/core';
-import { JsonlKnowledgeRepository } from '@mcp-dev-mesh/local-store';
+import { createDevMeshCore, type DevMeshCore } from '@devmesh/core';
+import { JsonlKnowledgeRepository } from '@devmesh/local-store';
 import { createHubState, DEFAULT_LOCAL_INVITE_TOKEN, type HubState, type HubStateOptions } from '../src/hub-state.js';
 import {
   createHubServer,
@@ -26,12 +26,13 @@ describe('hub server HTTP integration', () => {
 
     try {
       const health = await requestJson(`${url}/healthz`);
-      const wellKnown = await requestJson(`${url}/.well-known/dev-mesh`);
+      const wellKnown = await requestJson(`${url}/.well-known/devmesh`);
+      const legacyWellKnown = await requestJson(`${url}/.well-known/dev-mesh`);
 
       expect(health.status).toBe(200);
       expect(health.body).toMatchObject({
         status: 'ok',
-        service: 'mcp-dev-mesh'
+        service: 'devmesh'
       });
       expect(wellKnown.status).toBe(200);
       expect(wellKnown.body).toMatchObject({
@@ -41,6 +42,8 @@ describe('hub server HTTP integration', () => {
           npmPackage: 'devmesh'
         }
       });
+      expect(legacyWellKnown.status).toBe(200);
+      expect(legacyWellKnown.body).toMatchObject(wellKnown.body);
     } finally {
       await app.close();
     }

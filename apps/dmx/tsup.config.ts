@@ -7,14 +7,14 @@ export default defineConfig({
   dts: false,
   splitting: false,
   noExternal: [
-    '@mcp-dev-mesh/adapters',
-    '@mcp-dev-mesh/agent',
-    '@mcp-dev-mesh/client',
-    '@mcp-dev-mesh/core',
-    '@mcp-dev-mesh/extension-api',
-    '@mcp-dev-mesh/extractor',
-    '@mcp-dev-mesh/local-store',
-    '@mcp-dev-mesh/mcp-contracts',
-    '@mcp-dev-mesh/shared'
+    '@devmesh/adapters',
+    '@devmesh/agent',
+    '@devmesh/client',
+    '@devmesh/core',
+    '@devmesh/extension-api',
+    '@devmesh/extractor',
+    '@devmesh/local-store',
+    '@devmesh/mcp-contracts',
+    '@devmesh/shared'
   ]
 });

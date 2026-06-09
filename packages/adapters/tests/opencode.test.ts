@@ -32,14 +32,14 @@ describe('createOpencodeToolAdapter', () => {
 
       await expect(readJsonc(configPath)).resolves.toMatchObject({
         mcp: {
-          'dev-mesh': {
+          'devmesh': {
             type: 'remote',
             url: 'http://127.0.0.1:8722/mcp',
             enabled: true
           }
         },
         permission: {
-          'dev-mesh_*': 'ask'
+          'devmesh_*': 'ask'
         }
       });
 
@@ -60,7 +60,7 @@ describe('createOpencodeToolAdapter', () => {
       expect(update.changed).toBe(true);
       await expect(readJsonc(configPath)).resolves.toMatchObject({
         mcp: {
-          'dev-mesh': {
+          'devmesh': {
             type: 'remote',
             url: 'http://127.0.0.1:9999/mcp',
             enabled: true
@@ -131,7 +131,7 @@ describe('createOpencodeToolAdapter', () => {
             type: 'remote',
             url: 'https://example.test/mcp'
           },
-          'dev-mesh': {
+          'devmesh': {
             type: 'remote',
             url: 'http://127.0.0.1:8722/mcp',
             enabled: true
@@ -139,7 +139,7 @@ describe('createOpencodeToolAdapter', () => {
         },
         permission: {
           'other_*': 'allow',
-          'dev-mesh_*': 'ask'
+          'devmesh_*': 'ask'
         }
       });
       await expect(adapter.isConfigured(projectRoot)).resolves.toBe(true);

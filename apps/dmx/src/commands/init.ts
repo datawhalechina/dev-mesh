@@ -11,7 +11,7 @@ import {
   type GlobalToolStatus,
   type GlobalToolKey,
   type InitGlobalConfigOptions
-} from '@mcp-dev-mesh/client';
+} from '@devmesh/client';
 import { isCiEnvironment, shouldUseTuiOutput } from './shared.js';
 
 export function registerInitCommand(program: Command): void {

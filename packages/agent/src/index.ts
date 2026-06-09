@@ -5,7 +5,7 @@ import type {
   KnowledgeType,
   ParaRef,
   SearchKnowledgeInput
-} from '@mcp-dev-mesh/core';
+} from '@devmesh/core';
 
 export interface BuildContextPackInput {
   query: string;

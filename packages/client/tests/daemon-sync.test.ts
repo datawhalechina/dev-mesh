@@ -3,8 +3,8 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createKnowledgeItem } from '@mcp-dev-mesh/core';
-import { captureProjectKnowledge, ensureProjectStore, JsonlKnowledgeRepository } from '@mcp-dev-mesh/local-store';
+import { createKnowledgeItem } from '@devmesh/core';
+import { captureProjectKnowledge, ensureProjectStore, JsonlKnowledgeRepository } from '@devmesh/local-store';
 import { readDaemonSyncStatus, runDaemonSyncOnce } from '../src/daemon-sync.js';
 
 describe('daemon sync', () => {

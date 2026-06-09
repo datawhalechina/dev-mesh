@@ -32,8 +32,8 @@
     "koa-bodyparser": "^4.4.1"
   },
   "devDependencies": {
-    "@mcp-dev-mesh/client": "workspace:*",
-    "@mcp-dev-mesh/core": "workspace:*",
+    "@devmesh/client": "workspace:*",
+    "@devmesh/core": "workspace:*",
     "zod": "4.4.3"
   }
 }

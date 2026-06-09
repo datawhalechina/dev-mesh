@@ -1,4 +1,4 @@
-import { createBuiltInAdapters } from '@mcp-dev-mesh/adapters';
+import { createBuiltInAdapters } from '@devmesh/adapters';
 import { compactCheck } from './doctor-summary.js';
 import type { DevMeshDoctorCheck, DoctorContext } from './doctor-types.js';
 
@@ -7,7 +7,7 @@ export async function checkAdapters(context: DoctorContext): Promise<DevMeshDoct
   const checks: DevMeshDoctorCheck[] = [];
 
   for (const adapter of adapters) {
-    const adapterKey = adapter.id.replace(/^dev-mesh\.adapter\./, '');
+    const adapterKey = adapter.id.replace(/^devmesh\.adapter\./, '');
     const detection = await adapter.detect();
     const configured = await adapter.isConfigured(context.projectRoot);
 

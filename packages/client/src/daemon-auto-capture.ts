@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { CaptureProvider, RawEvent } from '@mcp-dev-mesh/extension-api';
-import { appendProjectEvent, ensureProjectStore, readProjectConfig, type ProjectStore } from '@mcp-dev-mesh/local-store';
-import { createFileSystemCaptureProvider, createGitCaptureProvider } from '@mcp-dev-mesh/providers';
+import type { CaptureProvider, RawEvent } from '@devmesh/extension-api';
+import { appendProjectEvent, ensureProjectStore, readProjectConfig, type ProjectStore } from '@devmesh/local-store';
+import { createFileSystemCaptureProvider, createGitCaptureProvider } from '@devmesh/providers';
 
 export const DAEMON_AUTO_CAPTURE_STATUS_FILENAME = 'status.json';
 export const DEFAULT_DAEMON_AUTO_CAPTURE_INTERVAL_MS = 15_000;

@@ -8,7 +8,7 @@ RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
 
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @mcp-dev-mesh/website build
+RUN pnpm --filter @devmesh/website build
 
 FROM nginx:1.27-alpine AS runtime
 

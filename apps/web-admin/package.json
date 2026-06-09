@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/web-admin",
+  "name": "@devmesh/web-admin",
   "version": "0.1.0",
   "private": true,
   "type": "module",

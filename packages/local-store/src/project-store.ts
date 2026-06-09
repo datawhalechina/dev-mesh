@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DevMeshError } from '@mcp-dev-mesh/shared';
+import { DevMeshError } from '@devmesh/shared';
 import {
   DEV_MESH_DIR,
   PROJECT_STORE_SCHEMA_VERSION,

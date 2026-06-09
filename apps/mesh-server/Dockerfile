@@ -8,7 +8,7 @@ RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
 
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @mcp-dev-mesh/mesh-server... build
+RUN pnpm --filter @devmesh/mesh-server... build
 
 FROM node:22-bookworm-slim AS runtime
 

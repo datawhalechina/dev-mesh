@@ -10,10 +10,10 @@ import type {
   McpCommandConfig,
   RemoveInput,
   ToolAdapter
-} from '@mcp-dev-mesh/extension-api';
+} from '@devmesh/extension-api';
 
 const execFileAsync = promisify(execFile);
-const DEFAULT_CODEX_MCP_SERVER_NAME = 'dev-mesh';
+const DEFAULT_CODEX_MCP_SERVER_NAME = 'devmesh';
 
 export interface CodexToolAdapterOptions {
   codexHome?: string;
@@ -38,7 +38,7 @@ export function createCodexToolAdapter(options: CodexToolAdapterOptions = {}): T
   const serverName = options.serverName ?? DEFAULT_CODEX_MCP_SERVER_NAME;
 
   return {
-    id: 'dev-mesh.adapter.codex',
+    id: 'devmesh.adapter.codex',
     kind: 'tool-adapter',
     capabilities: ['tool.detect', 'mcp.configure'],
     priority: 20,
@@ -121,7 +121,7 @@ export function createCodexToolAdapter(options: CodexToolAdapterOptions = {}): T
         checks.push({
           id: 'adapter.codex.mcp-config',
           status: 'warn',
-          message: 'Codex dev-mesh MCP server is not configured.',
+          message: 'Codex DevMesh MCP server is not configured.',
           fixHint: 'Run dmx init --global --tool codex --yes.'
         });
         return checks;
@@ -131,7 +131,7 @@ export function createCodexToolAdapter(options: CodexToolAdapterOptions = {}): T
         checks.push({
           id: 'adapter.codex.mcp-config',
           status: 'error',
-          message: `Codex dev-mesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
+          message: `Codex DevMesh MCP server exists in ${configured.targetPath} but does not define a url or command.`,
           fixHint: 'Re-run dmx init --global --tool codex --yes.'
         });
         return checks;
@@ -140,7 +140,7 @@ export function createCodexToolAdapter(options: CodexToolAdapterOptions = {}): T
       checks.push({
         id: 'adapter.codex.mcp-config',
         status: 'ok',
-        message: `Codex dev-mesh MCP server is configured in ${configured.targetPath}.`
+        message: `Codex DevMesh MCP server is configured in ${configured.targetPath}.`
       });
 
       return checks;

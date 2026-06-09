@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/server",
+  "name": "@devmesh/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,11 +17,11 @@
   },
   "dependencies": {
     "@koa/router": "^15.6.0",
-    "@mcp-dev-mesh/agent": "workspace:*",
-    "@mcp-dev-mesh/core": "workspace:*",
-    "@mcp-dev-mesh/local-store": "workspace:*",
-    "@mcp-dev-mesh/mcp-contracts": "workspace:*",
-    "@mcp-dev-mesh/protocol": "workspace:*",
+    "@devmesh/agent": "workspace:*",
+    "@devmesh/core": "workspace:*",
+    "@devmesh/local-store": "workspace:*",
+    "@devmesh/mcp-contracts": "workspace:*",
+    "@devmesh/protocol": "workspace:*",
     "@modelcontextprotocol/sdk": "1.29.0",
     "koa": "2",
     "koa-bodyparser": "^4.4.1",

@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
-import type { RateKnowledgeInput } from '@mcp-dev-mesh/core';
-import { createDevMeshClientRuntime } from '@mcp-dev-mesh/client';
+import type { RateKnowledgeInput } from '@devmesh/core';
+import { createDevMeshClientRuntime } from '@devmesh/client';
 import { createRateOptions, parseNumberOption } from './shared.js';
 
 export function registerRateCommand(program: Command): void {

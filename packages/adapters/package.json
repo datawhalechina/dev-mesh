@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-dev-mesh/adapters",
+  "name": "@devmesh/adapters",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mcp-dev-mesh/extension-api": "workspace:*",
+    "@devmesh/extension-api": "workspace:*",
     "jsonc-parser": "^3.3.1"
   }
 }
