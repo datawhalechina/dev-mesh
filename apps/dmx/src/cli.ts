@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { registerCaptureCommand } from './commands/capture.js';
 import { registerDoctorCommand } from './commands/doctor.js';
+import { registerGraphCommand } from './commands/graph.js';
 import { registerInboxCommand } from './commands/inbox.js';
 import { registerIndexCommand } from './commands/index-command.js';
 import { registerInitCommand } from './commands/init.js';
@@ -27,6 +28,7 @@ export function createDmxProgram(): Command {
   registerRateCommand(program);
   registerInboxCommand(program);
   registerIndexCommand(program);
+  registerGraphCommand(program);
   registerDoctorCommand(program);
   registerProxyCommand(program);
   registerServeCommand(program);

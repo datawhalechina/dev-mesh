@@ -228,6 +228,12 @@ pnpm --filter devmesh dev -- inbox reject <queue-id> --root . --reason "Not dura
 pnpm --filter devmesh dev -- search "focused tests" --root .
 ```
 
+探索本地知识图谱：
+
+```bash
+pnpm --filter devmesh dev -- graph explore --root . --query "focused tests" --depth 2
+```
+
 查看本地状态：
 
 ```bash

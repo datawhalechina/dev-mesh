@@ -40,6 +40,7 @@ describe('dmx CLI local flow', () => {
       ]);
       const status = await runDmx(['status', '--root', projectRoot]);
       const index = await runDmx(['index', 'rebuild', '--root', projectRoot]);
+      const graph = await runDmx(['graph', 'explore', '--root', projectRoot, '--query', 'focused tests', '--depth', '1']);
 
       const initJson = JSON.parse(init.stdout);
       const captureJson = JSON.parse(capture.stdout);
@@ -47,7 +48,9 @@ describe('dmx CLI local flow', () => {
       const rateJson = JSON.parse(rate.stdout);
       const statusJson = JSON.parse(status.stdout);
       const indexJson = JSON.parse(index.stdout);
+      const graphJson = JSON.parse(graph.stdout);
       const indexManifest = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'index', 'manifest.json'), 'utf8'));
+      const graphIndex = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'index', 'graph.json'), 'utf8'));
       const ratingsJsonl = await readFile(
         join(
           projectRoot,
@@ -97,12 +100,23 @@ describe('dmx CLI local flow', () => {
       });
       expect(indexJson).toMatchObject({
         documentCount: 1,
+        graphNodeCount: expect.any(Number),
+        graphEdgeCount: expect.any(Number),
         schemaVersion: 1
       });
       expect(indexManifest.documents[0]).toMatchObject({
         id: captureJson.id,
         title: 'Run focused tests'
       });
+      expect(graphJson.nodes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: `knowledge:${captureJson.id}`,
+            kind: 'knowledge'
+          })
+        ])
+      );
+      expect(graphIndex.sourceItemCount).toBe(1);
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
