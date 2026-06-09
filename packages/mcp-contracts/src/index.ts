@@ -86,10 +86,6 @@ export const meshResolveTermInputSchema = z.object({
   limit: z.number().int().min(1).max(10).default(5)
 });
 
-export const meshListDevelopmentSignalsInputSchema = z.object({
-  limit: z.number().int().min(1).max(50).default(10)
-});
-
 export const meshScanProjectKnowledgeInputSchema = z.object({
   limit: z.number().int().min(1).max(200).default(50)
 });
@@ -100,7 +96,6 @@ export type MeshCaptureTaskInput = z.infer<typeof meshCaptureTaskInputSchema>;
 export type MeshRateKnowledgeInput = z.infer<typeof meshRateKnowledgeInputSchema>;
 export type MeshSearchMemberExperienceInput = z.infer<typeof meshSearchMemberExperienceInputSchema>;
 export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
-export type MeshListDevelopmentSignalsInput = z.infer<typeof meshListDevelopmentSignalsInputSchema>;
 export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
 
 export interface MeshToolHandlers {
@@ -110,7 +105,6 @@ export interface MeshToolHandlers {
   rateKnowledge(input: MeshRateKnowledgeInput): Promise<unknown>;
   searchMemberExperience(input: MeshSearchMemberExperienceInput): Promise<unknown>;
   resolveTerm(input: MeshResolveTermInput): Promise<unknown>;
-  listDevelopmentSignals(input: MeshListDevelopmentSignalsInput): Promise<unknown>;
   scanProjectKnowledge(input: MeshScanProjectKnowledgeInput): Promise<unknown>;
 }
 
@@ -119,7 +113,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_search_context',
     {
       title: 'Search project context',
-      description: 'Search DevMesh project knowledge and return a context pack.',
+      description:
+        'Search DevMesh project knowledge before starting or continuing non-trivial work so you can reuse prior decisions, conventions, pitfalls, commands, and handoffs.',
       inputSchema: meshSearchContextInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.searchContext(meshSearchContextInputSchema.parse(args)))
@@ -130,7 +125,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Capture knowledge',
       description:
-        'Capture a durable project decision, convention, pitfall, command, or handoff that you have summarized from the current coding context. Do not store secrets or raw private transcript text.',
+        'When your current conversation, code reading, edit, command, review, or debugging work reveals durable project knowledge, decide yourself whether it is worth preserving and call this tool. Capture only summarized decisions, conventions, pitfalls, commands, or handoffs; do not store secrets, raw private transcript text, or noisy step-by-step logs.',
       inputSchema: meshCaptureKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.captureKnowledge(meshCaptureKnowledgeInputSchema.parse(args)))
@@ -140,7 +135,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_capture_task',
     {
       title: 'Capture task progress',
-      description: 'Capture current task state or handoff after you summarize what changed and what remains.',
+      description:
+        'When a meaningful task starts, changes state, finishes, or needs a handoff, decide yourself whether the current task state should be preserved and call this tool with a concise summary of what changed and what remains.',
       inputSchema: meshCaptureTaskInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.captureTask(meshCaptureTaskInputSchema.parse(args)))
@@ -150,7 +146,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_rate_knowledge',
     {
       title: 'Rate knowledge',
-      description: 'Apply explicit quality feedback to a knowledge item.',
+      description:
+        'Apply explicit quality feedback to a knowledge item when the user or your work shows it is useful, stale, wrong, adopted, or should be deprioritized.',
       inputSchema: meshRateKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.rateKnowledge(meshRateKnowledgeInputSchema.parse(args)))
@@ -171,22 +168,10 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_resolve_term',
     {
       title: 'Resolve term',
-      description: 'Resolve a project glossary term.',
+      description: 'Resolve a project glossary term before assuming local vocabulary, product names, or team-specific concepts.',
       inputSchema: meshResolveTermInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.resolveTerm(meshResolveTermInputSchema.parse(args)))
-  );
-
-  server.registerTool(
-    'mesh_list_development_signals',
-    {
-      title: 'List development signals',
-      description:
-        'List recent unsummarized development signals captured by the daemon. Use your own coding context to summarize durable knowledge, then call mesh_capture_knowledge or mesh_capture_task.',
-      inputSchema: meshListDevelopmentSignalsInputSchema.shape
-    },
-    async (args) =>
-      jsonToolResult(await handlers.listDevelopmentSignals(meshListDevelopmentSignalsInputSchema.parse(args)))
   );
 
   server.registerTool(
@@ -194,7 +179,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Scan project knowledge',
       description:
-        'Scan the current project for high-signal Git and filesystem activity, then use your own coding context to summarize durable knowledge before calling capture tools.',
+        'On demand, scan the current project for high-signal Git and filesystem context when you decide a project-wide sweep would help. Inspect the returned highlights and relevant files yourself, then call mesh_capture_knowledge or mesh_capture_task only for durable knowledge worth keeping.',
       inputSchema: meshScanProjectKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.scanProjectKnowledge(meshScanProjectKnowledgeInputSchema.parse(args)))

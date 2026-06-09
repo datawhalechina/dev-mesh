@@ -13,7 +13,6 @@ import {
   registerMeshTools,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
-  type MeshListDevelopmentSignalsInput,
   type MeshRateKnowledgeInput,
   type MeshScanProjectKnowledgeInput,
   type MeshSearchContextInput
@@ -77,14 +76,6 @@ export function createMeshMcpServer(core: DevMeshCore): McpServer {
         types: ['glossary'],
         limit: input.limit
       });
-    },
-    async listDevelopmentSignals(input: MeshListDevelopmentSignalsInput) {
-      return {
-        projectRoot: core.projectRoot,
-        instruction: 'Development signals are captured by the local daemon, not the remote Hub MCP server.',
-        limit: input.limit,
-        signals: []
-      };
     },
     async scanProjectKnowledge(input: MeshScanProjectKnowledgeInput) {
       return {

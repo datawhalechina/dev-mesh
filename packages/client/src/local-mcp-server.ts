@@ -13,7 +13,6 @@ import {
   type MeshToolHandlers,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
-  type MeshListDevelopmentSignalsInput,
   type MeshScanProjectKnowledgeInput,
   type MeshRateKnowledgeInput,
   type MeshSearchContextInput
@@ -41,7 +40,6 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
     captureKnowledge: (input) => runtime.captureKnowledge(toCaptureInput(input)),
     captureTask: (input) => runtime.captureTask(toTaskCaptureInput(input)),
     rateKnowledge: (input) => runtime.rateKnowledge(toRateInput(input)),
-    listDevelopmentSignals: (input) => runtime.listDevelopmentSignals(toListDevelopmentSignalsInput(input)),
     scanProjectKnowledge: (input) => runtime.scanProjectKnowledge(toScanProjectKnowledgeInput(input)),
     searchMemberExperience(input) {
       return runtime.searchContext({
@@ -197,12 +195,6 @@ function toRateInput(input: MeshRateKnowledgeInput): RateKnowledgeInput {
   }
 
   return rate;
-}
-
-function toListDevelopmentSignalsInput(input: MeshListDevelopmentSignalsInput): MeshListDevelopmentSignalsInput {
-  return {
-    limit: input.limit
-  };
 }
 
 function toScanProjectKnowledgeInput(input: MeshScanProjectKnowledgeInput): MeshScanProjectKnowledgeInput {

@@ -129,7 +129,7 @@ async function promptGlobalTools(options: PromptGlobalToolsOptions): Promise<Glo
 async function runGlobalInitTui(statuses: GlobalToolStatus[]): Promise<GlobalInitSelection> {
   intro('DevMesh init');
   note(createGlobalInitStatusSummary(statuses), 'Detected MCP hosts');
-  log.info('Automation defaults: auto_init, auto_reference, auto_capture, and auto_sync are enabled.');
+  log.info('Automation defaults: auto_init, auto_reference, assistant-led auto_capture, and auto_sync are enabled.');
   log.info('MCP hosts will run dmx serve --mcp; the launcher starts or reuses the project daemon.');
 
   const selectedTools = await multiselect<GlobalToolKey>({
@@ -198,13 +198,13 @@ function printGlobalInitResult(result: GlobalInitResult, options: { showIntro?: 
     note(attention, 'Needs attention');
   }
 
-  outro('Open a project with your MCP host to start automatic local knowledge capture.');
+  outro('Open a project with your MCP host; the assistant will decide when to preserve durable knowledge.');
 }
 
 function printProjectInitResult(store: ProjectInitResult): void {
   intro('DevMesh init');
   note(createProjectInitResultSummary(store), 'Project store');
-  outro('This project is ready for local knowledge capture.');
+  outro('This project is ready for assistant-led local knowledge capture.');
 }
 
 export function createGlobalInitToolChoices(statuses: GlobalToolStatus[]): GlobalInitToolChoice[] {
@@ -239,7 +239,7 @@ export function createGlobalInitResultSummary(result: GlobalInitResult): string 
     `Config: ${result.configPath}`,
     `Identity: ${result.identityPath}`,
     `Selected tools: ${selectedTools}`,
-    'Automation: auto_init, auto_reference, auto_capture, auto_sync'
+    'Automation: auto_init, auto_reference, assistant-led auto_capture, auto_sync'
   ].join('\n');
 }
 

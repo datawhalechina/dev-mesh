@@ -740,7 +740,8 @@ MCP 服务端应在 server instructions 中告诉 Agent 何时使用工具：
 Before starting non-trivial implementation, automatically call mesh_get_project_brief or mesh_search_context.
 If the user asks for a named teammate's experience, call mesh_search_member_experience with memberName.
 When you learn a durable project convention, decision, pitfall, command, or task handoff, automatically call mesh_capture_knowledge or mesh_capture_task.
-Periodically call mesh_list_development_signals when available; use the coding assistant's own reasoning to summarize durable knowledge from those signals instead of storing raw signal text directly.
+After each meaningful interaction, code edit, command, review, or debugging step, decide whether the current context contains durable knowledge worth preserving; call capture tools only for concise, high-signal summaries.
+When a project-wide sweep would help, call mesh_scan_project_knowledge on demand, inspect the returned highlights and relevant files, then capture only durable conclusions.
 Classify durable knowledge into raw, extract, and canonical layers; attach it to the right PARA index.
 When the user says a knowledge item is wrong, outdated, not advanced, or less useful, call mesh_rate_knowledge instead of silently ignoring it.
 Do not store secrets, raw credentials, personal private data, or large source files.
@@ -877,7 +878,7 @@ npm install -g devmesh && dmx init --global --yes && dmx join https://devmesh.co
 5. 客户端打开基于 Clack prompts 的 TUI 选择页面，展示 detected / not found / already configured 状态。
 6. 用户选择要注册 MCP 的工具和 scope，默认选中已安装且未配置的工具。
 7. 客户端调用各工具 adapter，把 DevMesh MCP 写成 stdio command/args。
-8. 客户端开启 auto_init、auto_reference、auto_capture；auto_sync 在未 join 时保持待机。
+8. 客户端开启 auto_init、auto_reference、助手自主决策的 auto_capture；auto_sync 在未 join 时保持待机。
 9. 客户端执行 dmx doctor，验证 stdio launcher / daemon 状态和各工具配置。
 10. 用户此时即使不 join，也可以在项目中自动创建 .dev-mesh/、沉淀本地知识并自动引用本地知识。
 ```
@@ -892,7 +893,7 @@ Detected tools:
   [x] Claude Code  installed, already configured  scope: user
   [ ] opencode     not found
 
-Automation: auto_init, auto_reference, auto_capture, and auto_sync are enabled by default.
+Automation: auto_init, auto_reference, assistant-led auto_capture, and auto_sync are enabled by default.
 MCP hosts run dmx serve --mcp; the launcher starts or reuses the project daemon on demand.
 
 Keys: ↑/↓ move, Space toggle, s scope, Enter apply, q cancel.
@@ -991,7 +992,7 @@ store_dir = ".dev-mesh"
 [automation]
 auto_init = true       # Codex/Claude/opencode 打开项目时自动创建 .dev-mesh/
 auto_reference = true  # Agent 开始任务和编辑前自动引用相关知识
-auto_capture = true    # 开发过程中自动沉淀经验
+auto_capture = true    # 由 Codex/Claude/opencode 根据当前上下文自主决定何时沉淀经验
 auto_sync = true       # 已 join 时本地知识变化后自动同步到对应 Server Group；未 join 时待机
 
 [capture]
@@ -1143,7 +1144,7 @@ Codex opens project
 | --- | --- | --- |
 | `auto_init` | 开启 | Codex、Claude Code、opencode 打开项目时自动创建或迁移 `.dev-mesh/`。 |
 | `auto_reference` | 开启 | Agent 开始任务、进入编辑或提出技术问题时，优先引用本地 `.dev-mesh/index`；已 join 时可 fallback 到远端知识。 |
-| `auto_capture` | 开启 | daemon 后台采集 Git / filesystem 开发信号，MCP host 通过 `mesh_list_development_signals` 读取信号，并由 Codex、Claude Code、opencode 自己总结后调用 capture 工具沉淀知识。 |
+| `auto_capture` | 开启 | MCP 工具描述提醒 Codex、Claude Code、opencode 在每次有意义的对话、代码修改、命令结果或调试后自主判断是否调用 capture 工具；daemon 不再为 capture 后台轮询 Git / filesystem。 |
 | `auto_sync` | 未 join 时待机，join 后开启 | 本地知识 committed 后自动 debounce 推送到已加入的 Server Group，并定期拉取同组成员经验。 |
 
 自动引用路径：
@@ -1161,12 +1162,13 @@ Agent starts task
 自动沉淀路径：
 
 ```text
-Git/file/MCP/tool event
-  -> Extractor
+Assistant handles task context
+  -> mesh_search_context when prior knowledge may help
+  -> optional mesh_scan_project_knowledge for an on-demand project sweep
+  -> assistant summarizes durable knowledge itself
+  -> mesh_capture_knowledge / mesh_capture_task
   -> Redaction
-  -> Risk policy
-  -> Low-risk item committed to .dev-mesh automatically
-  -> High-risk item enters .dev-mesh/queue for dmx inbox review
+  -> local .dev-mesh knowledge and event log
   -> Sync manager pushes committed events when joined
 ```
 
@@ -1304,7 +1306,6 @@ Agent 在工作过程中主动调用：
 - `mesh_capture_knowledge`
 - `mesh_capture_task`
 - `mesh_resolve_term`
-- `mesh_list_development_signals`
 - `mesh_scan_project_knowledge`
 
 这层跨工具最稳定，因为 Codex、Claude Code、opencode 都能通过 MCP tools 与服务端交互。
@@ -2117,7 +2118,7 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 - daemon 负责远端共享同步：当项目 `auto_sync = true` 且本机 `identity.json` 存在 joined server 时，daemon 会把 `.dev-mesh/events/*.jsonl` 事件签名后增量 push 到 Hub，并按 pull cursor 拉取同 group 事件。可回放的 `knowledge` snapshot 会 upsert 到本地 `.dev-mesh/knowledge/`，让同组成员沉淀的知识进入本地搜索；replay 不追加新的本地 event，避免同步回环。
 - 客户端同步游标写入 `.dev-mesh/sync/cursors.json`，最近一次 daemon sync 状态写入 `.dev-mesh/sync/status.json`，`dmx doctor` 会读取该状态报告远端错误和本地待推送事件数量。
 - `dmx proxy --root . --port 8722` 仍可直接启动 `http://127.0.0.1:8722/mcp`，用于调试或嵌入。
-- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_list_development_signals`、`mesh_scan_project_knowledge`。
+- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_scan_project_knowledge`。
 - 本地 proxy 不依赖 `packages/server`，只通过 `packages/mcp-contracts` 共享 tool schema，避免 client/server 反向耦合。
 
 ### 12.2 Adapter 接口
@@ -2538,7 +2539,7 @@ CI 门禁：
 - 本地 MCP 入口（已支持 `dmx serve --mcp` stdio launcher、按需 daemon、`dmx proxy`、Koa2、官方 MCP SDK Streamable HTTP transport 和 local-store capture/search）
 - `.dev-mesh/` local store manager
 - Codex 打开项目时自动 `ensureProjectStore`
-- 默认 `auto_init`、`auto_reference`、`auto_capture`，join 后开启 `auto_sync`
+- 默认 `auto_init`、`auto_reference`、助手自主决策的 `auto_capture`，join 后开启 `auto_sync`
 - Codex Adapter
 - Claude Code Adapter
 - opencode Adapter
