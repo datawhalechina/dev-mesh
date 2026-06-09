@@ -20,5 +20,5 @@ export async function startEmbeddedDevMeshServer(projectRoot: string, port = 872
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const url = await startEmbeddedDevMeshServer(process.cwd());
-  console.log(`Dev Mesh server listening at ${url}`);
+  console.log(`DevMesh server listening at ${url}`);
 }

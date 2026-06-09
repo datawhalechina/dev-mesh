@@ -1,12 +1,13 @@
-# MCP Dev Mesh 技术设计文档
+# DevMesh 技术设计文档
 
 状态：Draft v0.1  
 日期：2026-06-06  
-项目名：`mcp-dev-mesh`
+项目名：`devmesh`
+当前 npm CLI 包名：`mcp-dev-mesh`
 
 ## 1. 背景与目标
 
-`MCP Dev Mesh` 的目标是为多人协作开发中的 AI 编程工具建立一个分布式知识共享层。团队成员使用 Codex、Claude Code、opencode 等工具时，经常会产生以下上下文：
+`DevMesh` 的目标是为多人协作开发中的 AI 编程工具建立一个分布式知识共享层。团队成员使用 Codex、Claude Code、opencode 等工具时，经常会产生以下上下文：
 
 - 某个模块为什么这样设计
 - 某个 Bug 是怎么定位和修复的
@@ -15,16 +16,16 @@
 - 某个命令、测试、部署流程的正确使用方式
 - 某个开发工具踩坑经验
 
-这些上下文通常散落在聊天记录、终端输出、PR、个人笔记、Issue、Git 提交中。`MCP Dev Mesh` 通过 MCP 将这些上下文变成开发代理可检索、可引用、可沉淀、可同步的团队知识。
+这些上下文通常散落在聊天记录、终端输出、PR、个人笔记、Issue、Git 提交中。`DevMesh` 通过 MCP 将这些上下文变成开发代理可检索、可引用、可沉淀、可同步的团队知识。
 
 核心目标：
 
 - 提供 MCP 服务端，让 Codex、Claude Code、opencode 等 MCP Host 能检索和写入项目知识。
 - 提供 npm 安装的 `dmx` CLI，让成员一键安装、本机初始化，并按需加入指定服务器 IP / 域名和群组。
 - `dmx init --global` 自动扫描本机已安装的 Codex、Claude Code、opencode 等编程工具，并通过 TUI 选择要注册的 MCP Host。
-- 客户端默认自动为项目创建 `.dev-mesh/`，自动引用本地相关知识，自动沉淀项目经验；加入服务器群组后再自动同步到 Dev Mesh Server。
+- 客户端默认自动为项目创建 `.dev-mesh/`，自动引用本地相关知识，自动沉淀项目经验；加入服务器群组后再自动同步到 DevMesh Server。
 - 支持通过用户名称标识知识来源，例如“小云的前端样式设计经验”可以被精确检索和引用。
-- 支持未加入服务器时的 local-only 模式，把 Dev Mesh 作为本地项目知识库使用。
+- 支持未加入服务器时的 local-only 模式，把 DevMesh 作为本地项目知识库使用。
 - 支持分布式同步，先实现团队 Hub 模式，后续扩展为多节点 Mesh 联邦。
 - 支持项目级权限、脱敏、审计和可追溯来源，避免把密钥、个人隐私、未确认结论错误扩散。
 - 所有自动行为默认开启，但都可以在全局或项目级配置中关闭。
@@ -46,7 +47,7 @@
 | Mesh Client | 安装在开发者机器上的本地客户端，负责工具接入、事件采集、脱敏、缓存和同步。 |
 | Local MCP Proxy | 客户端在 `127.0.0.1` 暴露的本地 MCP 入口，Codex、Claude Code 等优先连接它。 |
 | Local-only Mode | 未执行 `dmx join` 或未连接远端时的默认模式，只使用本机全局配置和项目 `.dev-mesh/` 进行知识沉淀、检索和自动引用。 |
-| Project Dev Mesh Store | 项目根目录下的 `.dev-mesh/` 本地知识库，参考 CodeGraph 的项目级隐藏索引思路，用来沉淀项目知识、事件日志、检索索引和同步游标。 |
+| Project DevMesh Store | 项目根目录下的 `.dev-mesh/` 本地知识库，参考 CodeGraph 的项目级隐藏索引思路，用来沉淀项目知识、事件日志、检索索引和同步游标。 |
 | Project Space | 一个仓库或工作区的知识空间，由 Git remote、repo root、可选 project key 共同识别。 |
 | Member Identity | 人的身份，例如“小云”。用于标记知识作者、经验来源和检索过滤。 |
 | Client Identity | 设备或客户端身份，例如小云的 Windows 笔记本。用于认证、同步和审计。 |
@@ -173,7 +174,7 @@ mcp-dev-mesh/
 
 ### 4.1 Library-first 分层包设计
 
-`mcp-dev-mesh` 可以学习 `pi-core` / `pi-agent` 这类分层方式：产品入口是 `dmx`，但能力边界首先按可复用库设计。这样团队内部可以直接用 CLI，一些平台型开发者也可以把 Dev Mesh 嵌进自己的 Agent、IDE 插件、CI 工具或知识平台。
+`mcp-dev-mesh` 可以学习 `pi-core` / `pi-agent` 这类分层方式：产品入口是 `dmx`，但能力边界首先按可复用库设计。这样团队内部可以直接用 CLI，一些平台型开发者也可以把 DevMesh 嵌进自己的 Agent、IDE 插件、CI 工具或知识平台。
 
 核心包职责：
 
@@ -389,7 +390,7 @@ GET  /api/v1/admin/audit
 
 ```json
 {
-  "serverName": "MCP Dev Mesh",
+  "serverName": "DevMesh",
   "serverId": "mesh_01J...",
   "baseUrl": "https://dev-mesh.company.com",
   "mcpUrl": "https://dev-mesh.company.com/mcp",
@@ -842,7 +843,7 @@ dmx config set automation.auto_sync false --project .
 
 ### 6.3 NPM 一键安装、全局初始化和加入群组
 
-推荐安装方式是 NPM。`npm install -g mcp-dev-mesh` 安装 `dmx` 命令；`dmx init --global` 完成本机初始化、扫描已安装编程工具，并把 MCP host 配置为启动 `dmx serve --mcp`；`dmx join` 只负责加入远端服务器的指定 group。未执行 `dmx join` 时，Dev Mesh 仍然以 local-only 模式运行，作为本地项目知识库使用。
+推荐安装方式是 NPM。`npm install -g mcp-dev-mesh` 安装 `dmx` 命令；`dmx init --global` 完成本机初始化、扫描已安装编程工具，并把 MCP host 配置为启动 `dmx serve --mcp`；`dmx join` 只负责加入远端服务器的指定 group。未执行 `dmx join` 时，DevMesh 仍然以 local-only 模式运行，作为本地项目知识库使用。
 
 Windows PowerShell：
 
@@ -884,7 +885,7 @@ npm install -g mcp-dev-mesh && dmx init --global --yes && dmx join https://dev-m
 TUI 选择页面建议：
 
 ```text
-Dev Mesh Global Init
+DevMesh Global Init
 
 Detected tools:
   [x] Codex        installed, not configured      scope: user
@@ -924,7 +925,7 @@ Keys: ↑/↓ move, Space toggle, s scope, Enter apply, q cancel.
 
 ### 6.4 配置文件分层
 
-Dev Mesh 有两层配置：
+DevMesh 有两层配置：
 
 - 全局配置：`~/.dev-mesh/config.toml`，由 `dmx init --global` 自动创建，描述本机 daemon、工具注册状态、默认自动化策略，以及可选的服务器和群组连接。
 - 项目配置：`<project>/.dev-mesh/config.toml`，由 Codex 打开项目或 `dmx init .` 自动创建，描述当前项目身份和项目级覆盖策略。
@@ -1100,7 +1101,7 @@ interval_seconds = 60
 
 ### 6.6 Local-only 模式
 
-用户只执行 `npm install -g mcp-dev-mesh` 和 `dmx init --global`，但没有执行 `dmx join` 时，Dev Mesh 进入 local-only 模式：
+用户只执行 `npm install -g mcp-dev-mesh` 和 `dmx init --global`，但没有执行 `dmx join` 时，DevMesh 进入 local-only 模式：
 
 - Codex、Claude Code、opencode 仍然连接本地 MCP Proxy。
 - 打开项目时仍然自动创建或复用 `.dev-mesh/`。
@@ -1204,14 +1205,14 @@ Adapter 职责：
 - Codex 打开新项目后自动启动 watcher、索引和同步，不要求用户手动执行 `dmx init .`。
 - 不直接覆盖用户现有 MCP 配置。
 - 可选写入项目 `.codex/config.toml`；产品默认优先通过 Codex CLI 用户级配置完成 MCP 注册。
-- 可选向项目 `AGENTS.md` 追加受控区块，强化 Agent 使用 Dev Mesh；默认自动引用不依赖该文件。
+- 可选向项目 `AGENTS.md` 追加受控区块，强化 Agent 使用 DevMesh；默认自动引用不依赖该文件。
 
 `AGENTS.md` 可选受控区块：
 
 ```md
 <!-- dev-mesh:start -->
-Before non-trivial work, automatically query Dev Mesh for project decisions, conventions, teammate experience, and active task context.
-When a durable project decision, pitfall, command, or handoff is discovered, automatically capture it with Dev Mesh.
+Before non-trivial work, automatically query DevMesh for project decisions, conventions, teammate experience, and active task context.
+When a durable project decision, pitfall, command, or handoff is discovered, automatically capture it with DevMesh.
 Do not capture secrets or raw private conversation.
 <!-- dev-mesh:end -->
 ```
@@ -1479,7 +1480,7 @@ PARA 的使用规则：
 - 完成、废弃或被替代的知识进入 `archives`，保留来源但默认不参与自动引用。
 - 同一条 extract 可以同时链接一个 project 和一个 area，例如“小云在 AUTH-123 中总结的样式经验”既关联 `projects/AUTH-123`，也关联 `areas/frontend/styles`。
 
-LLM ingest 可以借鉴 LLM Wiki 的 `raw -> wiki` 思想，但 Dev Mesh 的输出不是 wiki 页面，而是结构化 extract 条目：
+LLM ingest 可以借鉴 LLM Wiki 的 `raw -> wiki` 思想，但 DevMesh 的输出不是 wiki 页面，而是结构化 extract 条目：
 
 ```text
 Raw event
@@ -2273,11 +2274,11 @@ Registry 规则：
 5. 新同事运行 `dmx join <server> --group frontend-team --name 小云 --token <invite-token>`。
 6. 服务端把小云加入指定 group，并返回 group-scoped 凭据。
 7. 新同事用 Codex 打开项目。
-8. Dev Mesh 自动识别项目根目录，创建或复用 `.dev-mesh/`。
-9. Dev Mesh 先检索本地知识，再拉取同 group 授权项目知识并重建本地索引。
+8. DevMesh 自动识别项目根目录，创建或复用 `.dev-mesh/`。
+9. DevMesh 先检索本地知识，再拉取同 group 授权项目知识并重建本地索引。
 10. Codex 自动引用 project brief、相关决策、历史坑点和成员经验。
 11. Codex 开发过程中自动沉淀任务进度、命令经验和技术决策。
-12. Dev Mesh 自动同步到指定 group，其他同组同事后续可检索“小云”的经验。
+12. DevMesh 自动同步到指定 group，其他同组同事后续可检索“小云”的经验。
 ```
 
 ### 13.2 未加入服务器的本地知识库
@@ -2286,7 +2287,7 @@ Registry 规则：
 1. 用户运行 `npm install -g mcp-dev-mesh`。
 2. 用户运行 `dmx init --global`，选择要注册 MCP 的编程工具。
 3. 用户用 Codex 或 Claude Code 打开任意项目。
-4. Dev Mesh 自动创建 `.dev-mesh/`，建立本地 raw / extract / canonical / PARA 知识库。
+4. DevMesh 自动创建 `.dev-mesh/`，建立本地 raw / extract / canonical / PARA 知识库。
 5. Agent 开发时自动检索本地 `.dev-mesh/index` 和本地知识条目。
 6. Agent 发现长期有效经验时自动沉淀到本地 `.dev-mesh/knowledge`。
 7. 用户后续加入服务器 group 后，可以选择同步哪些本地知识。
@@ -2309,7 +2310,7 @@ Registry 规则：
 ```text
 1. 用户对 Codex 说：“获取小云的前端样式设计经验”。
 2. Codex 调用 mesh_search_member_experience(memberName=小云, query=前端样式设计经验)。
-3. Dev Mesh 先检索本地 .dev-mesh/index，再 fallback 到已加入的 Server Group。
+3. DevMesh 先检索本地 .dev-mesh/index，再 fallback 到已加入的 Server Group。
 4. 返回小云沉淀过的样式规范、组件设计坑点、历史决策和适用项目。
 5. Codex 在当前任务中引用这些经验，并在产生新经验后继续以当前成员身份沉淀。
 ```

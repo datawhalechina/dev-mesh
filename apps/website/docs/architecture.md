@@ -5,7 +5,7 @@ title: 架构
 
 # 架构
 
-MCP Dev Mesh 采用 library-first 的 monorepo 结构。CLI、服务端、管理后台和本地运行时都复用底层包，避免把核心逻辑锁死在某一个入口里。
+DevMesh 采用 library-first 的 monorepo 结构。CLI、服务端、管理后台和本地运行时都复用底层包，避免把核心逻辑锁死在某一个入口里。
 
 ## 总体分层
 

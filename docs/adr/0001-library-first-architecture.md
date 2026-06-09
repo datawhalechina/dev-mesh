@@ -5,7 +5,7 @@ Date: 2026-06-06
 
 ## Context
 
-The technical design requires Dev Mesh to work as a CLI product, a local MCP proxy, a hub server, and a reusable library surface for Agent, IDE, CI, and enterprise integrations.
+The technical design requires DevMesh to work as a CLI product, a local MCP proxy, a hub server, and a reusable library surface for Agent, IDE, CI, and enterprise integrations.
 
 ## Decision
 

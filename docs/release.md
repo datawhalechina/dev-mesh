@@ -1,6 +1,6 @@
 # Alpha Release Guide
 
-This guide describes the current alpha release path for the MCP Dev Mesh application. It covers the Hub Server, Web Admin, Website, and PostgreSQL runtime used by the Docker Compose stack.
+This guide describes the current alpha release path for the DevMesh application. It covers the Hub Server, Web Admin, Website, and PostgreSQL runtime used by the Docker Compose stack.
 
 ## Release Scope
 

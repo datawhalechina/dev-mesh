@@ -17,7 +17,7 @@ const program = new Command();
 
 program
   .name('dmx-server')
-  .description('MCP Dev Mesh hub server')
+  .description('DevMesh hub server')
   .version('0.1.0')
   .option('--env-file <path>', 'dotenv-style environment file')
   .option('--host <host>', 'listen host')
@@ -55,7 +55,7 @@ program
       port: config.port
     });
 
-    console.log(`MCP Dev Mesh server listening on ${url}`);
+    console.log(`DevMesh server listening on ${url}`);
     installShutdownHandlers(async () => {
       await app.close();
       await postgres?.pool.end();

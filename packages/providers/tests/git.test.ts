@@ -18,7 +18,7 @@ describe('createGitCaptureProvider', () => {
     try {
       await git(projectRoot, ['init']);
       await git(projectRoot, ['config', 'user.email', 'devmesh@example.test']);
-      await git(projectRoot, ['config', 'user.name', 'Dev Mesh']);
+      await git(projectRoot, ['config', 'user.name', 'DevMesh']);
       await writeFile(join(projectRoot, 'README.md'), '# Test\n', 'utf8');
       await git(projectRoot, ['add', 'README.md']);
       await git(projectRoot, ['commit', '-m', 'ABC-123 initial commit']);

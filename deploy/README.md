@@ -1,6 +1,6 @@
 # Deployment Helpers
 
-This directory contains the alpha Docker Compose stack for MCP Dev Mesh.
+This directory contains the alpha Docker Compose stack for DevMesh.
 
 ## Services
 

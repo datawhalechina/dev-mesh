@@ -1,6 +1,6 @@
 ---
 layout: page
-title: MCP Dev Mesh
+title: DevMesh
 sidebar: false
 aside: false
 ---
@@ -9,7 +9,7 @@ aside: false
   <section class="mesh-hero">
     <div class="mesh-hero__inner">
       <p class="mesh-super">本地优先</p>
-      <h1>MCP Dev Mesh</h1>
+      <h1>DevMesh</h1>
       <p class="mesh-hero__lead">
         给项目放一个可检索、可审查的上下文层。决策、任务进展和命令经验保存到
         <code>.dev-mesh</code>，再通过 CLI 和 MCP proxy 回到开发流程里。

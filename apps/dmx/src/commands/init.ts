@@ -17,7 +17,7 @@ import { isCiEnvironment, shouldUseTuiOutput } from './shared.js';
 export function registerInitCommand(program: Command): void {
   program
     .command('init')
-    .description('Initialize global or project Dev Mesh state')
+    .description('Initialize global or project DevMesh state')
     .option('--global', 'initialize ~/.dev-mesh instead of the current project')
     .option('--project', 'initialize .dev-mesh in the selected project')
     .option('--root <path>', 'project root', process.cwd())
@@ -65,7 +65,7 @@ async function runInitCommand(options: InitCommandOptions): Promise<void> {
     }
 
     const initSpinner = tuiOutput ? spinner() : undefined;
-    initSpinner?.start('Writing Dev Mesh global config');
+    initSpinner?.start('Writing DevMesh global config');
     const result = await initGlobalConfig(options.name, initOptions);
     initSpinner?.stop('Global config ready');
 
@@ -127,7 +127,7 @@ async function promptGlobalTools(options: PromptGlobalToolsOptions): Promise<Glo
 }
 
 async function runGlobalInitTui(statuses: GlobalToolStatus[]): Promise<GlobalInitSelection> {
-  intro('Dev Mesh init');
+  intro('DevMesh init');
   note(createGlobalInitStatusSummary(statuses), 'Detected MCP hosts');
   log.info('Automation defaults: auto_init, auto_reference, auto_capture, and auto_sync are enabled.');
   log.info('MCP hosts will run dmx serve --mcp; the launcher starts or reuses the project daemon.');
@@ -186,7 +186,7 @@ async function runGlobalInitTui(statuses: GlobalToolStatus[]): Promise<GlobalIni
 
 function printGlobalInitResult(result: GlobalInitResult, options: { showIntro?: boolean } = {}): void {
   if (options.showIntro) {
-    intro('Dev Mesh init');
+    intro('DevMesh init');
   }
 
   note(createGlobalInitResultSummary(result), 'Global config');
@@ -202,7 +202,7 @@ function printGlobalInitResult(result: GlobalInitResult, options: { showIntro?: 
 }
 
 function printProjectInitResult(store: ProjectInitResult): void {
-  intro('Dev Mesh init');
+  intro('DevMesh init');
   note(createProjectInitResultSummary(store), 'Project store');
   outro('This project is ready for local knowledge capture.');
 }

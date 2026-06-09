@@ -11,11 +11,11 @@ import { parseIntOption } from './shared.js';
 export function registerServeCommand(program: Command): void {
   program
     .command('serve')
-    .description('Start the Dev Mesh stdio MCP launcher')
+    .description('Start the DevMesh stdio MCP launcher')
     .option('--mcp', 'serve stdio MCP for host tools')
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
-    .option('--global-root <path>', 'global Dev Mesh root')
+    .option('--global-root <path>', 'global DevMesh root')
     .option('--daemon-idle-ms <number>', 'background daemon idle timeout in milliseconds', parseIntOption)
     .option('--daemon-sync-interval-ms <number>', 'background daemon sync interval in milliseconds', parseIntOption)
     .option('--daemon-capture-interval-ms <number>', 'background daemon auto capture interval in milliseconds', parseIntOption)

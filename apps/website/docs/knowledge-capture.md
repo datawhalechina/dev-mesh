@@ -5,7 +5,7 @@ title: 自动沉淀
 
 # 自动沉淀
 
-当前实现里的“自动沉淀”主要由 MCP 工具调用触发。它不是一个默认后台扫描整个项目的守护进程，而是让 AI 客户端在合适的时机调用 Dev Mesh 工具，把重要上下文写入项目。
+当前实现里的“自动沉淀”主要由 MCP 工具调用触发。它不是一个默认后台扫描整个项目的守护进程，而是让 AI 客户端在合适的时机调用 DevMesh 工具，把重要上下文写入项目。
 
 ## 三条路径
 
@@ -42,13 +42,13 @@ pnpm --filter mcp-dev-mesh dev -- inbox --root $project
 在 Codex、Claude Code 或 opencode 中接入 proxy 后，可以直接要求：
 
 ```text
-请把这次实现里的长期项目知识沉淀到 Dev Mesh，包括关键决策、约定和后续注意事项。
+请把这次实现里的长期项目知识沉淀到 DevMesh，包括关键决策、约定和后续注意事项。
 ```
 
 或者更具体一些：
 
 ```text
-请调用 Dev Mesh，把“服务端 env 配置优先级为 CLI > process env > env file”记录为 canonical decision。
+请调用 DevMesh，把“服务端 env 配置优先级为 CLI > process env > env file”记录为 canonical decision。
 ```
 
 ## 验证位置

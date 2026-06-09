@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress';
 
 export default defineConfig({
   lang: 'zh-CN',
-  title: 'MCP Dev Mesh',
+  title: 'DevMesh',
   description: '面向 AI 协作开发的本地优先上下文网络',
   cleanUrls: true,
   head: [
@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   themeConfig: {
     logo: '/img/logo.svg',
-    siteTitle: 'MCP Dev Mesh',
+    siteTitle: 'DevMesh',
     nav: [
       { text: '文档', link: '/intro' },
       { text: '快速开始', link: '/getting-started' },
@@ -41,7 +41,7 @@ export default defineConfig({
     ],
     footer: {
       message: 'Local-first context memory for AI-assisted engineering teams.',
-      copyright: `Copyright © ${new Date().getFullYear()} MCP Dev Mesh`,
+      copyright: `Copyright © ${new Date().getFullYear()} DevMesh`,
     },
     search: {
       provider: 'local',

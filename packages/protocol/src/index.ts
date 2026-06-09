@@ -146,7 +146,7 @@ export interface SyncPullResponse {
 
 export function createDefaultWellKnown(baseUrl = 'http://127.0.0.1:8721'): WellKnownDevMesh {
   return {
-    serverName: 'MCP Dev Mesh',
+    serverName: 'DevMesh',
     serverId: 'mesh_local',
     baseUrl,
     mcpUrl: `${baseUrl.replace(/\/$/, '')}/mcp`,

@@ -15,7 +15,7 @@ export function registerDoctorCommand(program: Command): void {
     .command('doctor')
     .description('Run basic local diagnostics')
     .option('--root <path>', 'project root', process.cwd())
-    .option('--global-root <path>', 'global Dev Mesh root')
+    .option('--global-root <path>', 'global DevMesh root')
     .option('--mcp-url <url>', 'local MCP proxy URL')
     .option('--json', 'print machine-readable JSON')
     .action(async (options: { root: string; globalRoot?: string; mcpUrl?: string; json?: boolean }) => {
@@ -35,7 +35,7 @@ export function registerDoctorCommand(program: Command): void {
       const doctorSpinner = tuiOutput ? spinner() : undefined;
 
       if (tuiOutput) {
-        intro('Dev Mesh doctor');
+        intro('DevMesh doctor');
       }
 
       doctorSpinner?.start('Running diagnostics');
@@ -67,7 +67,7 @@ function printDoctorResult(result: DevMeshDoctorResult): void {
   }
 
   if (result.summary.warn > 0) {
-    outro('Doctor found warnings. Dev Mesh can run, but the hints above are worth fixing.');
+    outro('Doctor found warnings. DevMesh can run, but the hints above are worth fixing.');
     return;
   }
 

@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { createDevMeshClientRuntime } from '@mcp-dev-mesh/client';
 
 export function registerIndexCommand(program: Command): void {
-  const index = program.command('index').description('Manage the local Dev Mesh index');
+  const index = program.command('index').description('Manage the local DevMesh index');
 
   index
     .command('rebuild')

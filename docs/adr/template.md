@@ -15,7 +15,7 @@ Describe the decision and the boundaries it creates.
 
 Describe trade-offs, follow-up work, and migration notes.
 
-## Dev Mesh Knowledge
+## DevMesh Knowledge
 
 - PARA: `areas/<area>`
 - Layer: `canonical`

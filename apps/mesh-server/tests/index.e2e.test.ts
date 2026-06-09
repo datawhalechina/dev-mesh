@@ -299,7 +299,7 @@ function waitForServer(child: MeshServerProcess): Promise<void> {
     child.stdout.on('data', (chunk: string) => {
       stdout += chunk;
 
-      if (stdout.includes('MCP Dev Mesh server listening')) {
+      if (stdout.includes('DevMesh server listening')) {
         clearTimeout(timeout);
         resolve();
       }

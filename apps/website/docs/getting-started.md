@@ -73,13 +73,13 @@ pnpm --filter mcp-dev-mesh dev -- proxy --root $project --name local --port 8722
 先用 CLI 手动写一条知识：
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- capture --root $project --name local --title "Smoke test knowledge" --summary "Dev Mesh can persist project knowledge." --type decision --layer canonical --tag smoke
+pnpm --filter mcp-dev-mesh dev -- capture --root $project --name local --title "Smoke test knowledge" --summary "DevMesh can persist project knowledge." --type decision --layer canonical --tag smoke
 ```
 
 再搜索验证：
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- search --root $project --query "Dev Mesh"
+pnpm --filter mcp-dev-mesh dev -- search --root $project --query "DevMesh"
 pnpm --filter mcp-dev-mesh dev -- status --root $project
 pnpm --filter mcp-dev-mesh dev -- doctor --root $project
 ```

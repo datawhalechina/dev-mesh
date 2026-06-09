@@ -1,6 +1,6 @@
-# MCP Dev Mesh
+# DevMesh
 
-`MCP Dev Mesh` 是一个面向多人协作开发的 local-first 知识共享层。它通过 MCP 为 Codex、Claude Code、opencode 等 AI 编程工具提供项目知识检索、经验沉淀、本地缓存和可选团队同步能力。
+`DevMesh` 是一个面向多人协作开发的 local-first 知识共享层。它通过 MCP 为 Codex、Claude Code、opencode 等 AI 编程工具提供项目知识检索、经验沉淀、本地缓存和可选团队同步能力。
 
 当前仓库处于产品骨架阶段：已搭建 TypeScript monorepo、核心领域模型、`.dev-mesh/` 本地项目知识库、基础 CLI、Hub Server skeleton、MCP tool contract 和分层测试框架。
 

@@ -4,7 +4,7 @@ import { joinServerGroup, type JoinServerOptions } from '@mcp-dev-mesh/client';
 export function registerJoinCommand(program: Command): void {
   program
     .command('join')
-    .description('Join a remote Dev Mesh server group')
+    .description('Join a remote DevMesh server group')
     .argument('<server>', 'server URL, IP, or host:port')
     .requiredOption('--group <groupKey>', 'server group key')
     .requiredOption('--name <displayName>', 'member display name')

@@ -814,7 +814,7 @@ interface KnowledgeEdgeFormInput {
         <div class="brand">
           <Connection class="brand-icon" />
           <div>
-            <strong>MCP Dev Mesh</strong>
+            <strong>DevMesh</strong>
             <span>Admin</span>
           </div>
         </div>

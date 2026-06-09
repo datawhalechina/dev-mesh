@@ -1,4 +1,4 @@
-# MCP Dev Mesh CLI
+# DevMesh CLI
 
 `mcp-dev-mesh` provides the `dmx` command for local-first project knowledge capture, search, review, and MCP proxy setup.
 

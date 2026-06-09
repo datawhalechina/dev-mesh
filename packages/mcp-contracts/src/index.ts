@@ -119,7 +119,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     'mesh_search_context',
     {
       title: 'Search project context',
-      description: 'Search Dev Mesh project knowledge and return a context pack.',
+      description: 'Search DevMesh project knowledge and return a context pack.',
       inputSchema: meshSearchContextInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.searchContext(meshSearchContextInputSchema.parse(args)))

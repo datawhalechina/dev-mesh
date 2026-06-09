@@ -98,7 +98,7 @@ describe('createOpencodeToolAdapter', () => {
         projectConfigPath,
         [
           '{',
-          '  // Keep this comment while editing Dev Mesh config.',
+          '  // Keep this comment while editing DevMesh config.',
           '  "$schema": "https://opencode.ai/config.json",',
           '  "mcp": {',
           '    "other": {',
@@ -123,7 +123,7 @@ describe('createOpencodeToolAdapter', () => {
 
       const content = await readFile(projectConfigPath, 'utf8');
 
-      expect(content).toContain('// Keep this comment while editing Dev Mesh config.');
+      expect(content).toContain('// Keep this comment while editing DevMesh config.');
       expect(parse(content)).toMatchObject({
         $schema: 'https://opencode.ai/config.json',
         mcp: {

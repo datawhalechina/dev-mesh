@@ -1,6 +1,6 @@
-# MCP Dev Mesh Website
+# DevMesh Website
 
-VitePress site for the MCP Dev Mesh project.
+VitePress site for the DevMesh project.
 
 ```bash
 pnpm --filter @mcp-dev-mesh/website start

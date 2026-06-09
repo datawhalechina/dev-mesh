@@ -98,7 +98,7 @@ function createChecks(options) {
         const body = parseJson(response.body);
         const expectedMcpUrl = joinUrl(options.hubUrl, '/mcp');
 
-        if (body.serverName !== 'MCP Dev Mesh' || body.mcpUrl !== expectedMcpUrl) {
+        if (body.serverName !== 'DevMesh' || body.mcpUrl !== expectedMcpUrl) {
           return fail(response, 'unexpected discovery response body');
         }
 
@@ -151,7 +151,7 @@ function createChecks(options) {
           return fail(response, `expected 2xx, received ${response.status}`);
         }
 
-        if (!response.body.includes('MCP Dev Mesh')) {
+        if (!response.body.includes('DevMesh')) {
           return fail(response, 'expected website brand text');
         }
 
@@ -315,7 +315,7 @@ function readIntegerEnv(name, fallback) {
 function printResult(result) {
   const status = result.ok ? 'passed' : 'failed';
 
-  console.log(`MCP Dev Mesh Docker stack smoke check ${status} in ${formatDuration(result.elapsedMs)}.`);
+  console.log(`DevMesh Docker stack smoke check ${status} in ${formatDuration(result.elapsedMs)}.`);
 
   for (const check of result.checks) {
     const marker = check.ok ? 'OK' : 'FAIL';

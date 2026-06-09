@@ -95,7 +95,7 @@ export async function serveLocalMcpStdio(options: LocalMcpDaemonOptions = {}): P
   });
 
   void ensureLocalMcpDaemon(daemonOptions).catch((error) => {
-    process.stderr.write(`Dev Mesh daemon startup skipped: ${serializeError(error)}\n`);
+    process.stderr.write(`DevMesh daemon startup skipped: ${serializeError(error)}\n`);
   });
 
   const server = createLocalMeshMcpServerWithHandlers(createDaemonAwareHandlers(localHandlers, daemonOptions));
@@ -120,7 +120,7 @@ export async function runLocalMcpDaemon(options: LocalMcpDaemonOptions = {}): Pr
     projectRoot,
     intervalMs: options.syncIntervalMs ?? DEFAULT_DAEMON_SYNC_INTERVAL_MS,
     onError(error: unknown) {
-      process.stderr.write(`Dev Mesh daemon sync skipped: ${serializeError(error)}\n`);
+      process.stderr.write(`DevMesh daemon sync skipped: ${serializeError(error)}\n`);
     }
   };
 
@@ -135,7 +135,7 @@ export async function runLocalMcpDaemon(options: LocalMcpDaemonOptions = {}): Pr
     projectRoot,
     intervalMs: options.captureIntervalMs ?? DEFAULT_DAEMON_AUTO_CAPTURE_INTERVAL_MS,
     onError(error: unknown) {
-      process.stderr.write(`Dev Mesh daemon auto capture skipped: ${serializeError(error)}\n`);
+      process.stderr.write(`DevMesh daemon auto capture skipped: ${serializeError(error)}\n`);
     }
   });
   const state: LocalMcpDaemonState = {
@@ -226,7 +226,7 @@ export async function inspectLocalMcpDaemon(projectRoot = process.cwd()): Promis
       pidPath: paths.pidPath,
       statePath: paths.statePath,
       state,
-      message: `Dev Mesh daemon is running at ${state.mcpUrl}.`
+      message: `DevMesh daemon is running at ${state.mcpUrl}.`
     };
   }
 
@@ -235,7 +235,7 @@ export async function inspectLocalMcpDaemon(projectRoot = process.cwd()): Promis
     projectRoot,
     pidPath: paths.pidPath,
     statePath: paths.statePath,
-    message: 'Dev Mesh daemon is not running for this project.'
+    message: 'DevMesh daemon is not running for this project.'
   };
 }
 

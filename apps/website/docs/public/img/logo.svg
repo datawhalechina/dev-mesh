@@ -1,5 +1,5 @@
 <svg width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title" xmlns="http://www.w3.org/2000/svg">
-  <title id="title">MCP Dev Mesh</title>
+  <title id="title">DevMesh</title>
   <rect x="8" y="8" width="48" height="48" rx="8" fill="#13201a"/>
   <path d="M20 22h24M20 32h24M20 42h24" stroke="#f7efe2" stroke-width="4" stroke-linecap="round"/>
   <circle cx="20" cy="22" r="5" fill="#2aa889"/>
