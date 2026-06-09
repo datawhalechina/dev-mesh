@@ -69,7 +69,8 @@ describe('MCP tool contract schemas', () => {
       rateKnowledge: vi.fn(async () => ({ ok: 'rate' })),
       searchMemberExperience: vi.fn(async () => ({ ok: 'member' })),
       resolveTerm: vi.fn(async () => ({ ok: 'term' })),
-      scanProjectKnowledge: vi.fn(async () => ({ ok: 'scan' }))
+      scanProjectKnowledge: vi.fn(async () => ({ ok: 'scan' })),
+      exploreKnowledgeGraph: vi.fn(async () => ({ ok: 'graph' }))
     };
 
     registerMeshTools(fakeServer as never, handlers);
@@ -81,7 +82,8 @@ describe('MCP tool contract schemas', () => {
       'mesh_rate_knowledge',
       'mesh_search_member_experience',
       'mesh_resolve_term',
-      'mesh_scan_project_knowledge'
+      'mesh_scan_project_knowledge',
+      'mesh_explore_knowledge_graph'
     ]);
 
     const toolDescriptions = Object.fromEntries(registered.map((tool) => [tool.name, tool.config.description ?? '']));
@@ -90,6 +92,7 @@ describe('MCP tool contract schemas', () => {
     expect(toolDescriptions.mesh_capture_knowledge).toContain('before the final response');
     expect(toolDescriptions.mesh_capture_task).toContain('Summarize what changed');
     expect(toolDescriptions.mesh_scan_project_knowledge).toContain('Capture only durable conclusions');
+    expect(toolDescriptions.mesh_explore_knowledge_graph).toContain('related decisions');
 
     const result = await registered[0]?.callback({ query: 'auth' });
     expect(result).toEqual({

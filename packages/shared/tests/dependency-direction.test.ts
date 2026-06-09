@@ -8,6 +8,7 @@ const packagesRoot = join(repoRoot, 'packages');
 const forbiddenByPackage: Record<string, string[]> = {
   '@devmesh/shared': [
     '@devmesh/extension-api',
+    '@devmesh/graph',
     '@devmesh/core',
     '@devmesh/agent',
     '@devmesh/client',
@@ -33,6 +34,7 @@ const forbiddenByPackage: Record<string, string[]> = {
     '@devmesh/protocol',
     '@devmesh/adapters',
     '@devmesh/providers',
+    '@devmesh/graph',
     '@devmesh/quality',
     '@devmesh/redaction',
     '@devmesh/search',
@@ -48,6 +50,7 @@ const forbiddenByPackage: Record<string, string[]> = {
     '@devmesh/mcp-contracts',
     '@devmesh/adapters',
     '@devmesh/providers',
+    '@devmesh/graph',
     '@devmesh/quality',
     '@devmesh/redaction',
     '@devmesh/search',
@@ -63,12 +66,14 @@ const forbiddenByPackage: Record<string, string[]> = {
     '@devmesh/protocol',
     '@devmesh/adapters',
     '@devmesh/providers',
+    '@devmesh/graph',
     '@devmesh/quality',
     '@devmesh/redaction',
     '@devmesh/search',
     '@devmesh/storage',
     '@devmesh/registry'
   ],
+  '@devmesh/graph': ['@devmesh/agent', '@devmesh/client', '@devmesh/server', '@devmesh/local-store'],
   '@devmesh/agent': ['@devmesh/client', '@devmesh/server', '@devmesh/local-store'],
   '@devmesh/local-store': ['@devmesh/agent', '@devmesh/client', '@devmesh/server'],
   '@devmesh/mcp-contracts': ['@devmesh/client', '@devmesh/server'],

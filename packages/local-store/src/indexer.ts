@@ -6,6 +6,7 @@ import type { SearchKnowledgeInput } from '@devmesh/core';
 import { nowIso } from '@devmesh/shared';
 import { ensureProjectStore } from './project-store.js';
 import { getSqliteIndexFile, pathExists } from './files.js';
+import { writeProjectGraphIndex } from './graph-indexer.js';
 import { loadProjectKnowledgeItems } from './knowledge-files.js';
 import {
   PROJECT_STORE_SCHEMA_VERSION,
@@ -33,6 +34,7 @@ export async function rebuildProjectIndex(projectRoot: string): Promise<RebuildP
   }));
   const indexPath = join(store.paths.indexDir, 'manifest.json');
   const sqlitePath = getSqliteIndexFile(store.paths.indexDir);
+  const graph = await writeProjectGraphIndex(store.paths.indexDir, items, rebuiltAt);
 
   await writeFile(
     indexPath,
@@ -53,7 +55,10 @@ export async function rebuildProjectIndex(projectRoot: string): Promise<RebuildP
   return {
     indexPath,
     sqlitePath,
+    graphPath: graph.graphPath,
     documentCount: documents.length,
+    graphNodeCount: graph.nodeCount,
+    graphEdgeCount: graph.edgeCount,
     rebuiltAt,
     schemaVersion: PROJECT_STORE_SCHEMA_VERSION
   };

@@ -7,6 +7,7 @@ import type {
   ParaRef,
   RateKnowledgeInput
 } from '@devmesh/core';
+import type { ExploreKnowledgeGraphInput, ExploreKnowledgeGraphResult, KnowledgeGraph } from '@devmesh/graph';
 
 export const DEV_MESH_DIR = '.dev-mesh';
 export const PROJECT_STORE_SCHEMA_VERSION = 1;
@@ -73,10 +74,29 @@ export interface ProjectIndexDocument {
 export interface RebuildProjectIndexResult {
   indexPath: string;
   sqlitePath: string;
+  graphPath: string;
   documentCount: number;
+  graphNodeCount: number;
+  graphEdgeCount: number;
   rebuiltAt: string;
   schemaVersion: number;
 }
+
+export interface RebuildProjectGraphResult {
+  graphPath: string;
+  nodeCount: number;
+  edgeCount: number;
+  sourceItemCount: number;
+  rebuiltAt: string;
+  schemaVersion: number;
+}
+
+export type ProjectKnowledgeGraph = KnowledgeGraph & {
+  schemaVersion: number;
+};
+
+export type ProjectKnowledgeGraphExploreResult = ExploreKnowledgeGraphResult;
+export type ProjectKnowledgeGraphExploreInput = ExploreKnowledgeGraphInput;
 
 export interface ProjectIndexSearchResult {
   id: string;

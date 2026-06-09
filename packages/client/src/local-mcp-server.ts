@@ -13,6 +13,7 @@ import {
   type MeshToolHandlers,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
+  type MeshExploreKnowledgeGraphInput,
   type MeshScanProjectKnowledgeInput,
   type MeshRateKnowledgeInput,
   type MeshSearchContextInput
@@ -41,6 +42,7 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
     captureTask: (input) => runtime.captureTask(toTaskCaptureInput(input)),
     rateKnowledge: (input) => runtime.rateKnowledge(toRateInput(input)),
     scanProjectKnowledge: (input) => runtime.scanProjectKnowledge(toScanProjectKnowledgeInput(input)),
+    exploreKnowledgeGraph: (input) => runtime.exploreKnowledgeGraph(toExploreKnowledgeGraphInput(input)),
     searchMemberExperience(input) {
       return runtime.searchContext({
         ...toContextPackInput(input),
@@ -200,5 +202,11 @@ function toRateInput(input: MeshRateKnowledgeInput): RateKnowledgeInput {
 function toScanProjectKnowledgeInput(input: MeshScanProjectKnowledgeInput): MeshScanProjectKnowledgeInput {
   return {
     limit: input.limit
+  };
+}
+
+function toExploreKnowledgeGraphInput(input: MeshExploreKnowledgeGraphInput): MeshExploreKnowledgeGraphInput {
+  return {
+    ...input
   };
 }

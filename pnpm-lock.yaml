@@ -214,11 +214,20 @@ importers:
 
   packages/extension-api: {}
 
+  packages/graph:
+    dependencies:
+      '@devmesh/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/local-store:
     dependencies:
       '@devmesh/core':
         specifier: workspace:*
         version: link:../core
+      '@devmesh/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@devmesh/shared':
         specifier: workspace:*
         version: link:../shared
@@ -272,6 +281,9 @@ importers:
       '@devmesh/core':
         specifier: workspace:*
         version: link:../core
+      '@devmesh/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@devmesh/local-store':
         specifier: workspace:*
         version: link:../local-store

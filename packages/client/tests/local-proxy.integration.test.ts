@@ -47,6 +47,14 @@ describe('local MCP proxy', () => {
         }
       });
       const contextPack = JSON.parse(readTextToolResult(searchResult));
+      const graphResult = await client.callTool({
+        name: 'mesh_explore_knowledge_graph',
+        arguments: {
+          query: 'local proxy',
+          depth: 1
+        }
+      });
+      const graph = JSON.parse(readTextToolResult(graphResult));
       const knowledgeJsonl = await readFile(
         join(projectRoot, '.dev-mesh', 'knowledge', 'canonical', 'entries.jsonl'),
         'utf8'
@@ -69,7 +77,8 @@ describe('local MCP proxy', () => {
           'mesh_capture_task',
           'mesh_rate_knowledge',
           'mesh_search_member_experience',
-          'mesh_resolve_term'
+          'mesh_resolve_term',
+          'mesh_explore_knowledge_graph'
         ])
       );
       expect(captured).toMatchObject({
@@ -95,6 +104,17 @@ describe('local MCP proxy', () => {
           }
         ]
       });
+      expect(graph.nodes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: `knowledge:${captured.id}`,
+            kind: 'knowledge'
+          })
+        ])
+      );
+      expect(graph.edges.map((edge: { kind: string }) => edge.kind)).toEqual(
+        expect.arrayContaining(['belongs_to_para', 'tagged_with'])
+      );
       expect(knowledgeJsonl).toContain('"title":"Local proxy captures knowledge"');
       expect(usageJsonl).toContain('"kind":"context_pack.hit"');
       expect(usageJsonl).toContain(`"knowledgeId":"${captured.id}"`);

@@ -6,7 +6,7 @@ export function registerIndexCommand(program: Command): void {
 
   index
     .command('rebuild')
-    .description('Rebuild the local project search index manifest')
+    .description('Rebuild the local project search and graph indexes')
     .option('--root <path>', 'project root', process.cwd())
     .action(async (options: { root: string }) => {
       const runtime = createDevMeshClientRuntime({

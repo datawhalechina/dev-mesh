@@ -9,10 +9,12 @@ import type {
   ParaRef,
   RateKnowledgeInput
 } from '@devmesh/core';
+import { buildKnowledgeGraph, exploreKnowledgeGraph } from '@devmesh/graph';
 import {
   registerMeshTools,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
+  type MeshExploreKnowledgeGraphInput,
   type MeshRateKnowledgeInput,
   type MeshScanProjectKnowledgeInput,
   type MeshSearchContextInput
@@ -89,6 +91,14 @@ export function createMeshMcpServer(core: DevMeshCore): McpServer {
           todoFiles: []
         }
       };
+    },
+    async exploreKnowledgeGraph(input: MeshExploreKnowledgeGraphInput) {
+      const items = await core.listKnowledge({
+        includeSuperseded: true
+      });
+      const graph = buildKnowledgeGraph(items);
+
+      return exploreKnowledgeGraph(graph, input);
     }
   });
 

@@ -11,6 +11,7 @@
       "@devmesh/client": ["packages/client/src/index.ts"],
       "@devmesh/core": ["packages/core/src/index.ts"],
       "@devmesh/extension-api": ["packages/extension-api/src/index.ts"],
+      "@devmesh/graph": ["packages/graph/src/index.ts"],
       "@devmesh/local-store": ["packages/local-store/src/index.ts"],
       "@devmesh/mcp-contracts": ["packages/mcp-contracts/src/index.ts"],
       "@devmesh/protocol": ["packages/protocol/src/index.ts"],

@@ -20,9 +20,13 @@ export type {
   ProjectConfig,
   ProjectIndexDocument,
   ProjectIndexSearchResult,
+  ProjectKnowledgeGraph,
+  ProjectKnowledgeGraphExploreInput,
+  ProjectKnowledgeGraphExploreResult,
   ProjectStore,
   ProjectStorePaths,
   ProjectTaskStatus,
+  RebuildProjectGraphResult,
   RateProjectKnowledgeOptions,
   RateProjectKnowledgeResult,
   RecordKnowledgeUsageResult,
@@ -39,6 +43,11 @@ export {
 } from './project-store.js';
 export { JsonlKnowledgeRepository } from './repository.js';
 export { rebuildProjectIndex, searchProjectIndex } from './indexer.js';
+export {
+  exploreProjectGraph,
+  readProjectGraph,
+  rebuildProjectGraph
+} from './graph-indexer.js';
 export {
   appendKnowledgeRating,
   captureProjectKnowledge,

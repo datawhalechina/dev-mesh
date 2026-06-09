@@ -130,6 +130,7 @@ devmesh/
     registry/               # @devmesh/registry：扩展注册和能力发现
     mcp-contracts/          # @devmesh/mcp-contracts：MCP tool/resource/prompt schema
     protocol/               # @devmesh/protocol：Sync API types
+    graph/                  # @devmesh/graph：知识条目派生关系图谱
     adapters/               # @devmesh/adapters：codex / claude / opencode adapters
     providers/              # @devmesh/providers：git / filesystem project scan providers
     redaction/              # @devmesh/redaction：内置脱敏
@@ -185,6 +186,7 @@ devmesh/
 | `packages/server` | `@devmesh/server` | Hub Server、远程 MCP endpoint、group/ACL、同步 API、审计和管理接口。 | 不承担本机工具扫描、项目文件监听、开发工具配置。 |
 | `packages/extension-api` | `@devmesh/extension-api` | 对外稳定接口：Adapter、Provider、Redactor、Scorer、SearchBackend、StorageBackend、SyncBackend。 | 不依赖内置扩展实现，不泄漏内部服务细节。 |
 | `packages/registry` | `@devmesh/registry` | 扩展注册、能力发现、优先级排序、配置 schema 校验。 | 不包含具体扫描、脱敏、检索算法。 |
+| `packages/graph` | `@devmesh/graph` | 从 Knowledge Item 派生节点和边，支持关系探索和可重建 graph index。 | 不作为事实源，不直接写入 capture 事件。 |
 | `packages/adapters` | `@devmesh/adapters` | 内置 Codex、Claude Code、opencode 等工具适配。 | 不定义通用扩展协议。 |
 | `packages/providers` | `@devmesh/providers` | 内置 Git、文件系统等按需项目扫描来源。 | 不决定 canonical 团队事实。 |
 | `packages/search` | `@devmesh/search` | 混合检索、排序、向量/关键词 backend adapter。 | 不直接读取项目文件或写入知识事件。 |
@@ -202,6 +204,7 @@ extension-api
   <- registry
   <- adapters / providers / redaction / quality / search / storage
 
+core <- graph
 core <- server
 core <- local-store
 core <- storage
@@ -1047,6 +1050,7 @@ interval_seconds = 60
     pending.jsonl           # 不提交：待 review / 待同步项目
   index/
     mesh.sqlite             # 不提交：本地检索、去重、embedding metadata
+    graph.json              # 不提交：从知识条目派生的本地关系图谱索引
     fts/                    # 不提交：可重建关键词索引
     vector/                 # 不提交：可重建向量索引
   sync/
@@ -1296,6 +1300,7 @@ Agent 在工作过程中主动调用：
 - `mesh_capture_task`
 - `mesh_resolve_term`
 - `mesh_scan_project_knowledge`
+- `mesh_explore_knowledge_graph`
 
 这层跨工具最稳定，因为 Codex、Claude Code、opencode 都能通过 MCP tools 与服务端交互。
 
@@ -2099,7 +2104,7 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 - daemon 负责远端共享同步：当项目 `auto_sync = true` 且本机 `identity.json` 存在 joined server 时，daemon 会把 `.dev-mesh/events/*.jsonl` 事件签名后增量 push 到 Hub，并按 pull cursor 拉取同 group 事件。可回放的 `knowledge` snapshot 会 upsert 到本地 `.dev-mesh/knowledge/`，让同组成员沉淀的知识进入本地搜索；replay 不追加新的本地 event，避免同步回环。
 - 客户端同步游标写入 `.dev-mesh/sync/cursors.json`，最近一次 daemon sync 状态写入 `.dev-mesh/sync/status.json`，`dmx doctor` 会读取该状态报告远端错误和本地待推送事件数量。
 - `dmx proxy --root . --port 8722` 仍可直接启动 `http://127.0.0.1:8722/mcp`，用于调试或嵌入。
-- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_scan_project_knowledge`。
+- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_scan_project_knowledge`、`mesh_explore_knowledge_graph`。
 - 本地 proxy 不依赖 `packages/server`，只通过 `packages/mcp-contracts` 共享 tool schema，避免 client/server 反向耦合。
 
 ### 12.2 Adapter 接口
@@ -2425,7 +2430,7 @@ MCP 调试建议使用 MCP Inspector 验证：
 | --- | --- |
 | CLI local-only flow | 在临时目录运行 `dmx init`、`dmx capture`、`dmx search`、`dmx status`，验证 `.dev-mesh/` 结构、JSONL 内容和 Context Pack。 |
 | Global init flow | 运行 `dmx init --global --yes`，验证 `~/.dev-mesh/config.toml`、设备身份、MCP Host 选择结果和重复执行幂等。 |
-| Local MCP proxy flow | 启动本地 proxy，使用 MCP Inspector 或 SDK client 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_search_context`，验证写入默认落到当前项目 store。 |
+| Local MCP proxy flow | 启动本地 proxy，使用 MCP Inspector 或 SDK client 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_search_context`、`mesh_explore_knowledge_graph`，验证写入默认落到当前项目 store。 |
 | Hub server HTTP flow | 使用真实端口或 HTTP adapter 注入验证 `/healthz`、`/.well-known/devmesh`、`/api/v1/groups`、`/api/v1/join`、`/api/v1/projects/:id/brief`；Koa 实现需要跑同一组 parity 测试。 |
 | Sync push/pull flow | Client A capture 后 push，Client B pull，同 group 可见；不同 group 或无权限不可见；cursor 可增量推进。 |
 | Review queue flow | 高风险提取进入 `.dev-mesh/queue/pending.jsonl`，用户确认后写入 events，拒绝后进入 rejected，不同步。 |
@@ -2489,6 +2494,7 @@ CI 门禁：
 - `mesh_capture_knowledge`
 - `mesh_capture_task`
 - `mesh_rate_knowledge`
+- `mesh_explore_knowledge_graph`
 - MCP tools/list 和 tools/call contract test
 - HTTP join/groups/projects integration test
 - search/capture/rate server integration test

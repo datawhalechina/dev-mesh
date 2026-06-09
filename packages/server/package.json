@@ -19,6 +19,7 @@
     "@koa/router": "^15.6.0",
     "@devmesh/agent": "workspace:*",
     "@devmesh/core": "workspace:*",
+    "@devmesh/graph": "workspace:*",
     "@devmesh/local-store": "workspace:*",
     "@devmesh/mcp-contracts": "workspace:*",
     "@devmesh/protocol": "workspace:*",

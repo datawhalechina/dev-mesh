@@ -22,6 +22,7 @@ packages/
   local-store      .dev-mesh 文件知识库
   storage          PostgreSQL 存储适配
   mcp-contracts    MCP 工具契约
+  graph            知识条目关系图谱
   redaction        脱敏和隐私保护
   search           本地检索
   adapters         Codex、Claude Code、opencode 配置适配

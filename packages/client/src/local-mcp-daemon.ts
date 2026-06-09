@@ -8,6 +8,7 @@ import { DEV_MESH_DIR, ensureProjectStore } from '@devmesh/local-store';
 import type {
   MeshCaptureKnowledgeInput,
   MeshCaptureTaskInput,
+  MeshExploreKnowledgeGraphInput,
   MeshScanProjectKnowledgeInput,
   MeshRateKnowledgeInput,
   MeshResolveTermInput,
@@ -74,7 +75,8 @@ type DaemonToolName =
   | 'mesh_rate_knowledge'
   | 'mesh_search_member_experience'
   | 'mesh_resolve_term'
-  | 'mesh_scan_project_knowledge';
+  | 'mesh_scan_project_knowledge'
+  | 'mesh_explore_knowledge_graph';
 
 const DAEMON_VERSION = '0.1.0';
 
@@ -248,6 +250,13 @@ function createDaemonAwareHandlers(localHandlers: MeshToolHandlers, options: Loc
         () => localHandlers.scanProjectKnowledge(input),
         options
       ),
+    exploreKnowledgeGraph: (input) =>
+      callDaemonOrLocal(
+        'mesh_explore_knowledge_graph',
+        input,
+        () => localHandlers.exploreKnowledgeGraph(input),
+        options
+      ),
     searchMemberExperience: (input) =>
       callDaemonOrLocal(
         'mesh_search_member_experience',
@@ -265,6 +274,7 @@ async function callDaemonOrLocal(
     | MeshSearchContextInput
     | MeshCaptureKnowledgeInput
     | MeshCaptureTaskInput
+    | MeshExploreKnowledgeGraphInput
     | MeshScanProjectKnowledgeInput
     | MeshRateKnowledgeInput
     | MeshSearchMemberExperienceInput

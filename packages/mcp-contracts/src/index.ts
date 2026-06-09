@@ -90,6 +90,17 @@ export const meshScanProjectKnowledgeInputSchema = z.object({
   limit: z.number().int().min(1).max(200).default(50)
 });
 
+export const meshExploreKnowledgeGraphInputSchema = z.object({
+  query: z.string().min(1).optional(),
+  ids: z.array(z.string().min(1)).optional(),
+  depth: z.number().int().min(0).max(4).default(2),
+  limit: z.number().int().min(1).max(200).default(40),
+  nodeKinds: z.array(z.enum(['knowledge', 'para', 'type', 'tag', 'member', 'source'])).optional(),
+  edgeKinds: z
+    .array(z.enum(['authored_by', 'belongs_to_para', 'has_type', 'parent_para', 'sourced_from', 'tagged_with']))
+    .optional()
+});
+
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
 export type MeshCaptureKnowledgeInput = z.infer<typeof meshCaptureKnowledgeInputSchema>;
 export type MeshCaptureTaskInput = z.infer<typeof meshCaptureTaskInputSchema>;
@@ -97,6 +108,7 @@ export type MeshRateKnowledgeInput = z.infer<typeof meshRateKnowledgeInputSchema
 export type MeshSearchMemberExperienceInput = z.infer<typeof meshSearchMemberExperienceInputSchema>;
 export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
 export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
+export type MeshExploreKnowledgeGraphInput = z.infer<typeof meshExploreKnowledgeGraphInputSchema>;
 
 const assistantLedCaptureReminder =
   'IMPORTANT: Do not wait for the user to ask for knowledge capture. Before you answer the user at the end of any meaningful coding, debugging, review, design, setup, or documentation task, quickly decide whether you learned durable project knowledge. If yes, summarize it yourself and call mesh_capture_knowledge or mesh_capture_task before the final response.';
@@ -109,6 +121,7 @@ export interface MeshToolHandlers {
   searchMemberExperience(input: MeshSearchMemberExperienceInput): Promise<unknown>;
   resolveTerm(input: MeshResolveTermInput): Promise<unknown>;
   scanProjectKnowledge(input: MeshScanProjectKnowledgeInput): Promise<unknown>;
+  exploreKnowledgeGraph(input: MeshExploreKnowledgeGraphInput): Promise<unknown>;
 }
 
 export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers): void {
@@ -188,6 +201,18 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
       inputSchema: meshScanProjectKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.scanProjectKnowledge(meshScanProjectKnowledgeInputSchema.parse(args)))
+  );
+
+  server.registerTool(
+    'mesh_explore_knowledge_graph',
+    {
+      title: 'Explore knowledge graph',
+      description:
+        'Explore the derived DevMesh knowledge graph around matching knowledge items, PARA areas, tags, authors, sources, and types. Use this when relationships matter, such as finding related decisions, pits, owners, areas, or follow-up knowledge before answering or capturing a new item.',
+      inputSchema: meshExploreKnowledgeGraphInputSchema.shape
+    },
+    async (args) =>
+      jsonToolResult(await handlers.exploreKnowledgeGraph(meshExploreKnowledgeGraphInputSchema.parse(args)))
   );
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "@devmesh/local-store",
+  "name": "@devmesh/graph",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,8 +16,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@devmesh/core": "workspace:*",
-    "@devmesh/graph": "workspace:*",
-    "@devmesh/shared": "workspace:*"
+    "@devmesh/core": "workspace:*"
   }
 }

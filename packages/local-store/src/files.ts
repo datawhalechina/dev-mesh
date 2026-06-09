@@ -31,6 +31,10 @@ export function getSqliteIndexFile(indexDir: string): string {
   return join(indexDir, 'mesh.sqlite');
 }
 
+export function getKnowledgeGraphIndexFile(indexDir: string): string {
+  return join(indexDir, 'graph.json');
+}
+
 export function createKnowledgeIdForLayer(layer: KnowledgeLayer): string {
   if (layer === 'canonical') {
     return createKnowledgeId('can');

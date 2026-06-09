@@ -198,6 +198,12 @@ describe('local project store', () => {
         documentCount: number;
         documents: Array<{ id: string; text: string; tags: string[] }>;
       };
+      const graph = JSON.parse(await readFile(result.graphPath, 'utf8')) as {
+        schemaVersion: number;
+        sourceItemCount: number;
+        nodes: Array<{ id: string; kind: string }>;
+        edges: Array<{ kind: string }>;
+      };
       const indexHits = await searchProjectIndex(projectRoot, {
         query: 'derived index',
         limit: 5
@@ -208,6 +214,8 @@ describe('local project store', () => {
       });
 
       expect(result.documentCount).toBe(1);
+      expect(result.graphNodeCount).toBeGreaterThan(0);
+      expect(result.graphEdgeCount).toBeGreaterThan(0);
       await expect(stat(result.sqlitePath)).resolves.toMatchObject({ isFile: expect.any(Function) });
       expect(manifest.schemaVersion).toBe(PROJECT_STORE_SCHEMA_VERSION);
       expect(manifest.documentCount).toBe(1);
@@ -217,6 +225,10 @@ describe('local project store', () => {
       });
       expect(manifest.documents[0]?.text).toContain('Rebuild local index');
       expect(manifest.documents[0]?.text).toContain(item.entryKey);
+      expect(graph.schemaVersion).toBe(PROJECT_STORE_SCHEMA_VERSION);
+      expect(graph.sourceItemCount).toBe(1);
+      expect(graph.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ id: `knowledge:${item.id}` })]));
+      expect(graph.edges.map((edge) => edge.kind)).toEqual(expect.arrayContaining(['belongs_to_para', 'tagged_with']));
       expect(indexHits[0]).toMatchObject({
         id: item.id,
         score: expect.any(Number)

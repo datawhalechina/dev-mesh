@@ -9,6 +9,7 @@
 - [x] 补齐 redaction pipeline，确保 secret、credential、`.env`、`*.pem`、`*.key` 默认阻断或脱敏。
 - [x] 实现 review queue：高风险候选进入 `.dev-mesh/queue/pending.jsonl`，支持接受和拒绝。
 - [x] 引入 SQLite 本地索引，支持可重建关键词检索。
+- [x] 引入可重建知识图谱索引，支持 MCP 关系探索。
 - [x] 增加安全测试和端到端 smoke 测试用例。
 
 ## 阶段 0：产品骨架

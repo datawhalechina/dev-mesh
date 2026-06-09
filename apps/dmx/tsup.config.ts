@@ -12,6 +12,7 @@ export default defineConfig({
     '@devmesh/client',
     '@devmesh/core',
     '@devmesh/extension-api',
+    '@devmesh/graph',
     '@devmesh/local-store',
     '@devmesh/mcp-contracts',
     '@devmesh/redaction',

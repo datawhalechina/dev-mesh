@@ -19,6 +19,7 @@ import {
   readProjectConfig,
   rateProjectKnowledge,
   recordKnowledgeUsage,
+  exploreProjectGraph,
   rebuildProjectIndex,
   rejectPendingKnowledge,
   listPendingKnowledge,
@@ -28,6 +29,8 @@ import {
   type KnowledgeUsageOptions,
   type PendingKnowledgeReviewItem,
   type ProjectStore,
+  type ProjectKnowledgeGraphExploreInput,
+  type ProjectKnowledgeGraphExploreResult,
   type RateProjectKnowledgeOptions,
   type RejectPendingKnowledgeResult,
   type RebuildProjectIndexResult
@@ -88,6 +91,7 @@ export interface DevMeshClientRuntime {
   rejectInboxItem(id: string, reason?: string): Promise<RejectPendingKnowledgeResult>;
   searchContext(input: BuildContextPackInput): Promise<unknown>;
   scanProjectKnowledge(input?: ProjectKnowledgeScanInput): Promise<unknown>;
+  exploreKnowledgeGraph(input?: ProjectKnowledgeGraphExploreInput): Promise<ProjectKnowledgeGraphExploreResult>;
   rebuildIndex(): Promise<RebuildProjectIndexResult>;
   status(): Promise<Record<string, unknown>>;
 }
@@ -193,6 +197,7 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
     async scanProjectKnowledge(input = {}) {
       return readProjectKnowledgeScan(projectRoot, input);
     },
+    exploreKnowledgeGraph: (input = {}) => exploreProjectGraph(projectRoot, input),
     rebuildIndex: () => rebuildProjectIndex(projectRoot),
     async status() {
       const store = await ensureProjectStore(projectRoot, storeOptions(options.memberName));
