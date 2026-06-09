@@ -51,6 +51,10 @@ describe('local MCP proxy', () => {
         join(projectRoot, '.dev-mesh', 'knowledge', 'canonical', 'entries.jsonl'),
         'utf8'
       );
+      const usageJsonl = await readFile(
+        join(projectRoot, '.dev-mesh', 'knowledge', 'usage', `${contextPack.generatedAt.slice(0, 7)}.jsonl`),
+        'utf8'
+      );
 
       expect(health.body).toMatchObject({
         status: 'ok',
@@ -92,6 +96,9 @@ describe('local MCP proxy', () => {
         ]
       });
       expect(knowledgeJsonl).toContain('"title":"Local proxy captures knowledge"');
+      expect(usageJsonl).toContain('"kind":"context_pack.hit"');
+      expect(usageJsonl).toContain(`"knowledgeId":"${captured.id}"`);
+      expect(usageJsonl).toContain('"query":"local proxy"');
     } finally {
       await client.close().catch(() => undefined);
       await proxy.close();

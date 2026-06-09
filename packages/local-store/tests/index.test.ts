@@ -14,6 +14,7 @@ import {
   migrateProjectStore,
   PROJECT_STORE_SCHEMA_VERSION,
   readProjectConfig,
+  recordKnowledgeUsage,
   rateProjectKnowledge,
   rebuildProjectIndex,
   rejectPendingKnowledge,
@@ -375,6 +376,81 @@ describe('local project store', () => {
           knowledgeId: captured.item.id
         }
       });
+      expect(allItems).toHaveLength(1);
+      expect(allItems[0]?.id).toBe(captured.item.id);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records usage feedback outside ratings and updates adoption quality', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const core = createDevMeshCore({
+        projectRoot,
+        repository
+      });
+      const captured = await captureProjectKnowledge(projectRoot, {
+        type: 'decision',
+        title: 'Reuse local context pack hits',
+        summary: 'Context pack hits should improve adoption without becoming explicit ratings.'
+      });
+      const used = await recordKnowledgeUsage(
+        projectRoot,
+        core,
+        {
+          knowledgeId: captured.item.id,
+          kind: 'context_pack.hit',
+          adoptionDelta: 0.01,
+          context: {
+            query: 'local context',
+            rank: 1
+          }
+        },
+        {
+          reason: 'Returned in a context pack.',
+          createdBy: {
+            displayName: 'Ayuan'
+          }
+        }
+      );
+      const usageJsonl = await readFile(
+        join(projectRoot, '.dev-mesh', 'knowledge', 'usage', `${used.usage.createdAt.slice(0, 7)}.jsonl`),
+        'utf8'
+      );
+      const eventsJsonl = await readFile(
+        join(projectRoot, '.dev-mesh', 'events', `${used.event.createdAt.slice(0, 7)}.jsonl`),
+        'utf8'
+      );
+      const allItems = await repository.list({ includeSuperseded: true });
+
+      expect(used.item.quality.adoptionScore).toBeCloseTo(0.01);
+      expect(used.usage).toMatchObject({
+        knowledgeId: captured.item.id,
+        kind: 'context_pack.hit',
+        adoptionDelta: 0.01,
+        reason: 'Returned in a context pack.',
+        createdBy: {
+          displayName: 'Ayuan'
+        },
+        context: {
+          query: 'local context',
+          rank: 1
+        }
+      });
+      expect(usageJsonl).toContain('"kind":"context_pack.hit"');
+      expect(usageJsonl).toContain(`"knowledgeId":"${captured.item.id}"`);
+      await expect(
+        readFile(
+          join(projectRoot, '.dev-mesh', 'knowledge', 'ratings', `${used.usage.createdAt.slice(0, 7)}.jsonl`),
+          'utf8'
+        )
+      ).rejects.toMatchObject({
+        code: 'ENOENT'
+      });
+      expect(eventsJsonl).toContain('"kind":"knowledge.used"');
       expect(allItems).toHaveLength(1);
       expect(allItems[0]?.id).toBe(captured.item.id);
     } finally {

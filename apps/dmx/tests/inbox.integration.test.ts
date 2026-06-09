@@ -50,6 +50,10 @@ describe('dmx CLI inbox flow', () => {
 
       const accepted = await runDmx(['inbox', 'accept', queuedJson.id, '--root', projectRoot]);
       const acceptedJson = JSON.parse(accepted.stdout);
+      const usageAfterAcceptJsonl = await readFile(
+        join(projectRoot, '.dev-mesh', 'knowledge', 'usage', `${acceptedJson.item.updatedAt.slice(0, 7)}.jsonl`),
+        'utf8'
+      );
       const search = await runDmx(['search', 'accepted candidate', '--root', projectRoot]);
       const searchJson = JSON.parse(search.stdout);
       const emptyInbox = JSON.parse((await runDmx(['inbox', 'list', '--root', projectRoot])).stdout);
@@ -62,6 +66,8 @@ describe('dmx CLI inbox flow', () => {
         id: queuedJson.input.id,
         title: 'Review accepted candidate'
       });
+      expect(usageAfterAcceptJsonl).toContain('"kind":"review.accepted"');
+      expect(usageAfterAcceptJsonl).toContain(`"knowledgeId":"${queuedJson.input.id}"`);
       expect(emptyInbox.items).toHaveLength(0);
 
       const rejectedQueue = JSON.parse(

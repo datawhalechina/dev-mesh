@@ -11,6 +11,10 @@ export type {
   EnqueuePendingKnowledgeOptions,
   EnsureProjectStoreOptions,
   KnowledgeRatingRecord,
+  KnowledgeUsageInput,
+  KnowledgeUsageKind,
+  KnowledgeUsageOptions,
+  KnowledgeUsageRecord,
   PendingKnowledgeReviewItem,
   ProjectCaptureOptions,
   ProjectConfig,
@@ -21,6 +25,7 @@ export type {
   ProjectTaskStatus,
   RateProjectKnowledgeOptions,
   RateProjectKnowledgeResult,
+  RecordKnowledgeUsageResult,
   RebuildProjectIndexResult,
   RejectedKnowledgeReviewItem,
   RejectPendingKnowledgeResult,
@@ -40,6 +45,10 @@ export {
   captureProjectTask,
   rateProjectKnowledge
 } from './capture.js';
+export {
+  appendKnowledgeUsage,
+  recordKnowledgeUsage
+} from './usage.js';
 export { appendProjectEvent } from './events.js';
 export {
   acceptPendingKnowledge,

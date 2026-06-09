@@ -1,8 +1,14 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createAgentContextService, type AgentContextService, type BuildContextPackInput } from '@mcp-dev-mesh/agent';
+import {
+  createAgentContextService,
+  type AgentContextService,
+  type BuildContextPackInput,
+  type ContextPack,
+  type ContextPackItem
+} from '@mcp-dev-mesh/agent';
 import { createDevMeshCore, type CaptureKnowledgeInput, type DevMeshCore, type RateKnowledgeInput } from '@mcp-dev-mesh/core';
-import type { Extractor, ExtractProposal, RawEvent } from '@mcp-dev-mesh/extension-api';
+import type { Extractor, ExtractProposal, RawEvent, Redactor } from '@mcp-dev-mesh/extension-api';
 import { createRuleBasedExtractor, createSecretRedactor } from '@mcp-dev-mesh/extractor';
 import { createFileSystemCaptureProvider, createGitCaptureProvider } from '@mcp-dev-mesh/providers';
 import {
@@ -15,6 +21,7 @@ import {
   enqueuePendingKnowledge,
   readProjectConfig,
   rateProjectKnowledge,
+  recordKnowledgeUsage,
   rebuildProjectIndex,
   rejectPendingKnowledge,
   listPendingKnowledge,
@@ -22,6 +29,7 @@ import {
   type CaptureProjectTaskInput,
   type DevMeshEvent,
   type EnqueuePendingKnowledgeOptions,
+  type KnowledgeUsageOptions,
   type PendingKnowledgeReviewItem,
   type ProjectStore,
   type RateProjectKnowledgeOptions,
@@ -219,7 +227,35 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
       return enqueuePendingKnowledge(projectRoot, redacted, safeOptions);
     },
     listInbox: () => listPendingKnowledge(projectRoot),
-    acceptInboxItem: (id) => acceptPendingKnowledge(projectRoot, id),
+    async acceptInboxItem(id) {
+      const accepted = await acceptPendingKnowledge(projectRoot, id);
+
+      try {
+        const usage = await recordKnowledgeUsage(
+          projectRoot,
+          core,
+          {
+            knowledgeId: accepted.item.id,
+            kind: 'review.accepted',
+            adoptionDelta: 0.08,
+            confidenceDelta: 0.04,
+            context: {
+              queueId: accepted.queueItem.id,
+              risk: accepted.queueItem.risk,
+              reason: accepted.queueItem.reason
+            }
+          },
+          usageOptionsForMember(options.memberName)
+        );
+
+        return {
+          ...accepted,
+          item: usage.item
+        };
+      } catch {
+        return accepted;
+      }
+    },
     async rejectInboxItem(id, reason) {
       if (reason === undefined) {
         return rejectPendingKnowledge(projectRoot, id);
@@ -229,7 +265,15 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
 
       return rejectPendingKnowledge(projectRoot, id, safeReason);
     },
-    searchContext: (input) => agent.buildContextPack(input),
+    async searchContext(input) {
+      const contextPack = await agent.buildContextPack(input);
+
+      await recordContextPackUsage(projectRoot, core, redactor, contextPack, input, options.memberName).catch(
+        () => undefined
+      );
+
+      return contextPack;
+    },
     async listDevelopmentSignals(input = {}) {
       return {
         projectRoot,
@@ -258,6 +302,82 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
         autoCapture: true,
         autoSync: true
       };
+    }
+  };
+}
+
+async function recordContextPackUsage(
+  projectRoot: string,
+  core: DevMeshCore,
+  redactor: Redactor,
+  contextPack: ContextPack,
+  input: BuildContextPackInput,
+  memberName?: string
+): Promise<void> {
+  if (contextPack.items.length === 0) {
+    return;
+  }
+
+  const redactedQuery = (await redactor.redact({ text: input.query })).text;
+  const options = usageOptionsForMember(memberName);
+
+  await Promise.all(
+    contextPack.items.map(async (item, index) => {
+      await recordKnowledgeUsage(
+        projectRoot,
+        core,
+        {
+          knowledgeId: item.id,
+          kind: 'context_pack.hit',
+          adoptionDelta: 0.01,
+          context: createContextPackUsageContext(input, item, index, contextPack.items.length, redactedQuery)
+        },
+        options
+      );
+    })
+  );
+}
+
+function createContextPackUsageContext(
+  input: BuildContextPackInput,
+  item: ContextPackItem,
+  index: number,
+  resultCount: number,
+  query: string
+): Record<string, unknown> {
+  const context: Record<string, unknown> = {
+    tool: 'mesh_search_context',
+    query,
+    rank: index + 1,
+    resultCount,
+    layer: item.layer,
+    type: item.type,
+    entryKey: item.entryKey
+  };
+
+  if (input.authorName !== undefined) {
+    context.authorName = input.authorName;
+  }
+
+  if (input.para !== undefined) {
+    context.para = input.para;
+  }
+
+  if (input.recencyDays !== undefined) {
+    context.recencyDays = input.recencyDays;
+  }
+
+  return context;
+}
+
+function usageOptionsForMember(memberName: string | undefined): KnowledgeUsageOptions {
+  if (memberName === undefined) {
+    return {};
+  }
+
+  return {
+    createdBy: {
+      displayName: memberName
     }
   };
 }

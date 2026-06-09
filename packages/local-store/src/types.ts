@@ -173,3 +173,40 @@ export interface RateProjectKnowledgeResult {
 }
 
 export type RatingInput = RateKnowledgeInput;
+
+export type KnowledgeUsageKind = 'context_pack.hit' | 'review.accepted' | string;
+
+export interface KnowledgeUsageInput {
+  knowledgeId: string;
+  kind: KnowledgeUsageKind;
+  adoptionDelta?: number;
+  confidenceDelta?: number;
+  weightDelta?: number;
+  context?: Record<string, unknown>;
+}
+
+export interface KnowledgeUsageOptions extends ProjectCaptureOptions {
+  reason?: string;
+  createdBy?: MemberIdentity;
+}
+
+export interface KnowledgeUsageRecord {
+  id: string;
+  knowledgeId: string;
+  projectKey: string;
+  kind: KnowledgeUsageKind;
+  createdAt: string;
+  adoptionDelta?: number;
+  confidenceDelta?: number;
+  weightDelta?: number;
+  reason?: string;
+  context?: Record<string, unknown>;
+  createdBy?: MemberIdentity;
+  quality: KnowledgeItem['quality'];
+}
+
+export interface RecordKnowledgeUsageResult {
+  item: KnowledgeItem;
+  usage: KnowledgeUsageRecord;
+  event: DevMeshEvent;
+}

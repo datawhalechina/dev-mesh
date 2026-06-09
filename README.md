@@ -286,6 +286,7 @@ pnpm --filter mcp-dev-mesh dev -- doctor --root .
 - `knowledge/*.jsonl` 保存本地知识视图。
 - `events/*.jsonl` 是 append-only 事件日志。
 - `knowledge/ratings/*.jsonl` 保存显式反馈事件，不会被当作普通知识检索。
+- `knowledge/usage/*.jsonl` 保存检索命中、inbox 接受等采纳信号，用来轻量调整 adoption/quality，也不会被当作普通知识检索。
 - `index/manifest.json` 和 `index/mesh.sqlite` 是可重建本地索引。
 - `queue/pending.jsonl` 保存待 review 候选，接受后写入 knowledge 和 events，拒绝后进入 `queue/rejected.jsonl`。
 - `secrets/` 永远不应该同步或提交。
@@ -387,7 +388,7 @@ mesh_list_development_signals
 mesh_scan_project_knowledge
 ```
 
-其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件。
+其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件；检索命中和 inbox 接受会写入 usage 反馈文件，并通过较小的 adoption/confidence 增量影响后续排序。
 
 开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token、projects、knowledge edges 和 audit logs：
 

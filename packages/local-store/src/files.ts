@@ -15,6 +15,10 @@ export function getKnowledgeRatingFile(knowledgeDir: string, createdAt: string):
   return join(knowledgeDir, 'ratings', `${createdAt.slice(0, 7)}.jsonl`);
 }
 
+export function getKnowledgeUsageFile(knowledgeDir: string, createdAt: string): string {
+  return join(knowledgeDir, 'usage', `${createdAt.slice(0, 7)}.jsonl`);
+}
+
 export function getPendingQueueFile(queueDir: string): string {
   return join(queueDir, 'pending.jsonl');
 }
