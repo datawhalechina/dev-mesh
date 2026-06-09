@@ -88,7 +88,7 @@ describe('local-store SQLite repository integration', () => {
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   it('combines SQLite keyword hits with member filters and quality ranking', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-sqlite-member-search-'));

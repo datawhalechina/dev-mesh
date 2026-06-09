@@ -15,7 +15,7 @@ Included artifacts:
 
 ## Preflight
 
-Run the full verification suite before creating a tag or building images:
+Run the full verification suite before creating a tag or building images. The release check synchronizes the publishable CLI package version from the workspace root before validating the git tag:
 
 ```bash
 pnpm install
