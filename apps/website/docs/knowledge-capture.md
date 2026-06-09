@@ -17,7 +17,7 @@ title: 自动沉淀
 - `mesh_capture_task`：沉淀任务进展和交付记录。
 - `mesh_search_context`：按关键词检索项目上下文。
 - `mesh_scan_project_knowledge`：让 AI 客户端读取项目扫描发现项后自行总结并沉淀。
-- `mesh_explore_knowledge_graph`：围绕条目、PARA、tag、作者、来源和类型探索关系子图。
+- `mesh_explore_knowledge_graph`：围绕条目、PARA、tag、作者、来源、类型，以及 `supersedes`、`duplicates`、`contradicts` 语义边探索关系子图。
 
 检索命中会写入 `.dev-mesh/knowledge/usage/`，作为轻量 adoption 信号；inbox 接受会写入更强的 `review.accepted` usage 信号。usage 不会作为普通知识被检索，只用于质量分和后续排序反馈。
 

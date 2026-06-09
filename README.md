@@ -406,7 +406,7 @@ mesh_scan_project_knowledge
 mesh_explore_knowledge_graph
 ```
 
-其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。`mesh_explore_knowledge_graph` 会围绕条目、PARA、tag、作者、来源和类型返回关系子图，适合回答“这个决策关联哪些坑点/模块/成员经验”。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件；检索命中和 inbox 接受会写入 usage 反馈文件，并通过较小的 adoption/confidence 增量影响后续排序。
+其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。`mesh_explore_knowledge_graph` 会围绕条目、PARA、tag、作者、来源、类型，以及 `supersedes`、`duplicates`、`contradicts` 语义边返回关系子图，适合回答“这个决策关联哪些坑点/模块/成员经验”。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task` 和 `mesh_rate_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志和 ratings 反馈文件；检索命中和 inbox 接受会写入 usage 反馈文件，并通过较小的 adoption/confidence 增量影响后续排序。
 
 开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token、projects、knowledge edges 和 audit logs：
 
@@ -532,7 +532,7 @@ pnpm typecheck:examples
 - 已完成内置 quality scorers，覆盖 confidence、rating、adoption、freshness 和 source trust patch。
 - 已完成 assistant-led capture 主链路：MCP server instructions 和工具描述双层强提示模型总结当前上下文，再调用 `mesh_capture_knowledge` / `mesh_capture_task` 写入本地知识库。
 - 已完成 member-specific experience search 和内置 hybrid search backend，支持 keyword、deterministic embedding mock、recency、quality 和 adoption ranking。
-- 已完成知识图谱基础能力：从 Knowledge Item 派生 `.dev-mesh/index/graph.json`，并通过 `mesh_explore_knowledge_graph` 探索条目、PARA、tag、作者、来源和类型关系。
+- 已完成知识图谱基础能力：从 Knowledge Item 派生 `.dev-mesh/index/graph.json`，并通过 `mesh_explore_knowledge_graph` 探索条目、PARA、tag、作者、来源、类型和语义关系边。
 - 已完成 web-admin 的 member 禁用、invite 创建/撤销，以及 Hub admin audit log 写入和查询。
 - 已完成 project ACL 管理：支持 group/restricted visibility、成员角色配置、项目列表和 brief ACL 过滤。
 - 已完成 glossary 管理：支持 admin API 和 web-admin 创建、查询、编辑 canonical glossary term，并复用 `mesh_resolve_term` 检索。

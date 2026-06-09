@@ -2132,6 +2132,26 @@ describe('hub server HTTP integration', () => {
         layer: 'canonical',
         tags: ['mcp']
       });
+      const previousCapture = await client.callTool({
+        name: 'mesh_capture_knowledge',
+        arguments: {
+          type: 'decision',
+          title: 'Previous MCP graph decision',
+          summary: 'This older decision should be linked through a semantic edge.',
+          layer: 'canonical',
+          tags: ['mcp']
+        }
+      });
+      const previous = JSON.parse(readTextToolResult(previousCapture));
+      const edge = await requestJson(`${url}/api/v1/admin/knowledge-edges`, {
+        method: 'POST',
+        body: {
+          kind: 'supersedes',
+          fromId: captured.id,
+          toId: previous.id,
+          reason: 'MCP graph should include Hub semantic edges.'
+        }
+      });
 
       const search = await client.callTool({
         name: 'mesh_search_context',
@@ -2154,6 +2174,42 @@ describe('hub server HTTP integration', () => {
           }
         ]
       });
+
+      expect(edge.body).toMatchObject({
+        kind: 'supersedes',
+        fromId: captured.id,
+        toId: previous.id
+      });
+
+      const graphResult = await client.callTool({
+        name: 'mesh_explore_knowledge_graph',
+        arguments: {
+          ids: [captured.id],
+          depth: 1,
+          edgeKinds: ['supersedes']
+        }
+      });
+      const graph = JSON.parse(readTextToolResult(graphResult));
+
+      expect(graph.nodes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: `knowledge:${captured.id}`
+          }),
+          expect.objectContaining({
+            id: `knowledge:${previous.id}`
+          })
+        ])
+      );
+      expect(graph.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'supersedes',
+            from: `knowledge:${captured.id}`,
+            to: `knowledge:${previous.id}`
+          })
+        ])
+      );
     } finally {
       await client.close().catch(() => undefined);
       await app.close();

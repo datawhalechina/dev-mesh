@@ -60,7 +60,7 @@ pnpm --filter devmesh dev -- graph explore --root C:\path\to\project --query "pr
 pnpm --filter devmesh dev -- visualize --root C:\path\to\project --query "project knowledge"
 ```
 
-`visualize` 会生成一个基于 Cytoscape.js COSE force layout 的本地交互 HTML 图谱，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`。
+`visualize` 会生成一个基于 Cytoscape.js COSE force layout 的本地交互 HTML 图谱，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`；语义边会用方向、颜色和标签区分 `supersedes`、`duplicates`、`contradicts`。
 
 ## 诊断
 

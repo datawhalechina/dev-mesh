@@ -92,4 +92,95 @@ describe('knowledge graph', () => {
     expect(explored.nodes.map((node) => node.id)).toEqual(expect.arrayContaining([knowledgeNodeId('ki_second')]));
     expect(explored.edges.length).toBeGreaterThan(0);
   });
+
+  it('builds and explores semantic knowledge edges', () => {
+    const oldDecision = createKnowledgeItem({
+      id: 'ki_old',
+      type: 'decision',
+      title: 'Use polling sync',
+      summary: 'The daemon scans Git and filesystem signals on an interval.',
+      createdAt: '2026-06-09T09:00:00.000Z'
+    });
+    const newDecision = createKnowledgeItem({
+      id: 'ki_new',
+      type: 'decision',
+      title: 'Use assistant-led capture',
+      summary: 'Assistants decide when to capture durable project knowledge.',
+      createdAt: '2026-06-09T10:00:00.000Z'
+    });
+    const duplicate = createKnowledgeItem({
+      id: 'ki_duplicate',
+      type: 'decision',
+      title: 'Assistant capture habit',
+      summary: 'Capture only durable conclusions after meaningful work.',
+      createdAt: '2026-06-09T10:05:00.000Z'
+    });
+    const conflict = createKnowledgeItem({
+      id: 'ki_conflict',
+      type: 'pitfall',
+      title: 'Avoid background polling',
+      summary: 'Polling signals can add overhead without improving capture quality.',
+      createdAt: '2026-06-09T10:10:00.000Z'
+    });
+    const graph = buildKnowledgeGraph([oldDecision, newDecision, duplicate, conflict], {
+      semanticEdges: [
+        {
+          id: 'edge_supersedes',
+          kind: 'supersedes',
+          fromId: 'ki_new',
+          toId: 'ki_old',
+          reason: 'The newer decision replaces polling-based capture.'
+        },
+        {
+          id: 'edge_duplicates',
+          kind: 'duplicates',
+          fromId: 'ki_duplicate',
+          toId: 'ki_new'
+        },
+        {
+          id: 'edge_contradicts',
+          kind: 'contradicts',
+          fromId: 'ki_conflict',
+          toId: 'ki_old'
+        },
+        {
+          id: 'edge_missing',
+          kind: 'duplicates',
+          fromId: 'ki_missing',
+          toId: 'ki_new'
+        }
+      ]
+    });
+
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: `supersedes:${knowledgeNodeId('ki_new')}->${knowledgeNodeId('ki_old')}`,
+          from: knowledgeNodeId('ki_new'),
+          to: knowledgeNodeId('ki_old'),
+          kind: 'supersedes',
+          evidence: ['edge_supersedes']
+        }),
+        expect.objectContaining({
+          kind: 'duplicates'
+        }),
+        expect.objectContaining({
+          kind: 'contradicts'
+        })
+      ])
+    );
+    expect(graph.edges.some((edge) => edge.evidence.includes('edge_missing'))).toBe(false);
+
+    const explored = exploreKnowledgeGraph(graph, {
+      ids: ['ki_new'],
+      depth: 1,
+      edgeKinds: ['supersedes'],
+      limit: 10
+    });
+
+    expect(explored.nodes.map((node) => node.id)).toEqual(
+      expect.arrayContaining([knowledgeNodeId('ki_new'), knowledgeNodeId('ki_old')])
+    );
+    expect(explored.edges.map((edge) => edge.kind)).toEqual(['supersedes']);
+  });
 });

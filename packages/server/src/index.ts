@@ -19,3 +19,4 @@ export type {
   HubSyncTombstoneReplayResult
 } from './hub-sync.js';
 export { createMeshMcpServer } from './mcp.js';
+export type { MeshMcpServerOptions } from './mcp.js';

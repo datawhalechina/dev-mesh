@@ -9,7 +9,7 @@ import type {
   ParaRef,
   RateKnowledgeInput
 } from '@devmesh/core';
-import { buildKnowledgeGraph, exploreKnowledgeGraph } from '@devmesh/graph';
+import { buildKnowledgeGraph, exploreKnowledgeGraph, type KnowledgeGraphSemanticEdge } from '@devmesh/graph';
 import {
   DEV_MESH_MCP_INSTRUCTIONS,
   registerMeshTools,
@@ -31,7 +31,11 @@ import {
   type RateProjectKnowledgeResult
 } from '@devmesh/local-store';
 
-export function createMeshMcpServer(core: DevMeshCore): McpServer {
+export interface MeshMcpServerOptions {
+  knowledgeEdges?: () => KnowledgeGraphSemanticEdge[] | Promise<KnowledgeGraphSemanticEdge[]>;
+}
+
+export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOptions = {}): McpServer {
   const mcp = new McpServer(
     {
       name: 'devmesh',
@@ -102,7 +106,15 @@ export function createMeshMcpServer(core: DevMeshCore): McpServer {
       const items = await core.listKnowledge({
         includeSuperseded: true
       });
-      const graph = buildKnowledgeGraph(items);
+      const semanticEdges = await options.knowledgeEdges?.();
+      const graph = buildKnowledgeGraph(
+        items,
+        semanticEdges === undefined
+          ? {}
+          : {
+              semanticEdges
+            }
+      );
 
       return exploreKnowledgeGraph(graph, input);
     }

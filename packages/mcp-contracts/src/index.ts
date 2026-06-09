@@ -90,15 +90,26 @@ export const meshScanProjectKnowledgeInputSchema = z.object({
   limit: z.number().int().min(1).max(200).default(50)
 });
 
+const knowledgeGraphNodeKinds = ['knowledge', 'para', 'type', 'tag', 'member', 'source'] as const;
+const knowledgeGraphEdgeKinds = [
+  'authored_by',
+  'belongs_to_para',
+  'has_type',
+  'parent_para',
+  'sourced_from',
+  'tagged_with',
+  'supersedes',
+  'duplicates',
+  'contradicts'
+] as const;
+
 export const meshExploreKnowledgeGraphInputSchema = z.object({
   query: z.string().min(1).optional(),
   ids: z.array(z.string().min(1)).optional(),
   depth: z.number().int().min(0).max(4).default(2),
   limit: z.number().int().min(1).max(200).default(40),
-  nodeKinds: z.array(z.enum(['knowledge', 'para', 'type', 'tag', 'member', 'source'])).optional(),
-  edgeKinds: z
-    .array(z.enum(['authored_by', 'belongs_to_para', 'has_type', 'parent_para', 'sourced_from', 'tagged_with']))
-    .optional()
+  nodeKinds: z.array(z.enum(knowledgeGraphNodeKinds)).optional(),
+  edgeKinds: z.array(z.enum(knowledgeGraphEdgeKinds)).optional()
 });
 
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
@@ -217,7 +228,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Explore knowledge graph',
       description:
-        'Explore the derived DevMesh knowledge graph around matching knowledge items, PARA areas, tags, authors, sources, and types. Use this when relationships matter, such as finding related decisions, pits, owners, areas, or follow-up knowledge before answering or capturing a new item.',
+        'Explore the derived DevMesh knowledge graph around matching knowledge items, PARA areas, tags, authors, sources, types, and semantic edges such as supersedes, duplicates, and contradicts. Use this when relationships matter, such as finding related decisions, pits, owners, areas, or follow-up knowledge before answering or capturing a new item.',
       inputSchema: meshExploreKnowledgeGraphInputSchema.shape
     },
     async (args) =>

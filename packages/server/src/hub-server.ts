@@ -517,7 +517,7 @@ function createHubRouter(
   });
 
   router.all('/mcp', async (ctx) => {
-    await handleMcpRequest(ctx, core, mcpSessions);
+    await handleMcpRequest(ctx, core, hub, mcpSessions);
   });
 
   return router;
@@ -611,6 +611,7 @@ function readBearerToken(headers: Record<string, string | string[] | undefined>)
 async function handleMcpRequest(
   ctx: Context,
   core: DevMeshCore,
+  hub: HubState,
   sessions: Map<string, McpHttpSession>
 ): Promise<void> {
   const sessionId = readMcpSessionId(ctx.headers);
@@ -630,7 +631,7 @@ async function handleMcpRequest(
   }
 
   if (session === undefined) {
-    session = await createMcpHttpSession(core, sessions);
+    session = await createMcpHttpSession(core, hub, sessions);
   }
 
   ctx.respond = false;
@@ -639,6 +640,7 @@ async function handleMcpRequest(
 
 async function createMcpHttpSession(
   core: DevMeshCore,
+  hub: HubState,
   sessions: Map<string, McpHttpSession>
 ): Promise<McpHttpSession> {
   let session: McpHttpSession;
@@ -651,7 +653,9 @@ async function createMcpHttpSession(
       sessions.delete(sessionId);
     }
   });
-  const server = createMeshMcpServer(core);
+  const server = createMeshMcpServer(core, {
+    knowledgeEdges: () => hub.knowledgeEdges
+  });
 
   session = {
     server,

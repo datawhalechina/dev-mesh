@@ -8,7 +8,17 @@ import { createDevMeshClientRuntime, type DevMeshClientRuntime } from '@devmesh/
 import { parseIntOption } from './shared.js';
 
 const NODE_KINDS = ['knowledge', 'para', 'type', 'tag', 'member', 'source'] as const;
-const EDGE_KINDS = ['authored_by', 'belongs_to_para', 'has_type', 'parent_para', 'sourced_from', 'tagged_with'] as const;
+const EDGE_KINDS = [
+  'authored_by',
+  'belongs_to_para',
+  'has_type',
+  'parent_para',
+  'sourced_from',
+  'tagged_with',
+  'supersedes',
+  'duplicates',
+  'contradicts'
+] as const;
 const nodeRequire = createRequire(import.meta.url);
 
 export function registerGraphCommand(program: Command): void {
@@ -178,6 +188,9 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult, cytoscapeBundle
       --tag: #9a4f63;
       --member: #6d5f93;
       --source: #5a7076;
+      --supersedes: #2f6f9f;
+      --duplicates: #52714d;
+      --contradicts: #b64646;
     }
 
     * {
@@ -317,6 +330,20 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult, cytoscapeBundle
       background: var(--color);
     }
 
+    .edge-legend {
+      display: grid;
+      gap: 8px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .edge-swatch {
+      width: 20px;
+      height: 0;
+      border-top: 2px solid var(--color);
+    }
+
     pre {
       white-space: pre-wrap;
       word-break: break-word;
@@ -375,6 +402,9 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult, cytoscapeBundle
       <div class="legend">
         ${NODE_KINDS.map((kind) => `<div class="legend-item"><span class="swatch" style="--color: var(--${kind})"></span>${kind}</div>`).join('')}
       </div>
+      <div class="edge-legend">
+        ${['supersedes', 'duplicates', 'contradicts'].map((kind) => `<div class="legend-item"><span class="edge-swatch" style="--color: var(--${kind})"></span>${kind}</div>`).join('')}
+      </div>
       <pre id="detail-json">{}</pre>
     </aside>
   </main>
@@ -391,6 +421,12 @@ ${cytoscapeScript}
       member: '#6d5f93',
       source: '#5a7076'
     };
+    const edgeColors = {
+      supersedes: '#2f6f9f',
+      duplicates: '#52714d',
+      contradicts: '#b64646'
+    };
+    const semanticEdgeKinds = new Set(Object.keys(edgeColors));
     const graphContainer = document.getElementById('graph');
     const detailTitle = document.getElementById('detail-title');
     const detailMeta = document.getElementById('detail-meta');
@@ -418,8 +454,11 @@ ${cytoscapeScript}
             target: edge.to,
             kind: edge.kind,
             weight: edge.weight,
-            evidence: edge.evidence
-          }
+            evidence: edge.evidence,
+            color: edgeColors[edge.kind] || '#aeb2aa',
+            label: semanticEdgeKinds.has(edge.kind) ? edge.kind : ''
+          },
+          classes: semanticEdgeKinds.has(edge.kind) ? 'semantic' : ''
         }))
     ];
     const cy = cytoscape({
@@ -482,6 +521,34 @@ ${cytoscapeScript}
           }
         },
         {
+          selector: 'edge.semantic',
+          style: {
+            'color': '#343631',
+            'font-size': 9,
+            'label': 'data(label)',
+            'line-color': 'data(color)',
+            'target-arrow-color': 'data(color)',
+            'target-arrow-shape': 'triangle',
+            'text-background-color': '#f7f7f4',
+            'text-background-opacity': 0.9,
+            'text-background-padding': 2,
+            'text-rotation': 'autorotate',
+            'width': 'mapData(weight, 1, 8, 1.8, 4.5)'
+          }
+        },
+        {
+          selector: 'edge[kind = "duplicates"]',
+          style: {
+            'line-style': 'dashed'
+          }
+        },
+        {
+          selector: 'edge[kind = "contradicts"]',
+          style: {
+            'line-style': 'dashed'
+          }
+        },
+        {
           selector: 'edge:selected',
           style: {
             'line-color': '#202124',
@@ -517,6 +584,7 @@ ${cytoscapeScript}
       }
 
       cy.elements().removeClass('selected');
+      cy.elements().unselect();
       node.addClass('selected');
       detailTitle.textContent = node.data('label');
       detailMeta.innerHTML = [
@@ -525,6 +593,29 @@ ${cytoscapeScript}
         \`<strong>Degree</strong> \${node.connectedEdges().length}\`
       ].join('<br>');
       detailJson.textContent = JSON.stringify(node.data('metadata') || {}, null, 2);
+    }
+
+    function selectEdge(id) {
+      const edge = cy.getElementById(id);
+
+      if (edge.empty()) {
+        return;
+      }
+
+      cy.elements().removeClass('selected');
+      cy.elements().unselect();
+      edge.select();
+      detailTitle.textContent = edge.data('kind');
+      detailMeta.innerHTML = [
+        \`<strong>Kind</strong> \${escapeMarkup(edge.data('kind'))}\`,
+        \`<strong>From</strong> \${escapeMarkup(edge.source().data('label') || edge.source().id())}\`,
+        \`<strong>To</strong> \${escapeMarkup(edge.target().data('label') || edge.target().id())}\`,
+        \`<strong>Weight</strong> \${escapeMarkup(edge.data('weight'))}\`
+      ].join('<br>');
+      detailJson.textContent = JSON.stringify({
+        id: edge.id(),
+        evidence: edge.data('evidence') || []
+      }, null, 2);
     }
 
     function shorten(value, max) {
@@ -543,6 +634,7 @@ ${cytoscapeScript}
     }
 
     cy.on('tap', 'node', (event) => selectNode(event.target.id()));
+    cy.on('tap', 'edge', (event) => selectEdge(event.target.id()));
     cy.ready(() => {
       if (graph.nodes.length > 0) {
         selectNode(graph.nodes[0].id);

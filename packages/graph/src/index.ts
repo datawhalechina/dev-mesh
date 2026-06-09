@@ -1,13 +1,24 @@
 import type { KnowledgeItem, ParaCategory } from '@devmesh/core';
 
-export type KnowledgeGraphNodeKind = 'knowledge' | 'para' | 'type' | 'tag' | 'member' | 'source';
-export type KnowledgeGraphEdgeKind =
-  | 'authored_by'
-  | 'belongs_to_para'
-  | 'has_type'
-  | 'parent_para'
-  | 'sourced_from'
-  | 'tagged_with';
+export const KNOWLEDGE_GRAPH_NODE_KINDS = ['knowledge', 'para', 'type', 'tag', 'member', 'source'] as const;
+export const KNOWLEDGE_GRAPH_METADATA_EDGE_KINDS = [
+  'authored_by',
+  'belongs_to_para',
+  'has_type',
+  'parent_para',
+  'sourced_from',
+  'tagged_with'
+] as const;
+export const KNOWLEDGE_GRAPH_SEMANTIC_EDGE_KINDS = ['supersedes', 'duplicates', 'contradicts'] as const;
+export const KNOWLEDGE_GRAPH_EDGE_KINDS = [
+  ...KNOWLEDGE_GRAPH_METADATA_EDGE_KINDS,
+  ...KNOWLEDGE_GRAPH_SEMANTIC_EDGE_KINDS
+] as const;
+
+export type KnowledgeGraphNodeKind = (typeof KNOWLEDGE_GRAPH_NODE_KINDS)[number];
+export type KnowledgeGraphMetadataEdgeKind = (typeof KNOWLEDGE_GRAPH_METADATA_EDGE_KINDS)[number];
+export type KnowledgeGraphSemanticEdgeKind = (typeof KNOWLEDGE_GRAPH_SEMANTIC_EDGE_KINDS)[number];
+export type KnowledgeGraphEdgeKind = (typeof KNOWLEDGE_GRAPH_EDGE_KINDS)[number];
 
 export interface KnowledgeGraphNode {
   id: string;
@@ -32,8 +43,18 @@ export interface KnowledgeGraph {
   edges: KnowledgeGraphEdge[];
 }
 
+export interface KnowledgeGraphSemanticEdge {
+  id?: string;
+  kind: KnowledgeGraphSemanticEdgeKind;
+  fromId: string;
+  toId: string;
+  reason?: string;
+  createdAt?: string;
+}
+
 export interface BuildKnowledgeGraphOptions {
   now?: () => Date;
+  semanticEdges?: KnowledgeGraphSemanticEdge[] | undefined;
 }
 
 export interface ExploreKnowledgeGraphInput {
@@ -70,6 +91,10 @@ export function buildKnowledgeGraph(
 
   for (const item of items) {
     addKnowledgeItemGraph(graph, item);
+  }
+
+  for (const edge of options.semanticEdges ?? []) {
+    addKnowledgeSemanticEdgeGraph(graph, edge);
   }
 
   return {
@@ -146,6 +171,10 @@ export function knowledgeNodeId(itemId: string): string {
   return nodeId('knowledge', itemId);
 }
 
+export function isKnowledgeGraphSemanticEdgeKind(value: KnowledgeGraphEdgeKind): value is KnowledgeGraphSemanticEdgeKind {
+  return (KNOWLEDGE_GRAPH_SEMANTIC_EDGE_KINDS as readonly string[]).includes(value);
+}
+
 function addKnowledgeItemGraph(graph: MutableGraph, item: KnowledgeItem): void {
   const knowledgeId = knowledgeNodeId(item.id);
   addNode(graph, {
@@ -220,6 +249,17 @@ function addKnowledgeItemGraph(graph: MutableGraph, item: KnowledgeItem): void {
     });
     addEdge(graph, knowledgeId, sourceId, 'sourced_from', item.id);
   }
+}
+
+function addKnowledgeSemanticEdgeGraph(graph: MutableGraph, edge: KnowledgeGraphSemanticEdge): void {
+  const from = knowledgeNodeId(edge.fromId);
+  const to = knowledgeNodeId(edge.toId);
+
+  if (from === to || !graph.nodes.has(from) || !graph.nodes.has(to)) {
+    return;
+  }
+
+  addEdge(graph, from, to, edge.kind, edge.id ?? `${edge.kind}:${edge.fromId}->${edge.toId}`);
 }
 
 function addParaNodes(graph: MutableGraph, category: ParaCategory, key: string): string {

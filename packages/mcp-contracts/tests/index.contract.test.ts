@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEV_MESH_MCP_INSTRUCTIONS,
   meshCaptureKnowledgeInputSchema,
+  meshExploreKnowledgeGraphInputSchema,
   meshRateKnowledgeInputSchema,
   meshSearchContextInputSchema,
   registerMeshTools,
@@ -50,6 +51,15 @@ describe('MCP tool contract schemas', () => {
     expect(capture.visibility).toBe('project');
     expect(capture.weight).toBe(1);
     expect(() => meshRateKnowledgeInputSchema.parse({ id: 'ki_1', rating: 2 })).toThrow();
+  });
+
+  it('accepts semantic graph edge filters', () => {
+    const input = meshExploreKnowledgeGraphInputSchema.parse({
+      ids: ['ki_new'],
+      edgeKinds: ['supersedes', 'duplicates', 'contradicts']
+    });
+
+    expect(input.edgeKinds).toEqual(['supersedes', 'duplicates', 'contradicts']);
   });
 
   it('registers the expected public tools', async () => {
