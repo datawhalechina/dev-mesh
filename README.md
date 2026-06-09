@@ -241,7 +241,7 @@ pnpm --filter devmesh dev -- visualize --root . --query "focused tests"
 pnpm --filter devmesh dev -- graph visualize --root . --query "focused tests" --no-open
 ```
 
-可视化页面使用 Cytoscape.js 生成，输出为单个本地 HTML 文件。
+可视化页面使用 Cytoscape.js 的 COSE force layout 生成，打开时会以引力/斥力动画收敛，输出为单个本地 HTML 文件。
 
 查看本地状态：
 

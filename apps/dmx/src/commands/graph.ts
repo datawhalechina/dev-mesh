@@ -491,15 +491,21 @@ ${cytoscapeScript}
       ],
       layout: {
         name: graph.nodes.length <= 1 ? 'grid' : 'cose',
-        animate: false,
+        animate: true,
+        animationDuration: 900,
         componentSpacing: 90,
         edgeElasticity: 95,
         fit: true,
+        gravity: 1.2,
         idealEdgeLength: 112,
+        initialTemp: 180,
+        minTemp: 1,
         nodeOverlap: 18,
         nodeRepulsion: 7200,
+        numIter: 1200,
         padding: 52,
-        randomize: true
+        randomize: true,
+        refresh: 20
       }
     });
 
