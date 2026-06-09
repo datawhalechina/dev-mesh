@@ -29,6 +29,7 @@ describe('local project store', () => {
       const store = await ensureProjectStore(projectRoot, { projectKey: 'org/repo' });
       const config = await readFile(store.paths.config, 'utf8');
       expect(config).toContain('project_key = "org/repo"');
+      expect(config).toContain('auto_reference = true');
       await expect(readProjectConfig(projectRoot)).resolves.toMatchObject({
         schemaVersion: PROJECT_STORE_SCHEMA_VERSION,
         projectKey: 'org/repo',
@@ -122,7 +123,6 @@ describe('local project store', () => {
           '[automation]',
           'auto_init = true',
           'auto_reference = false',
-          'auto_capture = true',
           'auto_sync = true',
           '',
           '[privacy]',
@@ -471,7 +471,7 @@ describe('local project store', () => {
           tags: ['review']
         },
         {
-          reason: 'High-risk automatic extraction.',
+          reason: 'High-risk knowledge capture.',
           risk: 'high'
         }
       );

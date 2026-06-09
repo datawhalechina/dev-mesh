@@ -148,7 +148,6 @@ function normalizeProjectConfig(parsed: Record<string, unknown>): ProjectConfig 
     automation: {
       autoInit: readBoolean(parsed['automation.auto_init'], true),
       autoReference: readBoolean(parsed['automation.auto_reference'], true),
-      autoCapture: readBoolean(parsed['automation.auto_capture'], true),
       autoSync: readBoolean(parsed['automation.auto_sync'], false)
     },
     privacy: {
@@ -230,7 +229,6 @@ function defaultProjectConfig(options: EnsureProjectStoreOptions): string {
     automation: {
       autoInit: true,
       autoReference: true,
-      autoCapture: true,
       autoSync: true
     },
     privacy: {
@@ -251,7 +249,6 @@ function projectConfigToToml(config: ProjectConfig): string {
     '[automation]',
     `auto_init = ${config.automation.autoInit}`,
     `auto_reference = ${config.automation.autoReference}`,
-    `auto_capture = ${config.automation.autoCapture}`,
     `auto_sync = ${config.automation.autoSync}`,
     '',
     '[privacy]',

@@ -4,14 +4,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { createGitCaptureProvider } from '../src/index.js';
+import { createGitProjectScanProvider } from '../src/index.js';
 
 const execFileAsync = promisify(execFile);
 
-describe('createGitCaptureProvider', () => {
-  it('detects git repositories and collects a structured git snapshot raw event', async () => {
+describe('createGitProjectScanProvider', () => {
+  it('detects git repositories and collects a structured git project scan record', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-provider-git-'));
-    const provider = createGitCaptureProvider({
+    const provider = createGitProjectScanProvider({
       now: () => new Date('2026-06-06T10:00:00.000Z')
     });
 
@@ -38,7 +38,7 @@ describe('createGitCaptureProvider', () => {
 
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
-        id: 'raw_git_20260606T100000000Z',
+        id: 'scan_git_20260606T100000000Z',
         kind: 'git.snapshot',
         createdAt: '2026-06-06T10:00:00.000Z',
         source: {
@@ -74,7 +74,7 @@ describe('createGitCaptureProvider', () => {
 
   it('does not detect non-git directories', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-provider-not-git-'));
-    const provider = createGitCaptureProvider();
+    const provider = createGitProjectScanProvider();
 
     try {
       await expect(provider.detect(projectRoot)).resolves.toBe(false);

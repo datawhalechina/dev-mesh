@@ -47,14 +47,14 @@ packages/
   agent/                  # Agent context pack 编排
   client/                 # 本地 runtime、全局初始化和项目 store 组合
   server/                 # Hub Server、HTTP API、MCP endpoint
-  extension-api/          # Adapter / Provider / Extractor / Scorer 等接口
+  extension-api/          # Adapter / Provider / Redactor / Scorer 等接口
   registry/               # 扩展注册和 capability resolve
   mcp-contracts/          # MCP tool schema 和注册
   protocol/               # Sync / join / well-known API 类型
   local-store/            # .dev-mesh 本地知识库
   adapters/               # 内置 Codex / Claude Code / opencode 工具适配器
-  providers/              # 内置采集源 skeleton
-  extractor/              # 提取器 skeleton
+  providers/              # 内置项目扫描 provider skeleton
+  redaction/              # 内置 redactor
   quality/                # 质量评分器 skeleton
   search/                 # 搜索 backend skeleton
   storage/                # 存储 backend skeleton
@@ -137,7 +137,7 @@ Website: http://127.0.0.1:3000
 dmx init
 ```
 
-该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `devmesh` MCP server 配置。真实终端中完成后会继续用 TUI 展示写入结果；CI、管道重定向或显式 `--json` 时输出结构化 JSON。默认全局自动化策略启用 `auto_init`、`auto_reference`、助手自主决策的 `auto_capture` 和 `auto_sync`。
+该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `devmesh` MCP server 配置。真实终端中完成后会继续用 TUI 展示写入结果；CI、管道重定向或显式 `--json` 时输出结构化 JSON。默认全局自动化策略启用 `auto_init`、`auto_reference` 和 `auto_sync`；助手自主知识沉淀由 MCP 工具强提示直接驱动，不再需要单独配置开关。
 
 当前仓库开发期也可以通过 workspace dev script 运行：
 
@@ -154,7 +154,7 @@ pnpm --filter devmesh dev -- init --global --tools codex,claude,opencode --mcp-u
 ```
 
 该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `devmesh` MCP server 配置。
-默认写入的是 stdio MCP launcher 命令，语义等同于 `dmx serve --mcp --name <name>`；生产安装场景会尽量写成当前 Node 可执行文件直接运行 CLI 入口，避免经过 npm 生成的 shell shim（Windows 上尤其要避开 `dmx.cmd` 弹出控制台窗口）。配置不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。`auto_capture = true` 表示 MCP 工具描述会持续提醒 Codex、Claude Code 或 opencode 根据当前对话、代码阅读、编辑和命令结果自主判断是否调用 `mesh_capture_knowledge` / `mesh_capture_task`；DevMesh 不再依赖后台 Git / filesystem 轮询。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
+默认写入的是 stdio MCP launcher 命令，语义等同于 `dmx serve --mcp --name <name>`；生产安装场景会尽量写成当前 Node 可执行文件直接运行 CLI 入口，避免经过 npm 生成的 shell shim（Windows 上尤其要避开 `dmx.cmd` 弹出控制台窗口）。配置不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。MCP 工具描述会持续提醒 Codex、Claude Code 或 opencode 根据当前对话、代码阅读、编辑和命令结果自主判断是否调用 `mesh_capture_knowledge` / `mesh_capture_task`；DevMesh 不再依赖后台 Git / filesystem 轮询。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
 
 加入开发期 Hub Server 的 group：
 
@@ -207,7 +207,7 @@ pnpm --filter devmesh dev -- capture \
   --root . \
   --name local \
   --review \
-  --reason "High-risk automatic extraction" \
+  --reason "High-risk knowledge capture" \
   --title "Review before publishing" \
   --summary "This candidate should be accepted before it becomes project knowledge." \
   --type decision
@@ -257,7 +257,7 @@ pnpm --filter devmesh dev -- index rebuild --root .
 pnpm --filter devmesh dev -- doctor --root .
 ```
 
-`dmx doctor` 会检查本地 store、privacy 配置、auto-capture 状态、sync 身份、daemon sync 状态、stdio launcher/daemon 状态和内置 adapter 状态。真实终端中会用 Clack TUI 按类别展示检查结果和修复建议；需要机器读取时可使用 `dmx doctor --json`。
+`dmx doctor` 会检查本地 store、privacy 配置、assistant-led capture 提示、sync 身份、daemon sync 状态、stdio launcher/daemon 状态和内置 adapter 状态。真实终端中会用 Clack TUI 按类别展示检查结果和修复建议；需要机器读取时可使用 `dmx doctor --json`。
 
 ## `.dev-mesh/` 本地知识库
 
@@ -507,11 +507,10 @@ pnpm typecheck:examples
 阶段 5 分布式 Mesh 已完成，当前进入发布前验证和生产化准备：
 
 - 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx serve --mcp` stdio launcher、按需项目 daemon、daemon 自动 sync push/pull 和远端 knowledge replay、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
-- 已完成 Git snapshot provider、filesystem snapshot provider 和 MCP tool call provider，能采集 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数、工具调用成功/失败信号，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
-- 已完成 rule-based extractor，能把 provider raw event 生成带 risk 和 evidence metadata 的 `task_progress`、`command`、`pitfall` 等 extract proposal。
+- 已完成 Git snapshot provider 和 filesystem snapshot provider，供 `mesh_scan_project_knowledge` 按需读取 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
 - 已完成内置 redactor 的 secret、PII、URL token、Authorization、cookie、private key 和 sensitive path 脱敏。
 - 已完成内置 quality scorers，覆盖 confidence、rating、adoption、freshness 和 source trust patch。
-- 已完成 client runtime 的 raw event capture pipeline：provider raw event 写入本地 event log，extract proposal 低风险自动发布，高/中风险进入 `dmx inbox`。
+- 已完成 assistant-led capture 主链路：MCP 工具强提示模型总结当前上下文，再调用 `mesh_capture_knowledge` / `mesh_capture_task` 写入本地知识库。
 - 已完成 member-specific experience search 和内置 hybrid search backend，支持 keyword、deterministic embedding mock、recency、quality 和 adoption ranking。
 - 已完成 web-admin 的 member 禁用、invite 创建/撤销，以及 Hub admin audit log 写入和查询。
 - 已完成 project ACL 管理：支持 group/restricted visibility、成员角色配置、项目列表和 brief ACL 过滤。

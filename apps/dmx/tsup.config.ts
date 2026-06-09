@@ -12,9 +12,9 @@ export default defineConfig({
     '@devmesh/client',
     '@devmesh/core',
     '@devmesh/extension-api',
-    '@devmesh/extractor',
     '@devmesh/local-store',
     '@devmesh/mcp-contracts',
+    '@devmesh/redaction',
     '@devmesh/shared'
   ]
 });

@@ -58,14 +58,12 @@
 
 - [x] Git provider：采集 diff、commit、branch、测试结果摘要。
 - [x] 文件事件 provider：按 `.meshignore` 和隐私策略过滤。
-- [x] MCP tool call provider：采集工具调用结果和失败信号。
-- [x] Extractor：从 raw event 生成 extract proposal。
 - [x] Redactor：secret scan、PII scan、URL token、Authorization、cookie 脱敏。
 - [x] Quality scorer：confidence、rating、adoption、freshness、source trust。
-- [x] low-risk 自动发布，high-risk 进入 `dmx inbox`。
+- [x] assistant-led capture：由 MCP 工具强提示模型总结当前上下文后主动写入知识。
 - [x] member-specific experience search。
 - [x] hybrid search with embeddings。
-- [x] provider -> extractor -> local event log integration test。
+- [x] assistant-led capture integration test。
 - [x] redaction pipeline security test。
 
 ## 阶段 4：团队化
@@ -135,9 +133,9 @@
 
 ### 阶段 3 验收标准
 
-- Git、文件事件、命令和 MCP tool call provider 能产出统一 raw event，且遵守 `.meshignore` 和隐私策略。
+- Git 和文件扫描 provider 能产出按需项目扫描发现项，且遵守 `.meshignore` 和隐私策略。
 - redaction pipeline 对 token、Authorization、cookie、`.env`、`*.pem`、`*.key` 默认脱敏或阻断。
-- extractor 能把 raw event 生成 extract proposal，低风险自动发布，高风险进入 `dmx inbox`。
+- MCP 工具提示能驱动 AI 客户端自行总结当前上下文并调用 capture 工具。
 - quality scorer 能结合 confidence、rating、adoption、freshness、source trust 生成稳定 `qualityScore`。
 - 本地检索能结合 SQLite 关键词索引和质量排序，支持 member-specific experience search。
 

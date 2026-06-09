@@ -162,9 +162,6 @@ importers:
       '@devmesh/core':
         specifier: workspace:*
         version: link:../core
-      '@devmesh/extractor':
-        specifier: workspace:*
-        version: link:../extractor
       '@devmesh/local-store':
         specifier: workspace:*
         version: link:../local-store
@@ -177,6 +174,9 @@ importers:
       '@devmesh/providers':
         specifier: workspace:*
         version: link:../providers
+      '@devmesh/redaction':
+        specifier: workspace:*
+        version: link:../redaction
       '@devmesh/shared':
         specifier: workspace:*
         version: link:../shared
@@ -214,12 +214,6 @@ importers:
 
   packages/extension-api: {}
 
-  packages/extractor:
-    dependencies:
-      '@devmesh/extension-api':
-        specifier: workspace:*
-        version: link:../extension-api
-
   packages/local-store:
     dependencies:
       '@devmesh/core':
@@ -247,6 +241,12 @@ importers:
         version: link:../extension-api
 
   packages/quality:
+    dependencies:
+      '@devmesh/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
+
+  packages/redaction:
     dependencies:
       '@devmesh/extension-api':
         specifier: workspace:*

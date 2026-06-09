@@ -49,7 +49,6 @@ export interface ProjectConfig {
   automation: {
     autoInit: boolean;
     autoReference: boolean;
-    autoCapture: boolean;
     autoSync: boolean;
   };
   privacy: {

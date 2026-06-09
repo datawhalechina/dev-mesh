@@ -58,7 +58,6 @@
 | Knowledge Quality Signals | 知识质量信号，包括 `confidence`、`weight`、`rating`、`adoptionScore` 和派生的 `qualityScore`，用于表达可靠性、先进性、团队认可度、真实采纳情况和检索优先级。 |
 | Context Pack | 检索返回给 Agent 的上下文包，包含摘要、来源、质量信号和引用链接。 |
 | Adapter | 针对 Codex、Claude Code、opencode 等工具的配置写入和事件接入模块。 |
-| Extractor | 从 Git diff、命令结果、会话摘要、Agent 工具调用中提取候选知识的模块。 |
 | Sync Cursor | 客户端和服务端之间的增量同步游标。 |
 
 ## 3. 总体架构
@@ -73,8 +72,8 @@ Codex / Claude Code / opencode
 Mesh Client on developer machine
   - Local MCP Proxy: http://127.0.0.1:8722/mcp
   - Tool adapters
-  - Git and task observer
-  - Redaction and extraction pipeline
+  - Project scan providers
+  - Redaction helpers
   - Project store manager
         |
         v
@@ -132,8 +131,8 @@ devmesh/
     mcp-contracts/          # @devmesh/mcp-contracts：MCP tool/resource/prompt schema
     protocol/               # @devmesh/protocol：Sync API types
     adapters/               # @devmesh/adapters：codex / claude / opencode adapters
-    providers/              # @devmesh/providers：git / filesystem / command capture providers
-    extractor/              # @devmesh/extractor：知识提取、分类、脱敏
+    providers/              # @devmesh/providers：git / filesystem project scan providers
+    redaction/              # @devmesh/redaction：内置脱敏
     quality/                # @devmesh/quality：confidence / weight / rating scorer
     search/                 # @devmesh/search：hybrid search, ranking, backend adapters
     local-store/            # @devmesh/local-store：.dev-mesh schema, migrations, indexer
@@ -184,11 +183,11 @@ devmesh/
 | `packages/agent` | `@devmesh/agent` | 面向 AI Agent 的上下文包构建、自动引用策略、自动沉淀流程、工具调用策略、prompt helper。 | 不直接写 Codex/Claude/opencode 配置，不持有远端服务状态。 |
 | `packages/client` | `@devmesh/client` | 本地 daemon、local MCP proxy、`dmx` runtime、全局/项目配置、join 状态、本地自动化调度。 | 不实现团队 Hub 业务，不把核心知识规则写死在 CLI 中。 |
 | `packages/server` | `@devmesh/server` | Hub Server、远程 MCP endpoint、group/ACL、同步 API、审计和管理接口。 | 不承担本机工具扫描、项目文件监听、开发工具配置。 |
-| `packages/extension-api` | `@devmesh/extension-api` | 对外稳定接口：Adapter、Provider、Extractor、Scorer、SearchBackend、StorageBackend、SyncBackend。 | 不依赖内置扩展实现，不泄漏内部服务细节。 |
-| `packages/registry` | `@devmesh/registry` | 扩展注册、能力发现、优先级排序、配置 schema 校验。 | 不包含具体采集、提取、检索算法。 |
+| `packages/extension-api` | `@devmesh/extension-api` | 对外稳定接口：Adapter、Provider、Redactor、Scorer、SearchBackend、StorageBackend、SyncBackend。 | 不依赖内置扩展实现，不泄漏内部服务细节。 |
+| `packages/registry` | `@devmesh/registry` | 扩展注册、能力发现、优先级排序、配置 schema 校验。 | 不包含具体扫描、脱敏、检索算法。 |
 | `packages/adapters` | `@devmesh/adapters` | 内置 Codex、Claude Code、opencode 等工具适配。 | 不定义通用扩展协议。 |
-| `packages/providers` | `@devmesh/providers` | 内置 Git、文件系统、命令、MCP tool call 等采集源。 | 不决定 canonical 团队事实。 |
-| `packages/search` | `@devmesh/search` | 混合检索、排序、向量/关键词 backend adapter。 | 不直接采集 raw event。 |
+| `packages/providers` | `@devmesh/providers` | 内置 Git、文件系统等按需项目扫描来源。 | 不决定 canonical 团队事实。 |
+| `packages/search` | `@devmesh/search` | 混合检索、排序、向量/关键词 backend adapter。 | 不直接读取项目文件或写入知识事件。 |
 | `packages/quality` | `@devmesh/quality` | 置信度、权重、评分、引用后反馈、时效性等 scorer。 | 不直接删除或覆盖知识条目。 |
 
 依赖方向必须保持单向：
@@ -201,7 +200,7 @@ extension-api
 
 extension-api
   <- registry
-  <- adapters / providers / extractor / quality / search / storage
+  <- adapters / providers / redaction / quality / search / storage
 
 core <- server
 core <- local-store
@@ -265,14 +264,13 @@ export const domainFreshnessExtension: DevMeshExtension = {
 
 ### 4.2 开发横向扩展设计
 
-这里的横向扩展指“开发能力扩展”，不是服务端分布式扩容。目标是后续可以低成本增加新的开发工具、采集来源、知识模型、LLM 提取器、评分算法、检索后端和同步目标。
+这里的横向扩展指“开发能力扩展”，不是服务端分布式扩容。目标是后续可以低成本增加新的开发工具、项目扫描来源、知识模型、评分算法、检索后端和同步目标。
 
 核心原则：
 
 - Core 不认识具体工具，只认识接口和 capability。
 - Adapter 只负责工具接入，不写业务知识逻辑。
-- Provider 只负责采集 raw event，不直接写 canonical。
-- Extractor 只负责从 raw 生成 extract proposal，不决定团队事实。
+- Provider 只负责按需读取项目扫描上下文，不直接写 canonical。
 - Scorer 只负责计算质量信号，不直接删除知识。
 - SearchBackend 只负责召回，最终排序由统一 RankingService 完成。
 - StorageBackend 只负责持久化，业务层通过 repository 接口访问。
@@ -283,8 +281,7 @@ export const domainFreshnessExtension: DevMeshExtension = {
 | 扩展点 | 用途 | 示例 |
 | --- | --- | --- |
 | `ToolAdapter` | 接入新的 MCP Host 或开发工具。 | Codex、Claude Code、opencode、Cursor、VS Code 插件。 |
-| `CaptureProvider` | 增加新的事件来源。 | Git、文件系统、命令执行、CI、Issue、PR、聊天摘要。 |
-| `Extractor` | 增加新的知识提取方式。 | LLM extractor、规则 extractor、diff extractor、test failure extractor。 |
+| `ProjectScanProvider` | 增加新的按需项目扫描来源。 | Git、文件系统、CI 摘要、Issue、PR。 |
 | `Redactor` | 增加新的脱敏规则。 | Secret scan、PII scan、企业自定义客户数据规则。 |
 | `QualityScorer` | 增加新的质量评分策略。 | adoption scorer、rating scorer、freshness scorer、domain expert scorer。 |
 | `SearchBackend` | 增加新的检索实现。 | PostgreSQL FTS、pgvector、Tantivy、LanceDB、Elastic。 |
@@ -421,7 +418,6 @@ GET  /api/v1/admin/audit
   "automation": {
     "autoInit": true,
     "autoReference": true,
-    "autoCapture": true,
     "autoSync": true
   }
 }
@@ -795,7 +791,6 @@ dmx sync --project .
 dmx index .
 dmx capture --type decision --title "..."
 dmx inbox
-dmx config set automation.auto_capture false --global
 dmx config set automation.auto_sync false --project .
 dmx config set reference.mode manual --project .
 dmx logout
@@ -807,7 +802,6 @@ dmx logout
 dmx init --global \
   --tools codex,claude,opencode \
   --auto-init \
-  --auto-capture \
   --auto-reference \
   --yes
 
@@ -838,7 +832,6 @@ npx -y devmesh@latest join 192.168.1.10:8721 \
 ```bash
 dmx config set automation.auto_init false --project .
 dmx config set automation.auto_reference false --project .
-dmx config set automation.auto_capture false --project .
 dmx config set automation.auto_sync false --project .
 ```
 
@@ -878,7 +871,7 @@ npm install -g devmesh && dmx init --global --yes && dmx join https://devmesh.co
 5. 客户端打开基于 Clack prompts 的 TUI 选择页面，展示 detected / not found / already configured 状态。
 6. 用户选择要注册 MCP 的工具和 scope，默认选中已安装且未配置的工具。
 7. 客户端调用各工具 adapter，把 DevMesh MCP 写成 stdio command/args。
-8. 客户端开启 auto_init、auto_reference、助手自主决策的 auto_capture；auto_sync 在未 join 时保持待机。
+8. 客户端开启 auto_init、auto_reference；auto_sync 在未 join 时保持待机；助手自主沉淀由 MCP 工具强提示直接驱动。
 9. 客户端执行 dmx doctor，验证 stdio launcher / daemon 状态和各工具配置。
 10. 用户此时即使不 join，也可以在项目中自动创建 .dev-mesh/、沉淀本地知识并自动引用本地知识。
 ```
@@ -893,7 +886,7 @@ Detected tools:
   [x] Claude Code  installed, already configured  scope: user
   [ ] opencode     not found
 
-Automation: auto_init, auto_reference, assistant-led auto_capture, and auto_sync are enabled by default.
+Automation: auto_init, auto_reference, and auto_sync are enabled by default.
 MCP hosts run dmx serve --mcp; the launcher starts or reuses the project daemon on demand.
 
 Keys: ↑/↓ move, Space toggle, s scope, Enter apply, q cancel.
@@ -949,7 +942,6 @@ local_identity_id = "local_01J..."
 [automation]
 auto_init = true
 auto_reference = true
-auto_capture = true
 auto_sync = true
 
 [redaction]
@@ -992,7 +984,6 @@ store_dir = ".dev-mesh"
 [automation]
 auto_init = true       # Codex/Claude/opencode 打开项目时自动创建 .dev-mesh/
 auto_reference = true  # Agent 开始任务和编辑前自动引用相关知识
-auto_capture = true    # 由 Codex/Claude/opencode 根据当前上下文自主决定何时沉淀经验
 auto_sync = true       # 已 join 时本地知识变化后自动同步到对应 Server Group；未 join 时待机
 
 [capture]
@@ -1144,7 +1135,6 @@ Codex opens project
 | --- | --- | --- |
 | `auto_init` | 开启 | Codex、Claude Code、opencode 打开项目时自动创建或迁移 `.dev-mesh/`。 |
 | `auto_reference` | 开启 | Agent 开始任务、进入编辑或提出技术问题时，优先引用本地 `.dev-mesh/index`；已 join 时可 fallback 到远端知识。 |
-| `auto_capture` | 开启 | MCP 工具描述提醒 Codex、Claude Code、opencode 在每次有意义的对话、代码修改、命令结果或调试后自主判断是否调用 capture 工具；daemon 不再为 capture 后台轮询 Git / filesystem。 |
 | `auto_sync` | 未 join 时待机，join 后开启 | 本地知识 committed 后自动 debounce 推送到已加入的 Server Group，并定期拉取同组成员经验。 |
 
 自动引用路径：
@@ -1177,7 +1167,6 @@ Assistant handles task context
 ```bash
 dmx config set automation.auto_init false --project .
 dmx config set automation.auto_reference false --project .
-dmx config set automation.auto_capture false --project .
 dmx config set automation.auto_sync false --project .
 ```
 
@@ -1291,7 +1280,7 @@ Adapter 职责：
 
 ## 7. 自动沉淀项目知识
 
-自动沉淀不是把所有聊天和代码全量上传，而是“在本地提取候选知识，脱敏，去重，按策略发布”。
+自动沉淀不是把所有聊天和代码全量上传，而是由 Agent 结合当前上下文主动写入结构化知识，DevMesh 负责本地落库、脱敏、去重、检索和同步。
 
 ### 7.1 三层沉淀机制
 
@@ -1341,40 +1330,34 @@ supportsSessionExport = opt-in only
 - TODO / FIXME changes
 - docs and config changes
 
-客户端根据这些事件生成候选摘要。例如：
+客户端不会根据这些事件自动生成候选摘要。`mesh_scan_project_knowledge` 只在 AI 客户端主动调用时返回结构化发现项，例如：
 
 ```text
 发现 src/auth/session.ts 和 tests/auth/session.test.ts 被修改；
 分支名包含 AUTH-123；
 测试命令 pnpm test auth 通过；
-生成 task progress candidate。
+AI 客户端判断是否值得沉淀；
+需要沉淀时调用 mesh_capture_knowledge 或 mesh_capture_task。
 ```
 
-当前内置 Git provider 已输出结构化 `git.snapshot`，包含 branch、HEAD commit、HEAD subject、changed files、diff stat、issue keys 和可选测试摘要，但不包含完整 diff 内容。当前内置 filesystem provider 已输出结构化 `filesystem.snapshot`，只包含相对路径、mtime、大小、文件类别、TODO/FIXME 计数和过滤统计，并默认按 `.meshignore`、`.env`、credential 文件和 secrets 路径阻断敏感内容。当前内置 MCP tool call provider 已输出结构化 `mcp.tool_call`，只包含工具名、参数 key、成功/失败、耗时、结果形状和脱敏错误摘要，不记录参数值或工具返回正文。
+当前内置 Git provider 已输出结构化 `git.snapshot`，包含 branch、HEAD commit、HEAD subject、changed files、diff stat、issue keys 和可选测试摘要，但不包含完整 diff 内容。当前内置 filesystem provider 已输出结构化 `filesystem.snapshot`，只包含相对路径、mtime、大小、文件类别、TODO/FIXME 计数和过滤统计，并默认按 `.meshignore`、`.env`、credential 文件和 secrets 路径阻断敏感内容。
 
-### 7.2 知识提取流水线
+### 7.2 助手主导沉淀流水线
 
 ```text
-Raw Event
-  -> Normalize
+AI client handles task context
+  -> Search existing context when useful
+  -> Optional mesh_scan_project_knowledge
+  -> Assistant summarizes durable knowledge
+  -> mesh_capture_knowledge / mesh_capture_task
   -> Secret and PII Redaction
-  -> Classify
-  -> Summarize
-  -> Deduplicate
-  -> Link Evidence
-  -> Confidence Score
-  -> Initial Weight
-  -> Review Queue or Auto Publish
+  -> Local knowledge/event log
   -> Sync to Server
 ```
-
-当前内置 rule-based extractor 已支持 `git.snapshot`、`filesystem.snapshot` 和 `mcp.tool_call`，能生成 `task_progress`、`command`、`pitfall` 等 extract proposal，并在 `metadata` 中保留 `risk`、`sourceEventId`、`sourceEventKind` 和结构化 evidence。它只基于 provider 的结构化摘要提取，不读取完整 diff、文件正文或工具返回正文。
 
 当前内置 redactor 已覆盖 Authorization、Cookie、URL token、环境变量 secret、private key、sensitive path、email 和 phone 规则，输出统一的 `[REDACTED:*]` 标记，并在 scan 结果中保留 finding label、kind 和 severity。
 
 当前内置 quality scorers 已覆盖 confidence、rating、adoption、freshness 和 source trust 五类 patch。`QualityScorePatch` 支持 `confidenceDelta`、`weightDelta`、`ratingDelta`、`adoptionScoreDelta`、`freshnessDelta` 和 `sourceTrustDelta`，最终 `qualityScore` 仍由 core 按统一公式派生。
-
-当前 client runtime 已支持 raw event capture pipeline：先将 provider raw event 脱敏后写入 `.dev-mesh/events`，再用 extractor 生成 proposal；`metadata.risk=low` 的 proposal 自动写入本地 extract knowledge，高/中风险 proposal 进入 `.dev-mesh/queue` 供 `dmx inbox` review。
 
 当前内置 search backend 已支持 member-specific experience filters（`authorName` / `memberName`）和 hybrid ranking。Hybrid backend 使用可替换 `EmbeddingProvider`，默认提供 deterministic embedding mock，并组合 keyword、vector similarity、recency、qualityScore、adoptionScore 和 weight。`JsonlKnowledgeRepository` 在 SQLite FTS 命中后也会叠加 core ranking，避免本地索引绕开质量排序。
 
@@ -1484,18 +1467,17 @@ PARA 的使用规则：
 LLM ingest 可以借鉴 LLM Wiki 的 `raw -> wiki` 思想，但 DevMesh 的输出不是 wiki 页面，而是结构化 extract 条目：
 
 ```text
-Raw event
-  -> knowledge/raw/*.jsonl
-  -> LLM Extractor creates knowledge/extract/*.jsonl
-  -> Canonicalizer proposes or updates knowledge/canonical/entries.jsonl
-  -> PARA index points to related raw/extract/canonical records
+Assistant summary
+  -> mesh_capture_knowledge / mesh_capture_task
+  -> knowledge/extract/*.jsonl or knowledge/canonical/entries.jsonl
+  -> PARA index points to related extract/canonical records
 ```
 
 LLM ingest 边界：
 
 - LLM 可以从对话、diff、命令结果、任务交接中提炼 extract。
-- LLM 生成的 extract 必须带 `sourceItemIds`、作者、时间、置信度和 PARA 归属。
-- LLM 不能直接把 raw 内容提升为 canonical，除非满足低风险、高置信度、已有相似条目或用户/团队策略允许。
+- LLM 生成的 extract 必须带作者、时间、置信度和 PARA 归属。
+- LLM 不能直接把不确定内容提升为 canonical，除非满足高置信度、已有相似条目或用户/团队策略允许。
 - canonical 是团队协作对象，必须条目化、可 diff、可 supersede、可引用。
 - Markdown 视图可以由 canonical entries 生成，但不作为事实源。
 
@@ -1536,13 +1518,12 @@ Start task
 自动沉淀策略：
 
 ```text
-Capture candidate
-  -> write raw event
-  -> extract reusable entries
+Assistant summarizes durable context
+  -> capture reusable entry
   -> attach PARA category/key
-  -> update canonical entry if low risk and confidence is high
+  -> update canonical entry if confidence is high
   -> otherwise queue canonical proposal for review
-  -> sync raw refs, extracts, canonical entries, and PARA indexes
+  -> sync extract/canonical entries and PARA indexes
 ```
 
 引用后学习策略：
@@ -2139,12 +2120,12 @@ export interface ToolAdapter {
 ### 12.3 Capture Provider 接口
 
 ```ts
-export interface CaptureProvider {
+export interface ProjectScanProvider {
   id: string;
-  kind: 'capture-provider';
-  capabilities: CaptureCapability[];
+  kind: 'project-scan-provider';
+  capabilities: ProjectScanCapability[];
   detect(projectRoot: string): Promise<boolean>;
-  collect(ctx: CaptureContext): AsyncIterable<RawEvent>;
+  collect(ctx: ProjectScanContext): AsyncIterable<ProjectScanRecord>;
 }
 ```
 
@@ -2160,16 +2141,9 @@ export interface CaptureProvider {
 
 Codex、Claude、opencode provider 的基础能力以配置 MCP 和可选 hook 为主，不依赖未公开的内部会话格式。
 
-### 12.4 Extractor / Redactor / Scorer 接口
+### 12.4 Redactor / Scorer 接口
 
 ```ts
-export interface Extractor {
-  id: string;
-  kind: 'extractor';
-  supports(event: RawEvent): boolean;
-  extract(input: ExtractInput): Promise<ExtractProposal[]>;
-}
-
 export interface Redactor {
   id: string;
   kind: 'redactor';
@@ -2245,8 +2219,7 @@ export interface DevMeshExtension {
 
 export interface ExtensionRegistry {
   registerAdapter(adapter: ToolAdapter): void;
-  registerProvider(provider: CaptureProvider): void;
-  registerExtractor(extractor: Extractor): void;
+  registerProjectScanProvider(provider: ProjectScanProvider): void;
   registerRedactor(redactor: Redactor): void;
   registerScorer(scorer: QualityScorer): void;
   registerSearchBackend(search: SearchBackend): void;
@@ -2298,10 +2271,10 @@ Registry 规则：
 
 ```text
 1. Agent 或用户发现一个长期有效的技术决策。
-2. Agent 自动调用 mesh_capture_knowledge(type=decision)，或 Extractor 从事件中生成候选。
+2. Agent 自动调用 mesh_capture_knowledge(type=decision)。
 3. 客户端本地脱敏和去重。
-4. 低风险内容自动写入 .dev-mesh/events 与 .dev-mesh/knowledge。
-5. 高风险内容进入 .dev-mesh/queue 和 dmx inbox。
+4. 内容写入 .dev-mesh/events 与 .dev-mesh/knowledge。
+5. 需要人工确认的内容可由 dmx inbox 流程 review。
 6. 未 join 时留在本地知识库；已 join 时 Sync manager 自动推送到指定 Server Group。
 7. 其他同组同事拉取后写入自己的 .dev-mesh/，Agent 可本地检索到该决策。
 ```
@@ -2440,8 +2413,8 @@ MCP 调试建议使用 MCP Inspector 验证：
 | `packages/server` | `/healthz`、`/.well-known/devmesh`、join 参数校验、groupKey 解析、project brief 查询、MCP handler 到 core service 的参数映射。 |
 | `packages/client` | `dmx init --global` 配置生成、local-only status、`ensureProjectStore` 幂等、capture/search runtime 组合、join 后配置更新。 |
 | `packages/adapters` | Codex、Claude Code、opencode detect/configure/remove/doctor、重复配置幂等和临时 HOME / config 目录测试隔离。 |
-| `packages/providers` | Git diff 摘要采集、文件事件过滤、命令结果采集、MCP tool call 事件规范化、provider detect false 时不采集。 |
-| `packages/extractor` | raw event 到 extract proposal 的分类、置信度默认值、低风险/高风险标记、重复 proposal 去重。 |
+| `packages/providers` | Git diff 摘要扫描、文件事件过滤、provider detect false 时不采集。 |
+| `packages/redaction` | secret、PII、credential redactor。 |
 | `packages/quality` | confidence、rating、adoption、freshness、source trust scorer 的加权计算、过期降权、人工 override 优先级。 |
 | `packages/search` | BM25/关键词召回、向量召回 mock、hybrid ranking、filter 组合、limit、includeSuperseded、member experience 查询。 |
 | `packages/storage` | repository CRUD、tombstone、edge 查询、事务回滚、PostgreSQL schema migration dry-run。 |
@@ -2539,7 +2512,7 @@ CI 门禁：
 - 本地 MCP 入口（已支持 `dmx serve --mcp` stdio launcher、按需 daemon、`dmx proxy`、Koa2、官方 MCP SDK Streamable HTTP transport 和 local-store capture/search）
 - `.dev-mesh/` local store manager
 - Codex 打开项目时自动 `ensureProjectStore`
-- 默认 `auto_init`、`auto_reference`、助手自主决策的 `auto_capture`，join 后开启 `auto_sync`
+- 默认 `auto_init`、`auto_reference`，join 后开启 `auto_sync`；助手自主沉淀由 MCP 工具强提示直接驱动
 - Codex Adapter
 - Claude Code Adapter
 - opencode Adapter
@@ -2556,11 +2529,10 @@ CI 门禁：
 
 - Git provider（已支持结构化 snapshot，不采集完整 diff）
 - 文件事件 provider（已支持 `.meshignore` / 隐私过滤和路径级元数据采集）
-- MCP tool call provider（已支持成功/失败信号、参数 key、结果形状和脱敏错误摘要）
 - redaction pipeline（已支持 secret / PII / credential 脱敏）
-- extractor / redactor / quality scorer extension interfaces（extractor 已支持 provider raw event 的规则提取，redactor 已支持 secret / PII / credential 脱敏，quality scorer 已覆盖 confidence / rating / adoption / freshness / source trust）
-- low-risk 自动发布，high-risk review queue `dmx inbox`（已支持 extractor proposal 基于 `metadata.risk` 的发布/排队）
-- `.dev-mesh/events` append-only event log（已支持 raw capture event 写入）
+- redactor / quality scorer extension interfaces（redactor 已支持 secret / PII / credential 脱敏，quality scorer 已覆盖 confidence / rating / adoption / freshness / source trust）
+- assistant-led capture（已通过 MCP 工具强提示模型总结当前上下文后主动写入知识）
+- `.dev-mesh/events` append-only event log（已支持 capture、rating、usage、sync event 写入）
 - `.dev-mesh/index` rebuildable local search
 - `.dev-mesh/knowledge/raw` 原始材料
 - `.dev-mesh/knowledge/extract` 提炼片段
@@ -2574,9 +2546,9 @@ CI 门禁：
 - pluggable search backend interface
 - redaction pipeline security test
 - review queue integration test
-- provider -> extractor -> local event log integration test（已覆盖 MCP tool provider capture pipeline）
+- project scan provider integration test
 - hybrid search ranking integration test
-- 自定义 `Extractor`、`QualityScorer`、`SearchBackend` 插件示例
+- 自定义 `QualityScorer`、`SearchBackend` 插件示例
 - package API docs：core store、agent context、extension registry
 
 ### 阶段 4：团队化

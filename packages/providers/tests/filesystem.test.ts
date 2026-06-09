@@ -2,15 +2,15 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createFileSystemCaptureProvider } from '../src/index.js';
+import { createFileSystemProjectScanProvider } from '../src/index.js';
 
-describe('createFileSystemCaptureProvider', () => {
+describe('createFileSystemProjectScanProvider', () => {
   it('collects file metadata while filtering .meshignore and sensitive paths', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-provider-files-'));
     const observedAt = new Date('2026-06-06T10:00:00.000Z');
     const since = new Date('2026-06-06T09:00:00.000Z');
     const old = new Date('2026-06-06T08:00:00.000Z');
-    const provider = createFileSystemCaptureProvider({
+    const provider = createFileSystemProjectScanProvider({
       now: () => observedAt
     });
 
@@ -31,7 +31,7 @@ describe('createFileSystemCaptureProvider', () => {
 
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
-        id: 'raw_fs_20260606T100000000Z',
+        id: 'scan_fs_20260606T100000000Z',
         kind: 'filesystem.snapshot',
         createdAt: observedAt.toISOString(),
         source: {
@@ -82,7 +82,7 @@ describe('createFileSystemCaptureProvider', () => {
 
   it('does not detect missing project roots', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-provider-files-missing-'));
-    const provider = createFileSystemCaptureProvider();
+    const provider = createFileSystemProjectScanProvider();
 
     try {
       await expect(provider.detect(join(projectRoot, 'missing'))).resolves.toBe(false);

@@ -82,7 +82,7 @@ export function createMeshMcpServer(core: DevMeshCore): McpServer {
         projectRoot: core.projectRoot,
         instruction: 'Project-wide scanning is only meaningful in the local daemon where Git and filesystem access are available.',
         limit: input.limit,
-        signals: [],
+        findings: [],
         highlights: {
           changedFiles: [],
           fileCount: 0,

@@ -2,11 +2,11 @@ import { execFile } from 'node:child_process';
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import type { CaptureContext, CaptureProvider, RawEvent } from '@devmesh/extension-api';
+import type { ProjectScanContext, ProjectScanProvider, ProjectScanRecord } from '@devmesh/extension-api';
 
 const execFileAsync = promisify(execFile);
 
-export interface GitCaptureProviderOptions {
+export interface GitProjectScanProviderOptions {
   command?: string;
   now?: () => Date;
 }
@@ -18,14 +18,9 @@ export interface GitTestResultSummary {
   summary?: string;
 }
 
-export interface FileSystemCaptureProviderOptions {
+export interface FileSystemProjectScanProviderOptions {
   maxFiles?: number;
   maxTextBytes?: number;
-  now?: () => Date;
-}
-
-export interface McpToolCallCaptureProviderOptions {
-  maxErrorMessageLength?: number;
   now?: () => Date;
 }
 
@@ -93,54 +88,23 @@ interface IgnoreRule {
   matcher: (relativePath: string, isDirectory: boolean) => boolean;
 }
 
-interface NormalizedMcpToolCall {
-  toolName: string;
-  argumentKeys: string[];
-  failed: boolean;
-  status: 'failed' | 'succeeded';
-  durationMs?: number;
-  endedAt?: string;
-  error?: McpToolErrorSummary;
-  host?: string;
-  result?: McpToolResultSummary;
-  server?: string;
-  startedAt?: string;
-}
-
-interface McpToolResultSummary {
-  kind: 'array' | 'boolean' | 'mcp-content' | 'null' | 'number' | 'object' | 'string' | 'undefined';
-  contentItems?: number;
-  contentTypes?: string[];
-  itemCount?: number;
-  keys?: string[];
-  length?: number;
-  textChars?: number;
-}
-
-interface McpToolErrorSummary {
-  code?: string;
-  keys?: string[];
-  message?: string;
-  name?: string;
-}
-
-export function createGitCaptureProvider(options: GitCaptureProviderOptions = {}): CaptureProvider {
+export function createGitProjectScanProvider(options: GitProjectScanProviderOptions = {}): ProjectScanProvider {
   return {
     id: 'devmesh.provider.git',
-    kind: 'capture-provider',
-    capabilities: ['capture.git'],
+    kind: 'project-scan-provider',
+    capabilities: ['project.scan.git'],
     priority: 50,
     async detect(projectRoot: string) {
       const result = await runGit(projectRoot, ['rev-parse', '--is-inside-work-tree'], options);
 
       return result.stdout.trim() === 'true';
     },
-    async *collect(ctx: CaptureContext): AsyncIterable<RawEvent> {
+    async *collect(ctx: ProjectScanContext): AsyncIterable<ProjectScanRecord> {
       const snapshot = await collectGitSnapshot(ctx, options);
       const createdAt = (options.now?.() ?? new Date()).toISOString();
 
       yield {
-        id: `raw_git_${createdAt.replace(/[^0-9A-Za-z]/g, '')}`,
+        id: `scan_git_${createdAt.replace(/[^0-9A-Za-z]/g, '')}`,
         kind: 'git.snapshot',
         summary: summarizeGitSnapshot(snapshot),
         payload: {
@@ -162,11 +126,13 @@ export function createGitCaptureProvider(options: GitCaptureProviderOptions = {}
   };
 }
 
-export function createFileSystemCaptureProvider(options: FileSystemCaptureProviderOptions = {}): CaptureProvider {
+export function createFileSystemProjectScanProvider(
+  options: FileSystemProjectScanProviderOptions = {}
+): ProjectScanProvider {
   return {
     id: 'devmesh.provider.filesystem',
-    kind: 'capture-provider',
-    capabilities: ['capture.filesystem'],
+    kind: 'project-scan-provider',
+    capabilities: ['project.scan.filesystem'],
     priority: 40,
     async detect(projectRoot: string) {
       try {
@@ -176,7 +142,7 @@ export function createFileSystemCaptureProvider(options: FileSystemCaptureProvid
         return false;
       }
     },
-    async *collect(ctx: CaptureContext): AsyncIterable<RawEvent> {
+    async *collect(ctx: ProjectScanContext): AsyncIterable<ProjectScanRecord> {
       const snapshot = await collectFileSystemSnapshot(ctx, options);
       const createdAt = (options.now?.() ?? new Date()).toISOString();
       const payload: Record<string, unknown> = {
@@ -191,7 +157,7 @@ export function createFileSystemCaptureProvider(options: FileSystemCaptureProvid
       }
 
       yield {
-        id: `raw_fs_${createdAt.replace(/[^0-9A-Za-z]/g, '')}`,
+        id: `scan_fs_${createdAt.replace(/[^0-9A-Za-z]/g, '')}`,
         kind: 'filesystem.snapshot',
         summary: summarizeFileSystemSnapshot(snapshot),
         payload,
@@ -205,49 +171,10 @@ export function createFileSystemCaptureProvider(options: FileSystemCaptureProvid
   };
 }
 
-export function createMcpToolCallCaptureProvider(options: McpToolCallCaptureProviderOptions = {}): CaptureProvider {
-  return {
-    id: 'devmesh.provider.mcp-tool',
-    kind: 'capture-provider',
-    capabilities: ['capture.mcp-tool'],
-    priority: 35,
-    async detect(projectRoot: string) {
-      try {
-        const stats = await lstat(projectRoot);
-        return stats.isDirectory();
-      } catch {
-        return false;
-      }
-    },
-    async *collect(ctx: CaptureContext): AsyncIterable<RawEvent> {
-      const calls = readMcpToolCalls(ctx.metadata, options);
-      const fallbackCreatedAt = (options.now?.() ?? new Date()).toISOString();
-
-      for (const [index, call] of calls.entries()) {
-        const createdAt = call.endedAt ?? fallbackCreatedAt;
-        const payload = createMcpToolPayload(call);
-
-        yield {
-          id: `raw_mcp_tool_${createdAt.replace(/[^0-9A-Za-z]/g, '')}_${index}`,
-          kind: 'mcp.tool_call',
-          summary: summarizeMcpToolCall(call),
-          payload,
-          createdAt,
-          source: {
-            kind: 'mcp-tool',
-            projectRoot: ctx.projectRoot
-          }
-        };
-      }
-    }
-  };
-}
-
-export function createBuiltInProviders(): CaptureProvider[] {
-  return [createGitCaptureProvider(), createFileSystemCaptureProvider(), createMcpToolCallCaptureProvider()];
-}
-
-async function collectGitSnapshot(ctx: CaptureContext, options: GitCaptureProviderOptions): Promise<GitSnapshot> {
+async function collectGitSnapshot(
+  ctx: ProjectScanContext,
+  options: GitProjectScanProviderOptions
+): Promise<GitSnapshot> {
   const [branch, headCommit, headSubject, status, numstat, diffStat] = await Promise.all([
     readGitValue(ctx.projectRoot, ['branch', '--show-current'], options),
     readGitValue(ctx.projectRoot, ['rev-parse', 'HEAD'], options),
@@ -288,8 +215,8 @@ async function collectGitSnapshot(ctx: CaptureContext, options: GitCaptureProvid
 }
 
 async function collectFileSystemSnapshot(
-  ctx: CaptureContext,
-  options: FileSystemCaptureProviderOptions
+  ctx: ProjectScanContext,
+  options: FileSystemProjectScanProviderOptions
 ): Promise<FileSystemSnapshot> {
   const ignored = createIgnoredSummary();
   const policy = await loadFileIgnorePolicy(ctx.projectRoot);
@@ -386,7 +313,7 @@ async function readChangedFile(
   absolutePath: string,
   relativePath: string,
   sinceDate: Date | undefined,
-  options: FileSystemCaptureProviderOptions
+  options: FileSystemProjectScanProviderOptions
 ): Promise<FileSystemChangedFile | undefined> {
   let stats;
 
@@ -433,7 +360,7 @@ async function readChangedFile(
 async function runGit(
   projectRoot: string,
   args: string[],
-  options: GitCaptureProviderOptions
+  options: GitProjectScanProviderOptions
 ): Promise<GitCommandResult> {
   try {
     const result = await execFileAsync(options.command ?? 'git', ['-C', projectRoot, ...args], {
@@ -458,7 +385,7 @@ async function runGit(
 async function readGitValue(
   projectRoot: string,
   args: string[],
-  options: GitCaptureProviderOptions
+  options: GitProjectScanProviderOptions
 ): Promise<string | undefined> {
   const result = await runGit(projectRoot, args, options);
   const value = result.stdout.trim();
@@ -559,7 +486,7 @@ function mergeChangedFiles(
   return [...filesByPath.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
-function readTestResultSummary(metadata: CaptureContext['metadata']): GitTestResultSummary | undefined {
+function readTestResultSummary(metadata: ProjectScanContext['metadata']): GitTestResultSummary | undefined {
   if (metadata === undefined) {
     return undefined;
   }
@@ -632,270 +559,6 @@ function findIssueKeys(values: string[]): string[] {
   }
 
   return [...keys].sort();
-}
-
-function readMcpToolCalls(
-  metadata: CaptureContext['metadata'],
-  options: McpToolCallCaptureProviderOptions
-): NormalizedMcpToolCall[] {
-  const record = readRecord(metadata);
-  const values = [
-    ...readUnknownList(record.mcpToolCalls),
-    ...readUnknownList(record.toolCalls),
-    record.mcpToolCall,
-    record.toolCall
-  ];
-
-  if (typeof record.toolName === 'string' || typeof record.name === 'string') {
-    values.push(record);
-  }
-
-  return values
-    .map((value) => normalizeMcpToolCall(value, options))
-    .filter((call): call is NormalizedMcpToolCall => call !== undefined);
-}
-
-function normalizeMcpToolCall(
-  value: unknown,
-  options: McpToolCallCaptureProviderOptions
-): NormalizedMcpToolCall | undefined {
-  const record = readRecord(value);
-  const toolName = readString(record.toolName) ?? readString(record.name);
-
-  if (toolName === undefined) {
-    return undefined;
-  }
-
-  const errorValue = record.error ?? record.errorMessage;
-  const failed = readMcpToolCallFailed(record, errorValue);
-  const call: NormalizedMcpToolCall = {
-    toolName,
-    argumentKeys: readArgumentKeys(record.arguments ?? record.args ?? record.input),
-    failed,
-    status: failed ? 'failed' : 'succeeded'
-  };
-  const durationMs = readNumber(record.durationMs) ?? readNumber(record.duration);
-  const startedAt = readString(record.startedAt);
-  const endedAt = readString(record.endedAt);
-  const host = readString(record.host);
-  const server = readString(record.server);
-  const result = summarizeMcpToolResult(record.result ?? record.output ?? record.response);
-
-  if (durationMs !== undefined) {
-    call.durationMs = durationMs;
-  }
-
-  if (startedAt !== undefined) {
-    call.startedAt = startedAt;
-  }
-
-  if (endedAt !== undefined) {
-    call.endedAt = endedAt;
-  }
-
-  if (host !== undefined) {
-    call.host = host;
-  }
-
-  if (server !== undefined) {
-    call.server = server;
-  }
-
-  if (result !== undefined) {
-    call.result = result;
-  }
-
-  if (errorValue !== undefined) {
-    call.error = summarizeMcpToolError(errorValue, options);
-  }
-
-  return call;
-}
-
-function readMcpToolCallFailed(record: Record<string, unknown>, errorValue: unknown): boolean {
-  const status = readString(record.status)?.toLowerCase();
-
-  if (status === 'failed' || status === 'failure' || status === 'error') {
-    return true;
-  }
-
-  if (status === 'ok' || status === 'success' || status === 'succeeded') {
-    return false;
-  }
-
-  if (typeof record.success === 'boolean') {
-    return !record.success;
-  }
-
-  return errorValue !== undefined && errorValue !== null;
-}
-
-function readArgumentKeys(value: unknown): string[] {
-  const record = readRecord(value);
-
-  return Object.keys(record).sort();
-}
-
-function summarizeMcpToolResult(value: unknown): McpToolResultSummary | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (value === null) {
-    return { kind: 'null' };
-  }
-
-  if (Array.isArray(value)) {
-    return {
-      kind: 'array',
-      itemCount: value.length
-    };
-  }
-
-  if (typeof value === 'string') {
-    return {
-      kind: 'string',
-      length: value.length
-    };
-  }
-
-  if (typeof value === 'number') {
-    return { kind: 'number' };
-  }
-
-  if (typeof value === 'boolean') {
-    return { kind: 'boolean' };
-  }
-
-  const record = readRecord(value);
-  const content = readUnknownList(record.content);
-
-  if (content.length > 0) {
-    return {
-      kind: 'mcp-content',
-      contentItems: content.length,
-      contentTypes: readMcpContentTypes(content),
-      textChars: countMcpTextChars(content)
-    };
-  }
-
-  const keys = Object.keys(record).sort();
-  const result: McpToolResultSummary = {
-    kind: 'object',
-    keys
-  };
-  const items = readUnknownList(record.items);
-
-  if (items.length > 0) {
-    result.itemCount = items.length;
-  }
-
-  return result;
-}
-
-function summarizeMcpToolError(value: unknown, options: McpToolCallCaptureProviderOptions): McpToolErrorSummary {
-  if (typeof value === 'string') {
-    return {
-      message: redactSensitiveText(value, options.maxErrorMessageLength ?? 240)
-    };
-  }
-
-  const record = readRecord(value);
-  const summary: McpToolErrorSummary = {
-    keys: Object.keys(record).sort()
-  };
-  const name = readString(record.name);
-  const code = readString(record.code);
-  const message = readString(record.message);
-
-  if (name !== undefined) {
-    summary.name = name;
-  }
-
-  if (code !== undefined) {
-    summary.code = code;
-  }
-
-  if (message !== undefined) {
-    summary.message = redactSensitiveText(message, options.maxErrorMessageLength ?? 240);
-  }
-
-  return summary;
-}
-
-function createMcpToolPayload(call: NormalizedMcpToolCall): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
-    toolName: call.toolName,
-    status: call.status,
-    failed: call.failed,
-    argumentKeys: call.argumentKeys
-  };
-
-  if (call.durationMs !== undefined) {
-    payload.durationMs = call.durationMs;
-  }
-
-  if (call.startedAt !== undefined) {
-    payload.startedAt = call.startedAt;
-  }
-
-  if (call.endedAt !== undefined) {
-    payload.endedAt = call.endedAt;
-  }
-
-  if (call.host !== undefined) {
-    payload.host = call.host;
-  }
-
-  if (call.server !== undefined) {
-    payload.server = call.server;
-  }
-
-  if (call.result !== undefined) {
-    payload.result = call.result;
-  }
-
-  if (call.error !== undefined) {
-    payload.error = call.error;
-  }
-
-  return payload;
-}
-
-function summarizeMcpToolCall(call: NormalizedMcpToolCall): string {
-  const status = call.failed ? 'failed' : 'succeeded';
-  const duration = call.durationMs === undefined ? '' : ` in ${call.durationMs}ms`;
-  const error = call.error?.message ? `: ${call.error.message}` : '';
-
-  return `MCP tool ${call.toolName} ${status}${duration}${error}.`;
-}
-
-function readMcpContentTypes(content: unknown[]): string[] {
-  const types = new Set<string>();
-
-  for (const item of content) {
-    const type = readString(readRecord(item).type);
-
-    if (type !== undefined) {
-      types.add(type);
-    }
-  }
-
-  return [...types].sort();
-}
-
-function countMcpTextChars(content: unknown[]): number {
-  let total = 0;
-
-  for (const item of content) {
-    const text = readString(readRecord(item).text);
-
-    if (text !== undefined) {
-      total += text.length;
-    }
-  }
-
-  return total;
 }
 
 async function loadFileIgnorePolicy(projectRoot: string): Promise<FileIgnorePolicy> {
@@ -1175,41 +838,8 @@ function readRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function readUnknownList(value: unknown): unknown[] {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  return [];
-}
-
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-function readNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-function redactSensitiveText(text: string, maxLength: number): string {
-  const redacted = text
-    .replace(/\b(Authorization\s*:\s*(?:Bearer|Basic)\s+)([A-Za-z0-9._~+/=-]+)/gi, '$1[REDACTED:authorization]')
-    .replace(/\b(Cookie\s*:\s*)([^\r\n]+)/gi, '$1[REDACTED:cookie]')
-    .replace(/([?&](?:access_token|api_key|token|secret|signature|sig|password)=)([^&\s"'<>]+)/gi, '$1[REDACTED:url-token]')
-    .replace(
-      /(^|[^?&A-Z0-9_])([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|ACCESS_KEY|PRIVATE_KEY)[A-Z0-9_]*\s*=\s*)([^\s"'`]+)/gi,
-      '$1$2[REDACTED:env-secret]'
-    )
-    .replace(
-      /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g,
-      '[REDACTED:private-key]'
-    );
-
-  if (redacted.length <= maxLength) {
-    return redacted;
-  }
-
-  return `${redacted.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
 function isString(value: string | undefined): value is string {

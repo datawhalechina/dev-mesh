@@ -116,7 +116,7 @@ describe('dmx CLI global init', () => {
         globalRoot,
         selectedTools: ['codex']
       });
-      expect(config).toContain('auto_capture = true');
+      expect(config).toContain('auto_reference = true');
       expect(config).toContain('auto_sync = true');
       expect(codexConfig).toContain(`[mcp_servers.devmesh]`);
       expect(codexConfig).toContain('command = "dmx"');

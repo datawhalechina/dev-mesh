@@ -129,7 +129,7 @@ async function promptGlobalTools(options: PromptGlobalToolsOptions): Promise<Glo
 async function runGlobalInitTui(statuses: GlobalToolStatus[]): Promise<GlobalInitSelection> {
   intro('DevMesh init');
   note(createGlobalInitStatusSummary(statuses), 'Detected MCP hosts');
-  log.info('Automation defaults: auto_init, auto_reference, assistant-led auto_capture, and auto_sync are enabled.');
+  log.info('Automation defaults: auto_init, auto_reference, and auto_sync are enabled.');
   log.info('MCP hosts will run dmx serve --mcp; the launcher starts or reuses the project daemon.');
 
   const selectedTools = await multiselect<GlobalToolKey>({
@@ -239,7 +239,7 @@ export function createGlobalInitResultSummary(result: GlobalInitResult): string 
     `Config: ${result.configPath}`,
     `Identity: ${result.identityPath}`,
     `Selected tools: ${selectedTools}`,
-    'Automation: auto_init, auto_reference, assistant-led auto_capture, auto_sync'
+    'Automation: auto_init, auto_reference, auto_sync'
   ].join('\n');
 }
 

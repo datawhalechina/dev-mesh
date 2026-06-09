@@ -1,10 +1,9 @@
 import type {
-  CaptureProvider,
   DevMeshExtension,
   ExtensionComponent,
   ExtensionKind,
   ExtensionRegistry,
-  Extractor,
+  ProjectScanProvider,
   QualityScorer,
   Redactor,
   SearchBackend,
@@ -20,12 +19,8 @@ export class DefaultExtensionRegistry implements ExtensionRegistry {
     this.registerComponent('tool-adapter', adapter);
   }
 
-  registerProvider(provider: CaptureProvider): void {
-    this.registerComponent('capture-provider', provider);
-  }
-
-  registerExtractor(extractor: Extractor): void {
-    this.registerComponent('extractor', extractor);
+  registerProjectScanProvider(provider: ProjectScanProvider): void {
+    this.registerComponent('project-scan-provider', provider);
   }
 
   registerRedactor(redactor: Redactor): void {

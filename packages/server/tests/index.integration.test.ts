@@ -27,7 +27,6 @@ describe('hub server HTTP integration', () => {
     try {
       const health = await requestJson(`${url}/healthz`);
       const wellKnown = await requestJson(`${url}/.well-known/devmesh`);
-      const legacyWellKnown = await requestJson(`${url}/.well-known/dev-mesh`);
 
       expect(health.status).toBe(200);
       expect(health.body).toMatchObject({
@@ -42,8 +41,6 @@ describe('hub server HTTP integration', () => {
           npmPackage: 'devmesh'
         }
       });
-      expect(legacyWellKnown.status).toBe(200);
-      expect(legacyWellKnown.body).toMatchObject(wellKnown.body);
     } finally {
       await app.close();
     }

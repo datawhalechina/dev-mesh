@@ -5,7 +5,7 @@ import type {
   SearchKnowledgeInput
 } from '@devmesh/core';
 import { matchesKnowledgeFilter, rankKnowledgeItem } from '@devmesh/core';
-import type { RawEvent, StorageBackend } from '@devmesh/extension-api';
+import type { MeshEvent, StorageBackend } from '@devmesh/extension-api';
 import {
   createHubState,
   deserializeHubState,
@@ -17,7 +17,7 @@ import {
 
 export interface InMemoryStorageState {
   knowledgeItems: unknown[];
-  events: RawEvent[];
+  events: MeshEvent[];
   cursors: Record<string, string>;
 }
 

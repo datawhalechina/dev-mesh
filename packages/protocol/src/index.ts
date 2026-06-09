@@ -26,7 +26,6 @@ export interface JoinRequest {
   automation?: {
     autoInit?: boolean;
     autoReference?: boolean;
-    autoCapture?: boolean;
     autoSync?: boolean;
   };
 }

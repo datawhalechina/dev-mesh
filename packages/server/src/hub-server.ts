@@ -217,7 +217,6 @@ function createHubRouter(
   };
 
   router.get('/.well-known/devmesh', sendWellKnown);
-  router.get('/.well-known/dev-mesh', sendWellKnown);
 
   router.get('/api/v1/groups', (ctx) => {
     ctx.body = {

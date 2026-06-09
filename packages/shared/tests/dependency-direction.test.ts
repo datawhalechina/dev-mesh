@@ -17,8 +17,8 @@ const forbiddenByPackage: Record<string, string[]> = {
     '@devmesh/protocol',
     '@devmesh/adapters',
     '@devmesh/providers',
-    '@devmesh/extractor',
     '@devmesh/quality',
+    '@devmesh/redaction',
     '@devmesh/search',
     '@devmesh/storage',
     '@devmesh/registry'
@@ -33,8 +33,8 @@ const forbiddenByPackage: Record<string, string[]> = {
     '@devmesh/protocol',
     '@devmesh/adapters',
     '@devmesh/providers',
-    '@devmesh/extractor',
     '@devmesh/quality',
+    '@devmesh/redaction',
     '@devmesh/search',
     '@devmesh/storage',
     '@devmesh/registry'
@@ -48,8 +48,8 @@ const forbiddenByPackage: Record<string, string[]> = {
     '@devmesh/mcp-contracts',
     '@devmesh/adapters',
     '@devmesh/providers',
-    '@devmesh/extractor',
     '@devmesh/quality',
+    '@devmesh/redaction',
     '@devmesh/search',
     '@devmesh/storage',
     '@devmesh/registry'
@@ -63,8 +63,8 @@ const forbiddenByPackage: Record<string, string[]> = {
     '@devmesh/protocol',
     '@devmesh/adapters',
     '@devmesh/providers',
-    '@devmesh/extractor',
     '@devmesh/quality',
+    '@devmesh/redaction',
     '@devmesh/search',
     '@devmesh/storage',
     '@devmesh/registry'

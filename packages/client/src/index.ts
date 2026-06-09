@@ -54,10 +54,8 @@ export {
 export type { DaemonSyncOptions, DaemonSyncRemoteStatus, DaemonSyncStatus, DaemonSyncWorker } from './daemon-sync.js';
 export { createDevMeshClientRuntime } from './runtime.js';
 export type {
-  CaptureRawEventResult,
   DevMeshClientOptions,
   DevMeshClientRuntime,
   ProjectKnowledgeScanInput,
-  ProjectKnowledgeScanResult,
-  PublishExtractProposalResult
+  ProjectKnowledgeScanResult
 } from './runtime.js';

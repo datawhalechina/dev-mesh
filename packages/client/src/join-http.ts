@@ -17,11 +17,7 @@ export async function discoverJoinEndpoint(serverUrl: string): Promise<JoinEndpo
 }
 
 async function fetchWellKnown(discoveryUrl: string): Promise<WellKnownDevMesh> {
-  try {
-    return await fetchJson<WellKnownDevMesh>(`${discoveryUrl}/.well-known/devmesh`);
-  } catch (error) {
-    return await fetchJson<WellKnownDevMesh>(`${discoveryUrl}/.well-known/dev-mesh`);
-  }
+  return fetchJson<WellKnownDevMesh>(`${discoveryUrl}/.well-known/devmesh`);
 }
 
 export async function requestServerJoin(serverUrl: string, request: JoinRequest): Promise<JoinResponse> {

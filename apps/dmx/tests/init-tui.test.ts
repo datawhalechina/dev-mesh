@@ -99,9 +99,7 @@ describe('global init TUI helpers', () => {
     };
 
     expect(createGlobalInitResultSummary(result)).toContain('Selected tools: codex');
-    expect(createGlobalInitResultSummary(result)).toContain(
-      'Automation: auto_init, auto_reference, assistant-led auto_capture, auto_sync'
-    );
+    expect(createGlobalInitResultSummary(result)).toContain('Automation: auto_init, auto_reference, auto_sync');
     expect(createGlobalInitToolsSummary(result.tools)).toBe(
       'Codex        configured (user) -> C:\\Users\\xiaoyun\\.codex\\config.toml'
     );

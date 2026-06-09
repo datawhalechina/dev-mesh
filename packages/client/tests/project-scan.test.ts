@@ -22,11 +22,11 @@ describe('project knowledge scan', () => {
       const result = (await runtime.scanProjectKnowledge({ limit: 10 })) as {
         instruction: string;
         highlights: { changedFiles: string[]; fileCount: number; todoFiles: string[] };
-        signals: Array<{ kind: string; summary: string }>;
+        findings: Array<{ kind: string; summary: string }>;
       };
 
       expect(result.instruction).toContain('mesh_capture_knowledge');
-      expect(result.signals.map((signal) => signal.kind)).toEqual(
+      expect(result.findings.map((finding) => finding.kind)).toEqual(
         expect.arrayContaining(['git.snapshot', 'filesystem.snapshot'])
       );
       expect(result.highlights.changedFiles).toEqual(expect.arrayContaining(['README.md', 'src.ts', 'notes.md']));

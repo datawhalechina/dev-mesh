@@ -140,7 +140,6 @@ function createGlobalConfigToml(displayName: string, mcpUrl: string, selectedToo
     '[automation]',
     'auto_init = true',
     'auto_reference = true',
-    'auto_capture = true',
     'auto_sync = true',
     '',
     '[tools]',

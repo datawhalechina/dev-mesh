@@ -6,11 +6,10 @@ import {
   type ContextPackItem
 } from '@devmesh/agent';
 import { createDevMeshCore, type CaptureKnowledgeInput, type DevMeshCore, type RateKnowledgeInput } from '@devmesh/core';
-import type { Extractor, ExtractProposal, RawEvent, Redactor } from '@devmesh/extension-api';
-import { createRuleBasedExtractor, createSecretRedactor } from '@devmesh/extractor';
-import { createFileSystemCaptureProvider, createGitCaptureProvider } from '@devmesh/providers';
+import type { ProjectScanRecord, Redactor } from '@devmesh/extension-api';
+import { createSecretRedactor } from '@devmesh/redaction';
+import { createFileSystemProjectScanProvider, createGitProjectScanProvider } from '@devmesh/providers';
 import {
-  appendProjectEvent,
   ensureProjectStore,
   JsonlKnowledgeRepository,
   acceptPendingKnowledge,
@@ -25,7 +24,6 @@ import {
   listPendingKnowledge,
   type AcceptPendingKnowledgeResult,
   type CaptureProjectTaskInput,
-  type DevMeshEvent,
   type EnqueuePendingKnowledgeOptions,
   type KnowledgeUsageOptions,
   type PendingKnowledgeReviewItem,
@@ -37,7 +35,6 @@ import {
 import {
   redactCaptureKnowledgeInput,
   redactCaptureProjectTaskInput,
-  redactRawEvent,
   redactRateOptions,
   redactReviewOptions,
   storeOptions,
@@ -51,24 +48,11 @@ export interface DevMeshClientOptions {
   memberName?: string;
 }
 
-export interface PublishExtractProposalResult {
-  decision: 'published' | 'queued';
-  proposal: ExtractProposal;
-  item?: unknown;
-  queueItem?: PendingKnowledgeReviewItem;
-}
-
-export interface CaptureRawEventResult {
-  rawEvent: DevMeshEvent;
-  proposals: ExtractProposal[];
-  results: PublishExtractProposalResult[];
-}
-
 export interface ProjectKnowledgeScanInput {
   limit?: number;
 }
 
-export interface ProjectKnowledgeSignal {
+export interface ProjectKnowledgeFinding {
   kind: string;
   summary: string;
   payload?: Record<string, unknown>;
@@ -79,7 +63,7 @@ export interface ProjectKnowledgeScanResult {
   projectRoot: string;
   instruction: string;
   limit: number;
-  signals: ProjectKnowledgeSignal[];
+  findings: ProjectKnowledgeFinding[];
   highlights: {
     changedFiles: string[];
     fileCount: number;
@@ -92,8 +76,6 @@ export interface DevMeshClientRuntime {
   core: DevMeshCore;
   agent: AgentContextService;
   ensureProjectStore(): Promise<ProjectStore>;
-  captureRawEvent(event: RawEvent, extractor?: Extractor): Promise<CaptureRawEventResult>;
-  publishExtractProposal(proposal: ExtractProposal): Promise<PublishExtractProposalResult>;
   captureKnowledge(input: CaptureKnowledgeInput): Promise<unknown>;
   captureTask(input: CaptureProjectTaskInput): Promise<unknown>;
   rateKnowledge(input: RateKnowledgeInput, options?: RateProjectKnowledgeOptions): Promise<unknown>;
@@ -119,63 +101,12 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
   });
   const agent = createAgentContextService({ core });
   const redactor = createSecretRedactor();
-  const defaultExtractor = createRuleBasedExtractor();
-
-  async function publishExtractProposal(proposal: ExtractProposal): Promise<PublishExtractProposalResult> {
-    const risk = readProposalRisk(proposal);
-    const captureInput = extractProposalToCaptureInput(proposal);
-
-    if (risk === 'low') {
-      const redacted = await redactCaptureKnowledgeInput(withDefaultMember(captureInput, options.memberName), redactor);
-      const result = await captureProjectKnowledge(projectRoot, redacted);
-
-      return {
-        decision: 'published',
-        proposal,
-        item: {
-          ...result.item,
-          event: result.event
-        }
-      };
-    }
-
-    const redacted = await redactCaptureKnowledgeInput(withDefaultMember(captureInput, options.memberName), redactor);
-    const reviewOptions = await redactReviewOptions(
-      {
-        risk: risk === 'high' ? 'high' : 'medium',
-        reason: `${risk}-risk automatic extraction from ${readString(proposal.metadata?.sourceEventKind) ?? 'raw event'}.`
-      },
-      redactor
-    );
-    const queueItem = await enqueuePendingKnowledge(projectRoot, redacted, reviewOptions);
-
-    return {
-      decision: 'queued',
-      proposal,
-      queueItem
-    };
-  }
 
   return {
     projectRoot,
     core,
     agent,
     ensureProjectStore: () => ensureProjectStore(projectRoot, storeOptions(options.memberName)),
-    async captureRawEvent(event, extractor = defaultExtractor) {
-      const safeEvent = await redactRawEvent(event, redactor);
-      const rawEvent = await appendProjectEvent(projectRoot, 'raw.captured', {
-        rawEvent: safeEvent
-      });
-      const proposals = extractor.supports(safeEvent) ? await extractor.extract({ event: safeEvent, projectRoot }) : [];
-      const results = await Promise.all(proposals.map((proposal) => publishExtractProposal(proposal)));
-
-      return {
-        rawEvent,
-        proposals,
-        results
-      };
-    },
-    publishExtractProposal,
     async captureKnowledge(input) {
       const redacted = await redactCaptureKnowledgeInput(withDefaultMember(input, options.memberName), redactor);
       const result = await captureProjectKnowledge(projectRoot, redacted);
@@ -276,7 +207,6 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
         knowledgeItems: items.length,
         autoInit: config.automation.autoInit,
         autoReference: config.automation.autoReference,
-        autoCapture: config.automation.autoCapture,
         autoSync: config.automation.autoSync
       };
     }
@@ -364,12 +294,12 @@ async function readProjectKnowledgeScan(
   input: ProjectKnowledgeScanInput
 ): Promise<ProjectKnowledgeScanResult> {
   const limit = Math.min(Math.max(Math.trunc(input.limit ?? 50), 1), 200);
-  const signals: ProjectKnowledgeSignal[] = [];
+  const findings: ProjectKnowledgeFinding[] = [];
   const changedFiles: string[] = [];
   const todoFiles: string[] = [];
   const providers = [
-    createGitCaptureProvider(),
-    createFileSystemCaptureProvider({
+    createGitProjectScanProvider(),
+    createFileSystemProjectScanProvider({
       maxFiles: limit
     })
   ];
@@ -380,7 +310,7 @@ async function readProjectKnowledgeScan(
     }
 
     for await (const event of provider.collect({ projectRoot })) {
-      signals.push(summarizeProjectKnowledgeSignal(event));
+      findings.push(summarizeProjectKnowledgeFinding(event));
 
       if (event.kind === 'git.snapshot') {
         changedFiles.push(...readChangedFilePaths(event.payload));
@@ -400,7 +330,7 @@ async function readProjectKnowledgeScan(
     instruction:
       'Use this on-demand scan only when you decide a project-wide sweep would help. Inspect the listed highlights and relevant source files yourself, then summarize only durable decisions, conventions, pitfalls, commands, or task handoffs with mesh_capture_knowledge or mesh_capture_task.',
     limit,
-    signals,
+    findings,
     highlights: {
       changedFiles: uniqueStrings(changedFiles).slice(0, limit),
       fileCount: changedFiles.length,
@@ -409,21 +339,21 @@ async function readProjectKnowledgeScan(
   };
 }
 
-function summarizeProjectKnowledgeSignal(event: RawEvent): ProjectKnowledgeSignal {
-  const signal: ProjectKnowledgeSignal = {
+function summarizeProjectKnowledgeFinding(event: ProjectScanRecord): ProjectKnowledgeFinding {
+  const finding: ProjectKnowledgeFinding = {
     kind: event.kind,
     summary: event.summary
   };
 
   if (isRecord(event.payload)) {
-    signal.payload = event.payload;
+    finding.payload = event.payload;
   }
 
   if (isRecord(event.source)) {
-    signal.source = event.source;
+    finding.source = event.source;
   }
 
-  return signal;
+  return finding;
 }
 
 function readChangedFilePaths(payload: Record<string, unknown> | undefined): string[] {
@@ -480,50 +410,6 @@ function readFileSummaries(
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)].sort();
-}
-
-function extractProposalToCaptureInput(proposal: ExtractProposal): CaptureKnowledgeInput {
-  const source: NonNullable<CaptureKnowledgeInput['source']> = {
-    kind: 'extractor'
-  };
-  const input: CaptureKnowledgeInput = {
-    type: proposal.type,
-    title: proposal.title,
-    summary: proposal.summary,
-    layer: 'extract',
-    source,
-    tags: proposal.tags ?? []
-  };
-
-  if (proposal.confidence !== undefined) {
-    input.confidence = proposal.confidence;
-  }
-
-  if (proposal.para !== undefined) {
-    input.para = proposal.para;
-  }
-
-  if (proposal.metadata !== undefined) {
-    source.metadata = proposal.metadata;
-
-    const sourceEventId = readString(proposal.metadata.sourceEventId);
-
-    if (sourceEventId !== undefined) {
-      source.ref = sourceEventId;
-    }
-  }
-
-  return input;
-}
-
-function readProposalRisk(proposal: ExtractProposal): 'low' | 'medium' | 'high' {
-  const risk = readString(proposal.metadata?.risk);
-
-  if (risk === 'high' || risk === 'medium') {
-    return risk;
-  }
-
-  return 'low';
 }
 
 function readString(value: unknown): string | undefined {

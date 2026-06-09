@@ -10,8 +10,7 @@ export type JsonSchema = {
 
 export type ExtensionKind =
   | 'tool-adapter'
-  | 'capture-provider'
-  | 'extractor'
+  | 'project-scan-provider'
   | 'redactor'
   | 'quality-scorer'
   | 'search-backend'
@@ -47,8 +46,7 @@ export const extensionManifestJsonSchema: JsonSchema = {
       type: 'string',
       enum: [
         'tool-adapter',
-        'capture-provider',
-        'extractor',
+        'project-scan-provider',
         'redactor',
         'quality-scorer',
         'search-backend',
@@ -69,7 +67,7 @@ export const extensionManifestJsonSchema: JsonSchema = {
 };
 
 export type ToolCapability = 'tool.detect' | 'mcp.configure' | 'session.observe' | string;
-export type CaptureCapability = 'capture.git' | 'capture.filesystem' | 'capture.command' | 'capture.mcp-tool' | string;
+export type ProjectScanCapability = 'project.scan.git' | 'project.scan.filesystem' | 'project.scan.command' | string;
 
 export interface DetectResult {
   detected: boolean;
@@ -122,13 +120,13 @@ export interface ToolAdapter extends ExtensionComponent {
   doctor(projectRoot: string): Promise<DoctorCheck[]>;
 }
 
-export interface CaptureContext {
+export interface ProjectScanContext {
   projectRoot: string;
   since?: string;
   metadata?: Record<string, unknown>;
 }
 
-export interface RawEvent {
+export interface MeshEvent {
   id: string;
   kind: string;
   summary: string;
@@ -137,35 +135,13 @@ export interface RawEvent {
   source?: Record<string, unknown>;
 }
 
-export interface CaptureProvider extends ExtensionComponent {
-  kind: 'capture-provider';
-  capabilities: CaptureCapability[];
+export interface ProjectScanRecord extends MeshEvent {}
+
+export interface ProjectScanProvider extends ExtensionComponent {
+  kind: 'project-scan-provider';
+  capabilities: ProjectScanCapability[];
   detect(projectRoot: string): Promise<boolean>;
-  collect(ctx: CaptureContext): AsyncIterable<RawEvent>;
-}
-
-export interface ExtractInput {
-  event: RawEvent;
-  projectRoot: string;
-}
-
-export interface ExtractProposal {
-  type: string;
-  title: string;
-  summary: string;
-  confidence?: number;
-  para?: {
-    category: 'projects' | 'areas' | 'resources' | 'archives';
-    key: string;
-  };
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-}
-
-export interface Extractor extends ExtensionComponent {
-  kind: 'extractor';
-  supports(event: RawEvent): boolean;
-  extract(input: ExtractInput): Promise<ExtractProposal[]>;
+  collect(ctx: ProjectScanContext): AsyncIterable<ProjectScanRecord>;
 }
 
 export interface RedactionInput {
@@ -266,7 +242,7 @@ export interface StorageBackend extends ExtensionComponent {
 
 export interface SyncPushInput {
   clientId: string;
-  events: RawEvent[];
+  events: MeshEvent[];
 }
 
 export interface SyncPushResult {
@@ -283,13 +259,12 @@ export interface SyncPullInput {
 export interface SyncBackend extends ExtensionComponent {
   kind: 'sync-backend';
   push(input: SyncPushInput): Promise<SyncPushResult>;
-  pull(input: SyncPullInput): AsyncIterable<RawEvent>;
+  pull(input: SyncPullInput): AsyncIterable<MeshEvent>;
 }
 
 export interface ExtensionRegistry {
   registerAdapter(adapter: ToolAdapter): void;
-  registerProvider(provider: CaptureProvider): void;
-  registerExtractor(extractor: Extractor): void;
+  registerProjectScanProvider(provider: ProjectScanProvider): void;
   registerRedactor(redactor: Redactor): void;
   registerScorer(scorer: QualityScorer): void;
   registerSearchBackend(search: SearchBackend): void;

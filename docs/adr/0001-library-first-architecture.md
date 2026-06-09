@@ -13,4 +13,4 @@ The monorepo is organized around reusable packages first. `apps/*` only parse ar
 
 ## Consequences
 
-Core code stays independent from tool adapters, MCP hosts, storage engines, and HTTP servers. New adapters, providers, extractors, scorers, search backends, and sync backends are added through `packages/registry` and the interfaces in `packages/extension-api`.
+Core code stays independent from tool adapters, MCP hosts, storage engines, and HTTP servers. New adapters, providers, redactors, scorers, search backends, and sync backends are added through `packages/registry` and the interfaces in `packages/extension-api`.

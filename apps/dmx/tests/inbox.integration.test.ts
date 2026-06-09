@@ -17,7 +17,7 @@ describe('dmx CLI inbox flow', () => {
         'Xiaoyun',
         '--review',
         '--reason',
-        'High-risk automatic extraction.',
+        'High-risk knowledge capture.',
         '--title',
         'Review accepted candidate',
         '--summary',
@@ -32,7 +32,7 @@ describe('dmx CLI inbox flow', () => {
       expect(queuedJson).toMatchObject({
         kind: 'knowledge',
         risk: 'high',
-        reason: 'High-risk automatic extraction.',
+        reason: 'High-risk knowledge capture.',
         input: {
           title: 'Review accepted candidate',
           createdBy: {

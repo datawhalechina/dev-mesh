@@ -48,7 +48,7 @@
 | `packages/protocol` | 普通 HTTP / sync / join payload 类型。 |
 | `packages/extension-api` | 稳定扩展接口，不依赖具体扩展实现。 |
 | `packages/registry` | 扩展注册、去重、priority resolve。 |
-| `packages/*` 扩展包 | adapter、provider、extractor、quality、search、storage 等具体能力。 |
+| `packages/*` 扩展包 | adapter、provider、redaction、quality、search、storage 等具体能力。 |
 
 文件组织建议：
 
