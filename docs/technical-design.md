@@ -3,7 +3,7 @@
 状态：Draft v0.1  
 日期：2026-06-06  
 项目名：`devmesh`
-当前 npm CLI 包名：`mcp-dev-mesh`
+当前 npm CLI 包名：`devmesh`
 
 ## 1. 背景与目标
 
@@ -399,8 +399,8 @@ GET  /api/v1/admin/audit
     "defaultJoinMode": "invite"
   },
   "install": {
-    "npmPackage": "mcp-dev-mesh",
-    "command": "npm install -g mcp-dev-mesh"
+    "npmPackage": "devmesh",
+    "command": "npm install -g devmesh"
   },
   "minClientVersion": "0.1.0",
   "publicKeyFingerprint": "sha256:..."
@@ -772,11 +772,11 @@ Mesh Client 是安装在每个开发者机器上的本地代理：
 
 ### 6.2 CLI 命令
 
-NPM 包名：`mcp-dev-mesh`  
+NPM 包名：`devmesh`
 安装后提供二进制命令：`dmx`
 
 ```bash
-npm install -g mcp-dev-mesh
+npm install -g devmesh
 dmx init --global
 dmx init --global --tools codex,claude,opencode --yes
 dmx join 192.168.1.10:8721 --group frontend-team --name 小云 --token <invite-token>
@@ -822,9 +822,9 @@ dmx join 192.168.1.10:8721 \
 也支持不预先全局安装的一次性 npm 执行：
 
 ```bash
-npx -y mcp-dev-mesh@latest init --global --yes
+npx -y devmesh@latest init --global --yes
 
-npx -y mcp-dev-mesh@latest join 192.168.1.10:8721 \
+npx -y devmesh@latest join 192.168.1.10:8721 \
   --group frontend-team \
   --name 小云 \
   --handle xiaoyun \
@@ -843,12 +843,12 @@ dmx config set automation.auto_sync false --project .
 
 ### 6.3 NPM 一键安装、全局初始化和加入群组
 
-推荐安装方式是 NPM。`npm install -g mcp-dev-mesh` 安装 `dmx` 命令；`dmx init --global` 完成本机初始化、扫描已安装编程工具，并把 MCP host 配置为启动 `dmx serve --mcp`；`dmx join` 只负责加入远端服务器的指定 group。未执行 `dmx join` 时，DevMesh 仍然以 local-only 模式运行，作为本地项目知识库使用。
+推荐安装方式是 NPM。`npm install -g devmesh` 安装 `dmx` 命令；`dmx init --global` 完成本机初始化、扫描已安装编程工具，并把 MCP host 配置为启动 `dmx serve --mcp`；`dmx join` 只负责加入远端服务器的指定 group。未执行 `dmx join` 时，DevMesh 仍然以 local-only 模式运行，作为本地项目知识库使用。
 
 Windows PowerShell：
 
 ```powershell
-npm install -g mcp-dev-mesh
+npm install -g devmesh
 dmx init --global
 dmx join 192.168.1.10:8721 --group frontend-team --name 小云 --handle xiaoyun --token <invite-token> --yes
 ```
@@ -856,7 +856,7 @@ dmx join 192.168.1.10:8721 --group frontend-team --name 小云 --handle xiaoyun 
 macOS / Linux：
 
 ```bash
-npm install -g mcp-dev-mesh
+npm install -g devmesh
 dmx init --global
 dmx join 192.168.1.10:8721 --group frontend-team --name 小云 --handle xiaoyun --token <invite-token> --yes
 ```
@@ -864,7 +864,7 @@ dmx join 192.168.1.10:8721 --group frontend-team --name 小云 --handle xiaoyun 
 生产环境可使用 npm 一行命令：
 
 ```bash
-npm install -g mcp-dev-mesh && dmx init --global --yes && dmx join https://dev-mesh.company.com --group frontend-team --name 小云 --handle xiaoyun --token <invite-token> --yes
+npm install -g devmesh && dmx init --global --yes && dmx join https://dev-mesh.company.com --group frontend-team --name 小云 --handle xiaoyun --token <invite-token> --yes
 ```
 
 全局初始化流程：
@@ -1101,7 +1101,7 @@ interval_seconds = 60
 
 ### 6.6 Local-only 模式
 
-用户只执行 `npm install -g mcp-dev-mesh` 和 `dmx init --global`，但没有执行 `dmx join` 时，DevMesh 进入 local-only 模式：
+用户只执行 `npm install -g devmesh` 和 `dmx init --global`，但没有执行 `dmx join` 时，DevMesh 进入 local-only 模式：
 
 - Codex、Claude Code、opencode 仍然连接本地 MCP Proxy。
 - 打开项目时仍然自动创建或复用 `.dev-mesh/`。
@@ -2268,7 +2268,7 @@ Registry 规则：
 
 ```text
 1. 管理员创建 invite link。
-2. 新同事运行 `npm install -g mcp-dev-mesh`。
+2. 新同事运行 `npm install -g devmesh`。
 3. 新同事运行 `dmx init --global`，在 TUI 中选择 Codex、Claude Code、opencode 注册 MCP。
 4. 客户端开启 daemon，本机进入 local-only 自动模式。
 5. 新同事运行 `dmx join <server> --group frontend-team --name 小云 --token <invite-token>`。
@@ -2284,7 +2284,7 @@ Registry 规则：
 ### 13.2 未加入服务器的本地知识库
 
 ```text
-1. 用户运行 `npm install -g mcp-dev-mesh`。
+1. 用户运行 `npm install -g devmesh`。
 2. 用户运行 `dmx init --global`，选择要注册 MCP 的编程工具。
 3. 用户用 Codex 或 Claude Code 打开任意项目。
 4. DevMesh 自动创建 `.dev-mesh/`，建立本地 raw / extract / canonical / PARA 知识库。
@@ -2527,7 +2527,7 @@ CI 门禁：
 
 ### 阶段 2：Mesh Client
 
-- NPM package `mcp-dev-mesh`
+- NPM package `devmesh`
 - `dmx` CLI
 - `@mcp-dev-mesh/client` 提供可嵌入的 stdio launcher、local proxy 和 daemon runtime
 - `@mcp-dev-mesh/agent` 提供 `buildContextPack`、自动引用策略和沉淀 orchestration API

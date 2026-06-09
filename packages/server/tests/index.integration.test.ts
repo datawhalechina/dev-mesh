@@ -38,7 +38,7 @@ describe('hub server HTTP integration', () => {
         baseUrl: url,
         mcpUrl: `${url}/mcp`,
         install: {
-          npmPackage: 'mcp-dev-mesh'
+          npmPackage: 'devmesh'
         }
       });
     } finally {

@@ -1,7 +1,7 @@
 {
-  "name": "mcp-dev-mesh",
+  "name": "devmesh",
   "version": "0.1.6",
-  "description": "Local-first MCP project context mesh CLI",
+  "description": "DevMesh local-first project context CLI",
   "type": "module",
   "repository": {
     "type": "git",

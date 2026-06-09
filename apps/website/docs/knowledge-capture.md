@@ -25,8 +25,8 @@ title: 自动沉淀
 开发和调试阶段建议先用 `dmx capture` 写入一条知识，再用 `dmx search` 检查结果。这个流程能排除 AI 客户端配置问题。
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- capture --root $project --name local --title "API boundary decision" --summary "The local proxy owns MCP-facing tool contracts." --type decision --layer canonical --tag architecture
-pnpm --filter mcp-dev-mesh dev -- search --root $project --query "local proxy"
+pnpm --filter devmesh dev -- capture --root $project --name local --title "API boundary decision" --summary "The local proxy owns MCP-facing tool contracts." --type decision --layer canonical --tag architecture
+pnpm --filter devmesh dev -- search --root $project --query "local proxy"
 ```
 
 ### 审查队列
@@ -34,7 +34,7 @@ pnpm --filter mcp-dev-mesh dev -- search --root $project --query "local proxy"
 对于需要人工确认的知识，可以进入 `.dev-mesh/queue`，再由 inbox 命令接受或拒绝：
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- inbox --root $project
+pnpm --filter devmesh dev -- inbox --root $project
 ```
 
 ## 建议提示词
@@ -66,6 +66,6 @@ pnpm --filter mcp-dev-mesh dev -- inbox --root $project
 再执行：
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- search --root $project --query "canonical"
-pnpm --filter mcp-dev-mesh dev -- status --root $project
+pnpm --filter devmesh dev -- search --root $project --query "canonical"
+pnpm --filter devmesh dev -- status --root $project
 ```

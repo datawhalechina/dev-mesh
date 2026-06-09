@@ -138,7 +138,7 @@ The Web Admin and Website archives contain static files ready for any static hos
 
 ## NPM CLI Publishing
 
-The `NPM Publish` GitHub workflow publishes the `mcp-dev-mesh` CLI package on `v*` tags. Manual dispatch builds and uploads the npm tarball as a workflow artifact without publishing.
+The `NPM Publish` GitHub workflow publishes the `devmesh` CLI package on `v*` tags. Manual dispatch builds and uploads the npm tarball as a workflow artifact without publishing.
 
 Required repository secret:
 
@@ -149,7 +149,7 @@ NPM_TOKEN
 The workflow publishes with provenance, public package access, and the `alpha` dist-tag:
 
 ```bash
-npm install -g mcp-dev-mesh@alpha
+npm install -g devmesh@alpha
 ```
 
 The CLI package bundles internal workspace code into `dist/index.js`; runtime npm dependencies are limited to external packages used by the bundled CLI.
@@ -157,7 +157,7 @@ The CLI package `repository.url` must match the GitHub repository used by Action
 
 ## Current Release Boundaries
 
-- Public npm publishing is enabled for the `mcp-dev-mesh` CLI only. Internal workspace libraries remain private and are bundled into the CLI.
+- Public npm publishing is enabled for the `devmesh` CLI only. Internal workspace libraries remain private and are bundled into the CLI.
 - Container image publishing is manual-only and currently targets GHCR; Docker Hub publishing can be wired in later without affecting npm releases.
 - GitHub Release artifacts currently cover static frontends and deployment docs; the Node server is released through source checkout or container images, not as a standalone npm package.
 - Web Admin is intended to be served behind the included Nginx proxy or another reverse proxy that forwards `/api` and `/healthz` to the Hub Server.

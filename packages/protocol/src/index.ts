@@ -155,8 +155,8 @@ export function createDefaultWellKnown(baseUrl = 'http://127.0.0.1:8721'): WellK
       defaultJoinMode: 'invite'
     },
     install: {
-      npmPackage: 'mcp-dev-mesh',
-      command: 'npm install -g mcp-dev-mesh'
+      npmPackage: 'devmesh',
+      command: 'npm install -g devmesh'
     },
     minClientVersion: '0.1.0'
   };

@@ -44,8 +44,8 @@ node .\apps\mesh-server\dist\index.js --env-file .\mesh-server.env
 ```powershell
 $project="C:\path\to\your\project"
 
-pnpm --filter mcp-dev-mesh dev -- init --root $project --name local
-pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 --root $project --group default --name local --token devmesh-local-invite
+pnpm --filter devmesh dev -- init --root $project --name local
+pnpm --filter devmesh dev -- join http://127.0.0.1:8721 --root $project --group default --name local --token devmesh-local-invite
 ```
 
 执行后目标项目会出现 `.dev-mesh` 目录。
@@ -57,13 +57,13 @@ pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 --root $project --g
 ```powershell
 $project="C:\path\to\your\project"
 
-pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --yes
+pnpm --filter devmesh dev -- init --global --tools codex,claude,opencode --yes
 ```
 
 如需直接调试 HTTP MCP proxy，可以手动运行：
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- proxy --root $project --name local --port 8722
+pnpm --filter devmesh dev -- proxy --root $project --name local --port 8722
 ```
 
 之后在目标项目里让 AI 助手沉淀知识，它就可以通过 MCP 工具写入 `.dev-mesh`。
@@ -73,15 +73,15 @@ pnpm --filter mcp-dev-mesh dev -- proxy --root $project --name local --port 8722
 先用 CLI 手动写一条知识：
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- capture --root $project --name local --title "Smoke test knowledge" --summary "DevMesh can persist project knowledge." --type decision --layer canonical --tag smoke
+pnpm --filter devmesh dev -- capture --root $project --name local --title "Smoke test knowledge" --summary "DevMesh can persist project knowledge." --type decision --layer canonical --tag smoke
 ```
 
 再搜索验证：
 
 ```powershell
-pnpm --filter mcp-dev-mesh dev -- search --root $project --query "DevMesh"
-pnpm --filter mcp-dev-mesh dev -- status --root $project
-pnpm --filter mcp-dev-mesh dev -- doctor --root $project
+pnpm --filter devmesh dev -- search --root $project --query "DevMesh"
+pnpm --filter devmesh dev -- status --root $project
+pnpm --filter devmesh dev -- doctor --root $project
 ```
 
 如果搜索有结果，并且 `.dev-mesh/knowledge` 或 `.dev-mesh/events` 中有新文件，就说明本地沉淀链路已经跑通。

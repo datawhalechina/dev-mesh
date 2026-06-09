@@ -144,13 +144,13 @@ dmx init
 初始化全局配置，并选择要注册的 MCP Host 工具：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- init --global --yes --tool codex --tool opencode
+pnpm --filter devmesh dev -- init --global --yes --tool codex --tool opencode
 ```
 
 也可以用逗号列表：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --mcp-url http://127.0.0.1:8722/mcp --yes
+pnpm --filter devmesh dev -- init --global --tools codex,claude,opencode --mcp-url http://127.0.0.1:8722/mcp --yes
 ```
 
 该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `dev-mesh` MCP server 配置。
@@ -159,7 +159,7 @@ pnpm --filter mcp-dev-mesh dev -- init --global --tools codex,claude,opencode --
 加入开发期 Hub Server 的 group：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 \
+pnpm --filter devmesh dev -- join http://127.0.0.1:8721 \
   --group default \
   --name Xiaoyun \
   --token devmesh-local-invite \
@@ -171,13 +171,13 @@ pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 \
 启动当前项目的 stdio MCP launcher：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- serve --mcp --root . --name local
+pnpm --filter devmesh dev -- serve --mcp --root . --name local
 ```
 
 直接启动当前项目的 HTTP MCP Proxy 调试入口：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- proxy --root . --name local --port 8722
+pnpm --filter devmesh dev -- proxy --root . --name local --port 8722
 ```
 
 `dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。后台 auto-capture 只采集结构化开发信号，不在本地用粗规则代替编码助手总结；Codex、Claude Code 或 opencode 可以通过 `mesh_list_development_signals` 读取这些信号，并基于当前上下文调用 capture 工具沉淀知识。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
@@ -185,13 +185,13 @@ pnpm --filter mcp-dev-mesh dev -- proxy --root . --name local --port 8722
 初始化项目本地知识库：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- init --project --root . --name local
+pnpm --filter devmesh dev -- init --project --root . --name local
 ```
 
 写入一条本地知识：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- capture \
+pnpm --filter devmesh dev -- capture \
   --root . \
   --name local \
   --title "Run focused tests" \
@@ -203,7 +203,7 @@ pnpm --filter mcp-dev-mesh dev -- capture \
 将高风险候选放入 review queue：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- capture \
+pnpm --filter devmesh dev -- capture \
   --root . \
   --name local \
   --review \
@@ -216,27 +216,27 @@ pnpm --filter mcp-dev-mesh dev -- capture \
 查看、接受或拒绝 inbox 候选：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- inbox --root .
-pnpm --filter mcp-dev-mesh dev -- inbox accept <queue-id> --root .
-pnpm --filter mcp-dev-mesh dev -- inbox reject <queue-id> --root . --reason "Not durable enough"
+pnpm --filter devmesh dev -- inbox --root .
+pnpm --filter devmesh dev -- inbox accept <queue-id> --root .
+pnpm --filter devmesh dev -- inbox reject <queue-id> --root . --reason "Not durable enough"
 ```
 
 检索本地知识：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- search "focused tests" --root .
+pnpm --filter devmesh dev -- search "focused tests" --root .
 ```
 
 查看本地状态：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- status --root .
+pnpm --filter devmesh dev -- status --root .
 ```
 
 提交显式反馈：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- rate <knowledge-id> \
+pnpm --filter devmesh dev -- rate <knowledge-id> \
   --root . \
   --name local \
   --rating 1 \
@@ -246,7 +246,7 @@ pnpm --filter mcp-dev-mesh dev -- rate <knowledge-id> \
 重建本地索引 manifest：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- index rebuild --root .
+pnpm --filter devmesh dev -- index rebuild --root .
 ```
 
 该命令会同时重建 `.dev-mesh/index/manifest.json` 和 `.dev-mesh/index/mesh.sqlite`，后者包含可重建的本地关键词 FTS 索引。
@@ -254,7 +254,7 @@ pnpm --filter mcp-dev-mesh dev -- index rebuild --root .
 运行 doctor：
 
 ```bash
-pnpm --filter mcp-dev-mesh dev -- doctor --root .
+pnpm --filter devmesh dev -- doctor --root .
 ```
 
 `dmx doctor` 会检查本地 store、privacy 配置、auto-capture 状态、sync 身份、daemon sync 状态、stdio launcher/daemon 状态和内置 adapter 状态。真实终端中会用 Clack TUI 按类别展示检查结果和修复建议；需要机器读取时可使用 `dmx doctor --json`。

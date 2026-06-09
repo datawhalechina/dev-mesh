@@ -1,11 +1,11 @@
 # DevMesh CLI
 
-`mcp-dev-mesh` provides the `dmx` command for local-first project knowledge capture, search, review, and MCP proxy setup.
+`devmesh` provides the `dmx` command for local-first project knowledge capture, search, review, and MCP proxy setup.
 
 ## Install
 
 ```bash
-npm install -g mcp-dev-mesh@alpha
+npm install -g devmesh@alpha
 ```
 
 ## Commands
