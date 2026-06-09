@@ -6,6 +6,7 @@ import Koa, { type Context, type Middleware } from 'koa';
 import Router from '@koa/router';
 import bodyParser from 'koa-bodyparser';
 import type { DevMeshCore } from '@devmesh/core';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   createDefaultWellKnown,
   type CreateProjectRequest,
@@ -208,7 +209,7 @@ function createHubRouter(
     ctx.body = {
       status: 'ok',
       service: 'devmesh',
-      version: '0.1.0'
+      version: DEV_MESH_VERSION
     };
   });
 

@@ -18,6 +18,10 @@ export const meshSearchContextInputSchema = z.object({
   includeSuperseded: z.boolean().default(false)
 });
 
+export const meshGetStatusInputSchema = z.object({
+  project: z.string().default('auto')
+});
+
 export const meshCaptureKnowledgeInputSchema = z.object({
   type: z.string().min(1),
   title: z.string().min(1),
@@ -121,6 +125,7 @@ export const meshExploreKnowledgeGraphInputSchema = z.object({
 });
 
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
+export type MeshGetStatusInput = z.infer<typeof meshGetStatusInputSchema>;
 export type MeshCaptureKnowledgeInput = z.infer<typeof meshCaptureKnowledgeInputSchema>;
 export type MeshCaptureTaskInput = z.infer<typeof meshCaptureTaskInputSchema>;
 export type MeshRateKnowledgeInput = z.infer<typeof meshRateKnowledgeInputSchema>;
@@ -132,6 +137,7 @@ export type MeshExploreKnowledgeGraphInput = z.infer<typeof meshExploreKnowledge
 
 export const DEV_MESH_MCP_INSTRUCTIONS = [
   'DevMesh is an assistant-led project knowledge memory. Treat knowledge capture as part of normal coding work, not as an optional user-requested step.',
+  'Use mesh_get_status when you need to confirm the running DevMesh version, project store, or automation state.',
   'Before final responses after meaningful coding, debugging, review, design, setup, release, deployment, or documentation work, decide whether you learned durable project knowledge.',
   'Capture durable decisions, conventions, commands, architecture notes, debugging lessons, pitfalls, setup/deployment steps, release notes, and handoffs with mesh_capture_knowledge.',
   'Capture task state, blockers, verification status, and next actions with mesh_capture_task when work starts, changes state, finishes, or needs handoff.',
@@ -144,6 +150,7 @@ const assistantLedCaptureReminder =
   'IMPORTANT: Treat capture as a default end-of-task habit. Do not wait for the user to ask. Before the final response for meaningful coding, debugging, review, design, setup, release, deployment, or documentation work, decide whether the session produced durable project knowledge. If yes, summarize it yourself and call mesh_capture_knowledge or mesh_capture_task first.';
 
 export interface MeshToolHandlers {
+  getStatus(input: MeshGetStatusInput): Promise<unknown>;
   searchContext(input: MeshSearchContextInput): Promise<unknown>;
   captureKnowledge(input: MeshCaptureKnowledgeInput): Promise<unknown>;
   captureTask(input: MeshCaptureTaskInput): Promise<unknown>;
@@ -156,6 +163,17 @@ export interface MeshToolHandlers {
 }
 
 export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers): void {
+  server.registerTool(
+    'mesh_get_status',
+    {
+      title: 'Get DevMesh status',
+      description:
+        'Inspect the current running DevMesh version, runtime status, project store path, automation flags, and knowledge counts before assuming which version or mode is active.',
+      inputSchema: meshGetStatusInputSchema.shape
+    },
+    async (args) => jsonToolResult(await handlers.getStatus(meshGetStatusInputSchema.parse(args)))
+  );
+
   server.registerTool(
     'mesh_search_context',
     {

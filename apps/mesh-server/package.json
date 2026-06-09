@@ -12,6 +12,7 @@
     "@devmesh/core": "workspace:*",
     "@devmesh/local-store": "workspace:*",
     "@devmesh/server": "workspace:*",
+    "@devmesh/shared": "workspace:*",
     "@devmesh/storage": "workspace:*",
     "commander": "15.0.0",
     "pg": "^8.21.0"

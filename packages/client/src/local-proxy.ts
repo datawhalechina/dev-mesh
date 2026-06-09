@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http';
 import Koa, { type Middleware } from 'koa';
 import Router from '@koa/router';
 import bodyParser from 'koa-bodyparser';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   closeLocalMcpSessions,
   handleLocalMcpRequest,
@@ -134,7 +135,7 @@ function createLocalProxyRouter(
     ctx.body = {
       status: 'ok',
       service: 'devmesh-local-proxy',
-      version: '0.1.0',
+      version: DEV_MESH_VERSION,
       projectRoot: runtime.projectRoot,
       mcpUrl: `${baseUrl}/mcp`
     };

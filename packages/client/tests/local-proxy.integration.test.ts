@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { describe, expect, it } from 'vitest';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import { createLocalMcpProxy } from '../src/index.js';
 
 describe('local MCP proxy', () => {
@@ -28,6 +29,11 @@ describe('local MCP proxy', () => {
       await client.connect(transport as never);
 
       const tools = await client.listTools();
+      const statusResult = await client.callTool({
+        name: 'mesh_get_status',
+        arguments: {}
+      });
+      const status = JSON.parse(readTextToolResult(statusResult));
       const captureResult = await client.callTool({
         name: 'mesh_capture_knowledge',
         arguments: {
@@ -90,18 +96,21 @@ describe('local MCP proxy', () => {
       expect(health.body).toMatchObject({
         status: 'ok',
         service: 'devmesh-local-proxy',
+        version: DEV_MESH_VERSION,
         projectRoot,
         mcpUrl: `${url}/mcp`
       });
       expect(tools.tools.map((tool) => tool.name)).toEqual(
         expect.arrayContaining([
           'mesh_search_context',
+          'mesh_get_status',
           'mesh_capture_knowledge',
           'mesh_capture_task',
           'mesh_rate_knowledge',
           'mesh_link_knowledge',
           'mesh_search_member_experience',
           'mesh_resolve_term',
+          'mesh_scan_project_knowledge',
           'mesh_explore_knowledge_graph'
         ])
       );
@@ -118,6 +127,13 @@ describe('local MCP proxy', () => {
             knowledgeId: captured.id
           }
         }
+      });
+      expect(status).toMatchObject({
+        service: 'devmesh',
+        version: DEV_MESH_VERSION,
+        mode: 'local-only',
+        projectRoot,
+        storeRoot: join(projectRoot, '.dev-mesh')
       });
       expect(contextPack.query).toBe('local proxy');
       expect(contextPack.items).toEqual(

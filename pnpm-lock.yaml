@@ -72,6 +72,9 @@ importers:
       '@devmesh/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@devmesh/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -87,6 +90,9 @@ importers:
       '@devmesh/server':
         specifier: workspace:*
         version: link:../../packages/server
+      '@devmesh/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@devmesh/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -296,6 +302,9 @@ importers:
       '@devmesh/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@devmesh/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@koa/router':
         specifier: ^15.6.0
         version: 15.6.0(koa@2.16.4)

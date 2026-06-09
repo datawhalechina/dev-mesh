@@ -23,6 +23,7 @@
     "@devmesh/local-store": "workspace:*",
     "@devmesh/mcp-contracts": "workspace:*",
     "@devmesh/protocol": "workspace:*",
+    "@devmesh/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "1.29.0",
     "koa": "2",
     "koa-bodyparser": "^4.4.1",

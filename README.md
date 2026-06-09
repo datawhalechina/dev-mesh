@@ -343,6 +343,7 @@ POST /mcp
 MCP tools 与 Hub Server 核心工具保持一致：
 
 ```text
+mesh_get_status
 mesh_search_context
 mesh_capture_knowledge
 mesh_capture_task
@@ -354,7 +355,7 @@ mesh_scan_project_knowledge
 mesh_explore_knowledge_graph
 ```
 
-集成测试覆盖 stdio launcher 启动 daemon、SDK client 调用 `tools/list` / `mesh_capture_knowledge`，以及 HTTP proxy 调用 `tools/list`、`mesh_capture_knowledge`、`mesh_link_knowledge`、`mesh_search_context`、`mesh_explore_knowledge_graph`，并验证默认写入当前项目 store。
+集成测试覆盖 stdio launcher 启动 daemon、SDK client 调用 `tools/list` / `mesh_get_status` / `mesh_capture_knowledge`，以及 HTTP proxy 调用 `tools/list`、`mesh_get_status`、`mesh_capture_knowledge`、`mesh_link_knowledge`、`mesh_search_context`、`mesh_explore_knowledge_graph`，并验证默认写入当前项目 store。
 
 ## HTTP API Skeleton
 
@@ -399,6 +400,7 @@ POST /mcp
 MCP `/mcp` 已使用 SDK Streamable HTTP transport 接入，集成测试覆盖 `tools/list` 和 `tools/call`。MCP tool contract 目前包含：
 
 ```text
+mesh_get_status
 mesh_search_context
 mesh_capture_knowledge
 mesh_capture_task
@@ -410,7 +412,7 @@ mesh_scan_project_knowledge
 mesh_explore_knowledge_graph
 ```
 
-其中 `mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。`mesh_link_knowledge` 会把明确的 `supersedes`、`duplicates`、`contradicts` 关系写入本地 edge store 或 Hub knowledge edges。`mesh_explore_knowledge_graph` 会围绕条目、PARA、tag、作者、来源、类型和语义边返回关系子图，适合回答“这个决策关联哪些坑点/模块/成员经验”。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge` 和 `mesh_link_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志、ratings 反馈文件或 semantic edge 文件；检索命中和 inbox 接受会写入 usage 反馈文件，并通过较小的 adoption/confidence 增量影响后续排序。
+其中 `mesh_get_status` 返回当前 DevMesh MCP 运行版本、模式、项目根、store 路径、知识数量；通过 stdio launcher 连接时还会包含前台 proxy 和共享 daemon 的运行状态，方便 Codex 先确认实际连接状态。`mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。`mesh_link_knowledge` 会把明确的 `supersedes`、`duplicates`、`contradicts` 关系写入本地 edge store 或 Hub knowledge edges。`mesh_explore_knowledge_graph` 会围绕条目、PARA、tag、作者、来源、类型和语义边返回关系子图，适合回答“这个决策关联哪些坑点/模块/成员经验”。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge` 和 `mesh_link_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志、ratings 反馈文件或 semantic edge 文件；检索命中和 inbox 接受会写入 usage 反馈文件，并通过较小的 adoption/confidence 增量影响后续排序。
 
 开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token、projects、knowledge edges 和 audit logs：
 

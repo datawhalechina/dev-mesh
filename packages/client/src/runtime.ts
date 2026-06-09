@@ -9,6 +9,7 @@ import { createDevMeshCore, type CaptureKnowledgeInput, type DevMeshCore, type R
 import type { ProjectScanRecord, Redactor } from '@devmesh/extension-api';
 import { createSecretRedactor } from '@devmesh/redaction';
 import { createFileSystemProjectScanProvider, createGitProjectScanProvider } from '@devmesh/providers';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   ensureProjectStore,
   JsonlKnowledgeRepository,
@@ -221,6 +222,8 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
       const items = await core.listKnowledge({ includeSuperseded: true });
 
       return {
+        service: 'devmesh',
+        version: DEV_MESH_VERSION,
         mode: 'local-only',
         schemaVersion: config.schemaVersion,
         projectRoot,

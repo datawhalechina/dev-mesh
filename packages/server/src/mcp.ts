@@ -10,6 +10,7 @@ import type {
   RateKnowledgeInput
 } from '@devmesh/core';
 import { buildKnowledgeGraph, exploreKnowledgeGraph, type KnowledgeGraphSemanticEdge } from '@devmesh/graph';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   DEV_MESH_MCP_INSTRUCTIONS,
   registerMeshTools,
@@ -42,7 +43,7 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
   const mcp = new McpServer(
     {
       name: 'devmesh',
-      version: '0.1.0'
+      version: DEV_MESH_VERSION
     },
     {
       instructions: DEV_MESH_MCP_INSTRUCTIONS
@@ -51,6 +52,20 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
   const agent = createAgentContextService({ core });
 
   registerMeshTools(mcp, {
+    async getStatus() {
+      const items = await core.listKnowledge({
+        includeSuperseded: true
+      });
+
+      return {
+        service: 'devmesh',
+        version: DEV_MESH_VERSION,
+        mode: isLocalStoreBacked(core) ? 'local-store' : 'server',
+        projectRoot: core.projectRoot,
+        repository: core.repository.constructor.name,
+        knowledgeItems: items.length
+      };
+    },
     async searchContext(input) {
       return agent.buildContextPack(toContextPackInput(input));
     },

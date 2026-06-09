@@ -5,10 +5,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { DEV_MESH_DIR, ensureProjectStore } from '@devmesh/local-store';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import type {
   MeshCaptureKnowledgeInput,
   MeshCaptureTaskInput,
   MeshExploreKnowledgeGraphInput,
+  MeshGetStatusInput,
   MeshLinkKnowledgeInput,
   MeshScanProjectKnowledgeInput,
   MeshRateKnowledgeInput,
@@ -71,6 +73,7 @@ export interface LocalMcpDaemonStatus {
 
 type DaemonToolName =
   | 'mesh_search_context'
+  | 'mesh_get_status'
   | 'mesh_capture_knowledge'
   | 'mesh_capture_task'
   | 'mesh_rate_knowledge'
@@ -80,7 +83,7 @@ type DaemonToolName =
   | 'mesh_scan_project_knowledge'
   | 'mesh_explore_knowledge_graph';
 
-const DAEMON_VERSION = '0.1.0';
+const DAEMON_VERSION = DEV_MESH_VERSION;
 
 export async function serveLocalMcpStdio(options: LocalMcpDaemonOptions = {}): Promise<void> {
   const projectRoot = options.projectRoot ?? process.cwd();
@@ -238,6 +241,12 @@ export async function readLocalMcpDaemonState(projectRoot = process.cwd()): Prom
 
 function createDaemonAwareHandlers(localHandlers: MeshToolHandlers, options: LocalMcpDaemonOptions): MeshToolHandlers {
   return {
+    async getStatus(input) {
+      const status = await callDaemonOrLocal('mesh_get_status', input, () => localHandlers.getStatus(input), options);
+      const daemon = await inspectLocalMcpDaemon(options.projectRoot ?? process.cwd());
+
+      return withProxyRuntimeStatus(status, daemon);
+    },
     searchContext: (input) =>
       callDaemonOrLocal('mesh_search_context', input, () => localHandlers.searchContext(input), options),
     captureKnowledge: (input) =>
@@ -276,6 +285,7 @@ async function callDaemonOrLocal(
   toolName: DaemonToolName,
   input:
     | MeshSearchContextInput
+    | MeshGetStatusInput
     | MeshCaptureKnowledgeInput
     | MeshCaptureTaskInput
     | MeshExploreKnowledgeGraphInput
@@ -298,6 +308,50 @@ async function callDaemonOrLocal(
   }
 
   return fallback();
+}
+
+function withProxyRuntimeStatus(status: unknown, daemon: LocalMcpDaemonStatus): unknown {
+  const mcp = {
+    entrypoint: 'stdio-proxy',
+    daemon: formatDaemonRuntimeStatus(daemon)
+  };
+
+  if (isRecord(status)) {
+    return {
+      ...status,
+      mcp
+    };
+  }
+
+  return {
+    result: status,
+    mcp
+  };
+}
+
+function formatDaemonRuntimeStatus(status: LocalMcpDaemonStatus): Record<string, unknown> {
+  const daemon: Record<string, unknown> = {
+    running: status.running,
+    projectRoot: status.projectRoot,
+    message: status.message
+  };
+
+  if (status.state !== undefined) {
+    Object.assign(daemon, {
+      pid: status.state.pid,
+      version: status.state.version,
+      mcpUrl: status.state.mcpUrl,
+      healthUrl: status.state.healthUrl,
+      startedAt: status.state.startedAt,
+      syncStatusPath: status.state.syncStatusPath
+    });
+  }
+
+  return daemon;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 async function callDaemonTool(mcpUrl: string, toolName: DaemonToolName, input: Record<string, unknown>): Promise<unknown> {

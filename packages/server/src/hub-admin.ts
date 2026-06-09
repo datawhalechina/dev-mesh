@@ -8,6 +8,7 @@ import type {
   SearchKnowledgeInput
 } from '@devmesh/core';
 import type { JoinResponse, ProjectAclMember, ProjectAclRole, ProjectAclVisibility, ProjectSummary } from '@devmesh/protocol';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   ACCESS_TOKEN_TTL_MS,
   DEFAULT_ADMIN_INVITE_TTL_MS,
@@ -103,7 +104,7 @@ export async function createAdminOverview(
 
   return {
     service: 'devmesh',
-    version: '0.1.0',
+    version: DEV_MESH_VERSION,
     baseUrl,
     mcpUrl: `${baseUrl.replace(/\/$/, '')}/mcp`,
     counts: {

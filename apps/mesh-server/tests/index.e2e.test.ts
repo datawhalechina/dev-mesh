@@ -4,6 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = join(import.meta.dirname, '..', '..', '..');
@@ -22,15 +23,28 @@ describe('mesh-server e2e smoke', () => {
       expect(health.status).toBe(200);
       await expect(health.json()).resolves.toMatchObject({
         status: 'ok',
-        service: 'devmesh'
+        service: 'devmesh',
+        version: DEV_MESH_VERSION
       });
 
       const mcp = await createMcpSession(`${baseUrl}/mcp`);
       const tools = await mcp.request('tools/list', {});
 
       expect(tools.result.tools.map((tool: { name: string }) => tool.name)).toEqual(
-        expect.arrayContaining(['mesh_search_context', 'mesh_capture_knowledge'])
+        expect.arrayContaining(['mesh_get_status', 'mesh_search_context', 'mesh_capture_knowledge'])
       );
+      const status = await mcp.request('tools/call', {
+        name: 'mesh_get_status',
+        arguments: {}
+      });
+      const statusResult = JSON.parse(status.result.content[0].text);
+
+      expect(statusResult).toMatchObject({
+        service: 'devmesh',
+        version: DEV_MESH_VERSION,
+        mode: 'local-store',
+        projectRoot
+      });
 
       const capture = await mcp.request('tools/call', {
         name: 'mesh_capture_knowledge',

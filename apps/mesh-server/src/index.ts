@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { createDevMeshCore } from '@devmesh/core';
 import { JsonlKnowledgeRepository } from '@devmesh/local-store';
 import { createHubServer, listenMeshServer, type MeshServerOptions } from '@devmesh/server';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   createPostgresHubStateStore,
   migratePostgresHubStateStore,
@@ -18,7 +19,7 @@ const program = new Command();
 program
   .name('dmx-server')
   .description('DevMesh hub server')
-  .version('0.1.0')
+  .version(DEV_MESH_VERSION)
   .option('--env-file <path>', 'dotenv-style environment file')
   .option('--host <host>', 'listen host')
   .option('--port <port>', 'listen port', parseIntOption)

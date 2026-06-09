@@ -35,6 +35,7 @@
   "devDependencies": {
     "@devmesh/client": "workspace:*",
     "@devmesh/core": "workspace:*",
+    "@devmesh/shared": "workspace:*",
     "zod": "4.4.3"
   }
 }

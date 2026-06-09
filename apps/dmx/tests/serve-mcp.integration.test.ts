@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = join(import.meta.dirname, '..', '..', '..');
@@ -40,6 +41,11 @@ describe('dmx serve --mcp', () => {
       await client.connect(transport as never);
 
       const tools = await client.listTools();
+      const statusResult = await client.callTool({
+        name: 'mesh_get_status',
+        arguments: {}
+      });
+      const status = JSON.parse(readTextToolResult(statusResult));
       const captureResult = await client.callTool({
         name: 'mesh_capture_knowledge',
         arguments: {
@@ -58,8 +64,21 @@ describe('dmx serve --mcp', () => {
       );
 
       expect(tools.tools.map((tool) => tool.name)).toEqual(
-        expect.arrayContaining(['mesh_search_context', 'mesh_capture_knowledge'])
+        expect.arrayContaining(['mesh_get_status', 'mesh_search_context', 'mesh_capture_knowledge'])
       );
+      expect(status).toMatchObject({
+        service: 'devmesh',
+        version: DEV_MESH_VERSION,
+        projectRoot,
+        mcp: {
+          entrypoint: 'stdio-proxy',
+          daemon: {
+            running: true,
+            projectRoot,
+            version: DEV_MESH_VERSION
+          }
+        }
+      });
       expect(captured).toMatchObject({
         title: 'Stdio launcher starts daemon',
         createdBy: {
@@ -68,7 +87,7 @@ describe('dmx serve --mcp', () => {
       });
       expect(daemon).toMatchObject({
         projectRoot,
-        version: '0.1.0'
+        version: DEV_MESH_VERSION
       });
       expect(knowledgeJsonl).toContain('"title":"Stdio launcher starts daemon"');
     } finally {

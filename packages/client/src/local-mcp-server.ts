@@ -8,6 +8,7 @@ import type {
   RateKnowledgeInput
 } from '@devmesh/core';
 import type { CaptureProjectTaskInput } from '@devmesh/local-store';
+import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   DEV_MESH_MCP_INSTRUCTIONS,
   registerMeshTools,
@@ -30,7 +31,7 @@ export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers)
   const mcp = new McpServer(
     {
       name: 'devmesh-local',
-      version: '0.1.0'
+      version: DEV_MESH_VERSION
     },
     {
       instructions: DEV_MESH_MCP_INSTRUCTIONS
@@ -49,6 +50,7 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
     captureTask: (input) => runtime.captureTask(toTaskCaptureInput(input)),
     rateKnowledge: (input) => runtime.rateKnowledge(toRateInput(input)),
     linkKnowledge: (input) => runtime.linkKnowledge(toLinkKnowledgeInput(input)),
+    getStatus: () => runtime.status(),
     scanProjectKnowledge: (input) => runtime.scanProjectKnowledge(toScanProjectKnowledgeInput(input)),
     exploreKnowledgeGraph: (input) => runtime.exploreKnowledgeGraph(toExploreKnowledgeGraphInput(input)),
     searchMemberExperience(input) {

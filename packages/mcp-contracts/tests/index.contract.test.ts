@@ -3,6 +3,7 @@ import {
   DEV_MESH_MCP_INSTRUCTIONS,
   meshCaptureKnowledgeInputSchema,
   meshExploreKnowledgeGraphInputSchema,
+  meshGetStatusInputSchema,
   meshLinkKnowledgeInputSchema,
   meshRateKnowledgeInputSchema,
   meshSearchContextInputSchema,
@@ -79,6 +80,12 @@ describe('MCP tool contract schemas', () => {
     });
   });
 
+  it('applies defaults for status checks', () => {
+    expect(meshGetStatusInputSchema.parse({})).toEqual({
+      project: 'auto'
+    });
+  });
+
   it('registers the expected public tools', async () => {
     const registered: Array<{
       name: string;
@@ -91,6 +98,7 @@ describe('MCP tool contract schemas', () => {
       }
     };
     const handlers: MeshToolHandlers = {
+      getStatus: vi.fn(async () => ({ ok: 'status' })),
       searchContext: vi.fn(async () => ({ ok: 'search' })),
       captureKnowledge: vi.fn(async () => ({ ok: 'capture' })),
       captureTask: vi.fn(async () => ({ ok: 'task' })),
@@ -105,6 +113,7 @@ describe('MCP tool contract schemas', () => {
     registerMeshTools(fakeServer as never, handlers);
 
     expect(registered.map((tool) => tool.name)).toEqual([
+      'mesh_get_status',
       'mesh_search_context',
       'mesh_capture_knowledge',
       'mesh_capture_task',
@@ -118,6 +127,7 @@ describe('MCP tool contract schemas', () => {
 
     const toolDescriptions = Object.fromEntries(registered.map((tool) => [tool.name, tool.config.description ?? '']));
 
+    expect(toolDescriptions.mesh_get_status).toContain('running DevMesh version');
     expect(toolDescriptions.mesh_capture_knowledge).toContain('Do not wait for the user');
     expect(toolDescriptions.mesh_capture_knowledge).toContain('Before the final response');
     expect(toolDescriptions.mesh_capture_knowledge).toContain('Prefer one high-signal item');
@@ -129,6 +139,21 @@ describe('MCP tool contract schemas', () => {
 
     const result = await registered[0]?.callback({ query: 'auth' });
     expect(result).toEqual({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ ok: 'status' }, null, 2)
+        }
+      ]
+    });
+    expect(handlers.getStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: 'auto'
+      })
+    );
+
+    const searchResult = await registered[1]?.callback({ query: 'auth' });
+    expect(searchResult).toEqual({
       content: [
         {
           type: 'text',
@@ -146,6 +171,7 @@ describe('MCP tool contract schemas', () => {
 
   it('publishes assistant-led capture server instructions', () => {
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('assistant-led project knowledge memory');
+    expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_get_status');
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('Before final responses');
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_capture_knowledge');
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_capture_task');
