@@ -1,6 +1,6 @@
 import { cancel, intro, isCancel, log, multiselect, note, outro, select, spinner } from '@clack/prompts';
 import type { Command } from 'commander';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import {
   createDevMeshClientRuntime,
@@ -385,9 +385,9 @@ function createDmxServeMcpCommand(options: InitCommandOptions): { command: strin
 }
 
 function createCurrentDmxLauncherCommand(): { command: string; args: string[] } {
-  const entry = process.argv[1];
+  const entry = resolveRunnableDmxEntry(process.argv[1]);
 
-  if (entry !== undefined && isRunnableNodeEntry(entry)) {
+  if (entry !== undefined) {
     return {
       command: resolveWindowlessNodeCommand(),
       args: [entry]
@@ -400,10 +400,33 @@ function createCurrentDmxLauncherCommand(): { command: string; args: string[] } 
   };
 }
 
-function isRunnableNodeEntry(entry: string): boolean {
+function resolveRunnableDmxEntry(entry: string | undefined): string | undefined {
+  if (entry === undefined || !existsSync(entry)) {
+    return undefined;
+  }
+
   const extension = extname(entry).toLowerCase();
 
-  return extension === '.js' || extension === '.mjs' || extension === '.cjs';
+  if (extension === '.js' || extension === '.mjs' || extension === '.cjs') {
+    return entry;
+  }
+
+  if (extension === '.ts' || extension === '.tsx' || extension === '.cmd' || extension === '.bat' || extension === '.ps1') {
+    return undefined;
+  }
+
+  try {
+    const realEntry = realpathSync(entry);
+    const realExtension = extname(realEntry).toLowerCase();
+
+    if (realExtension === '.js' || realExtension === '.mjs' || realExtension === '.cjs') {
+      return realEntry;
+    }
+
+    return extension === '' ? entry : undefined;
+  } catch {
+    return extension === '' ? entry : undefined;
+  }
 }
 
 function resolveWindowlessNodeCommand(): string {

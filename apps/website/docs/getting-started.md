@@ -52,7 +52,7 @@ pnpm --filter mcp-dev-mesh dev -- join http://127.0.0.1:8721 --root $project --g
 
 ## 配置 AI 客户端
 
-全局配置 Codex、Claude Code 和 opencode。配置写入的是 `dmx serve --mcp` stdio MCP 命令；AI 客户端启动它后，会按需拉起项目 daemon。
+全局配置 Codex、Claude Code 和 opencode。配置写入的是等价于 `dmx serve --mcp` 的 stdio MCP launcher；生产安装场景会尽量直接使用 Node 运行 CLI 入口，AI 客户端启动它后，会按需拉起项目 daemon。
 
 ```powershell
 $project="C:\path\to\your\project"
