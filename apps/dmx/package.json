@@ -28,6 +28,7 @@
     "@koa/router": "^15.6.0",
     "@modelcontextprotocol/sdk": "1.29.0",
     "commander": "15.0.0",
+    "cytoscape": "^3.34.0",
     "koa": "2",
     "koa-bodyparser": "^4.4.1"
   },

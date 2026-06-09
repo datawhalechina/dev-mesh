@@ -60,6 +60,8 @@ pnpm --filter devmesh dev -- graph explore --root C:\path\to\project --query "pr
 pnpm --filter devmesh dev -- visualize --root C:\path\to\project --query "project knowledge"
 ```
 
+`visualize` 会生成一个基于 Cytoscape.js 的本地交互 HTML 图谱。
+
 ## 诊断
 
 ```powershell

@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Command } from 'commander';
@@ -8,6 +9,7 @@ import { parseIntOption } from './shared.js';
 
 const NODE_KINDS = ['knowledge', 'para', 'type', 'tag', 'member', 'source'] as const;
 const EDGE_KINDS = ['authored_by', 'belongs_to_para', 'has_type', 'parent_para', 'sourced_from', 'tagged_with'] as const;
+const nodeRequire = createRequire(import.meta.url);
 
 export function registerGraphCommand(program: Command): void {
   const graph = program.command('graph').description('Explore the local DevMesh knowledge graph');
@@ -59,12 +61,13 @@ function registerVisualizeCommand(parent: Command, name: string): void {
     const runtime = createDevMeshClientRuntime({
       projectRoot: options.root
     });
-    const input = createGraphExploreInput(options);
-    const graph = await runtime.exploreKnowledgeGraph(input);
-    const outputPath = await resolveGraphVisualizationOutputPath(runtime, options.output);
+      const input = createGraphExploreInput(options);
+      const graph = await runtime.exploreKnowledgeGraph(input);
+      const outputPath = await resolveGraphVisualizationOutputPath(runtime, options.output);
+      const cytoscapeBundle = await readCytoscapeBundle();
 
-    await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, renderGraphVisualizationHtml(graph), 'utf8');
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, renderGraphVisualizationHtml(graph, cytoscapeBundle), 'utf8');
 
     if (options.open) {
       openGraphVisualization(outputPath);
@@ -144,14 +147,22 @@ function openGraphVisualization(outputPath: string): void {
   child.unref();
 }
 
-function renderGraphVisualizationHtml(graph: GraphExploreResult): string {
+async function readCytoscapeBundle(): Promise<string> {
+  const bundlePath = nodeRequire.resolve('cytoscape/dist/cytoscape.min.js');
+
+  return readFile(bundlePath, 'utf8');
+}
+
+function renderGraphVisualizationHtml(graph: GraphExploreResult, cytoscapeBundle: string): string {
   const payload = JSON.stringify(graph).replaceAll('<', '\\u003c');
+  const cytoscapeScript = escapeInlineScript(cytoscapeBundle);
 
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="devmesh-graph-library" content="Cytoscape.js">
   <title>DevMesh Knowledge Graph</title>
   <style>
     :root {
@@ -258,41 +269,10 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult): string {
       text-transform: uppercase;
     }
 
-    svg {
+    #graph {
       display: block;
       width: 100%;
       height: 100vh;
-      cursor: grab;
-    }
-
-    svg:active {
-      cursor: grabbing;
-    }
-
-    .edge {
-      stroke: #aeb2aa;
-      stroke-width: 1.3;
-      opacity: 0.8;
-    }
-
-    .node circle {
-      stroke: #ffffff;
-      stroke-width: 2;
-    }
-
-    .node text {
-      fill: var(--ink);
-      font-size: 12px;
-      paint-order: stroke;
-      stroke: rgba(247, 247, 244, 0.82);
-      stroke-width: 4px;
-      stroke-linejoin: round;
-      pointer-events: none;
-    }
-
-    .node.selected circle {
-      stroke: #111111;
-      stroke-width: 3;
     }
 
     .sidebar {
@@ -360,7 +340,7 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult): string {
         border-bottom: 1px solid var(--line);
       }
 
-      svg {
+      #graph {
         height: 70vh;
       }
 
@@ -387,7 +367,7 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult): string {
           <div class="stat"><strong>${graph.seedNodeIds.length}</strong><span>Seeds</span></div>
         </div>
       </div>
-      <svg id="graph" role="img" aria-label="Interactive DevMesh knowledge graph"></svg>
+      <div id="graph" role="img" aria-label="Interactive DevMesh knowledge graph"></div>
     </section>
     <aside class="sidebar">
       <h2 id="detail-title">Node details</h2>
@@ -399,6 +379,9 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult): string {
     </aside>
   </main>
   <script>
+${cytoscapeScript}
+  </script>
+  <script>
     const graph = ${payload};
     const colors = {
       knowledge: '#2f6f9f',
@@ -408,167 +391,139 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult): string {
       member: '#6d5f93',
       source: '#5a7076'
     };
-    const svg = document.getElementById('graph');
+    const graphContainer = document.getElementById('graph');
     const detailTitle = document.getElementById('detail-title');
     const detailMeta = document.getElementById('detail-meta');
     const detailJson = document.getElementById('detail-json');
-    const width = () => svg.clientWidth || 900;
-    const height = () => svg.clientHeight || 700;
-    const state = {
-      nodes: graph.nodes.map((node, index) => ({
-        ...node,
-        x: width() / 2 + Math.cos((index / Math.max(graph.nodes.length, 1)) * Math.PI * 2) * Math.min(width(), height()) * 0.28,
-        y: height() / 2 + Math.sin((index / Math.max(graph.nodes.length, 1)) * Math.PI * 2) * Math.min(width(), height()) * 0.28,
-        vx: 0,
-        vy: 0
+    const seedNodeIds = new Set(graph.seedNodeIds);
+    const nodeIds = new Set(graph.nodes.map((node) => node.id));
+    const elements = [
+      ...graph.nodes.map((node) => ({
+        data: {
+          id: node.id,
+          label: node.label,
+          shortLabel: shorten(node.label, 34),
+          kind: node.kind,
+          metadata: node.metadata,
+          color: colors[node.kind] || '#777777'
+        },
+        classes: seedNodeIds.has(node.id) ? 'seed' : ''
       })),
-      selected: undefined
-    };
-    const nodesById = new Map(state.nodes.map((node) => [node.id, node]));
-    const edges = graph.edges
-      .map((edge) => ({ ...edge, fromNode: nodesById.get(edge.from), toNode: nodesById.get(edge.to) }))
-      .filter((edge) => edge.fromNode && edge.toNode);
-    const edgeLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    const nodeLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-
-    svg.append(edgeLayer, nodeLayer);
-
-    function render() {
-      edgeLayer.replaceChildren(...edges.map(renderEdge));
-      nodeLayer.replaceChildren(...state.nodes.map(renderNode));
-    }
-
-    function renderEdge(edge) {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('class', 'edge');
-      line.setAttribute('x1', edge.fromNode.x);
-      line.setAttribute('y1', edge.fromNode.y);
-      line.setAttribute('x2', edge.toNode.x);
-      line.setAttribute('y2', edge.toNode.y);
-      line.setAttribute('data-kind', edge.kind);
-      return line;
-    }
-
-    function renderNode(node) {
-      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      const radius = node.kind === 'knowledge' ? 13 : 9;
-
-      group.setAttribute('class', \`node\${state.selected === node.id ? ' selected' : ''}\`);
-      group.setAttribute('transform', \`translate(\${node.x}, \${node.y})\`);
-      group.style.cursor = 'pointer';
-      circle.setAttribute('r', radius);
-      circle.setAttribute('fill', colors[node.kind] || '#777777');
-      label.setAttribute('x', radius + 6);
-      label.setAttribute('y', '4');
-      label.textContent = shorten(node.label, 34);
-      group.append(circle, label);
-      group.addEventListener('click', () => selectNode(node.id));
-      group.addEventListener('pointerdown', (event) => dragNode(event, node));
-      return group;
-    }
-
-    function tick() {
-      const centerX = width() / 2;
-      const centerY = height() / 2;
-
-      for (const node of state.nodes) {
-        node.vx += (centerX - node.x) * 0.0008;
-        node.vy += (centerY - node.y) * 0.0008;
-      }
-
-      for (let i = 0; i < state.nodes.length; i += 1) {
-        for (let j = i + 1; j < state.nodes.length; j += 1) {
-          const a = state.nodes[i];
-          const b = state.nodes[j];
-          const dx = b.x - a.x || 0.01;
-          const dy = b.y - a.y || 0.01;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          const force = Math.min(900 / (distance * distance), 2.8);
-          const fx = (dx / distance) * force;
-          const fy = (dy / distance) * force;
-          a.vx -= fx;
-          a.vy -= fy;
-          b.vx += fx;
-          b.vy += fy;
+      ...graph.edges
+        .filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to))
+        .map((edge) => ({
+          data: {
+            id: edge.id,
+            source: edge.from,
+            target: edge.to,
+            kind: edge.kind,
+            weight: edge.weight,
+            evidence: edge.evidence
+          }
+        }))
+    ];
+    const cy = cytoscape({
+      container: graphContainer,
+      elements,
+      minZoom: 0.18,
+      maxZoom: 2.6,
+      wheelSensitivity: 0.18,
+      style: [
+        {
+          selector: 'node',
+          style: {
+            'background-color': 'data(color)',
+            'border-color': '#ffffff',
+            'border-width': 2,
+            'color': '#202124',
+            'font-family': 'Inter, ui-sans-serif, system-ui, sans-serif',
+            'font-size': 12,
+            'height': 20,
+            'label': 'data(shortLabel)',
+            'text-halign': 'right',
+            'text-margin-x': 8,
+            'text-outline-color': '#f7f7f4',
+            'text-outline-width': 3,
+            'text-valign': 'center',
+            'width': 20
+          }
+        },
+        {
+          selector: 'node[kind = "knowledge"]',
+          style: {
+            'height': 28,
+            'width': 28
+          }
+        },
+        {
+          selector: 'node.seed',
+          style: {
+            'border-color': '#111111',
+            'border-width': 3
+          }
+        },
+        {
+          selector: 'node.selected',
+          style: {
+            'border-color': '#111111',
+            'border-width': 4,
+            'height': 34,
+            'width': 34
+          }
+        },
+        {
+          selector: 'edge',
+          style: {
+            'curve-style': 'bezier',
+            'line-color': '#aeb2aa',
+            'opacity': 0.78,
+            'target-arrow-shape': 'none',
+            'width': 'mapData(weight, 1, 8, 1.2, 4)'
+          }
+        },
+        {
+          selector: 'edge:selected',
+          style: {
+            'line-color': '#202124',
+            'opacity': 1
+          }
         }
+      ],
+      layout: {
+        name: graph.nodes.length <= 1 ? 'grid' : 'cose',
+        animate: false,
+        componentSpacing: 90,
+        edgeElasticity: 95,
+        fit: true,
+        idealEdgeLength: 112,
+        nodeOverlap: 18,
+        nodeRepulsion: 7200,
+        padding: 52,
+        randomize: true
       }
-
-      for (const edge of edges) {
-        const dx = edge.toNode.x - edge.fromNode.x;
-        const dy = edge.toNode.y - edge.fromNode.y;
-        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-        const pull = (distance - 150) * 0.004 * Math.max(edge.weight, 1);
-        const fx = (dx / distance) * pull;
-        const fy = (dy / distance) * pull;
-        edge.fromNode.vx += fx;
-        edge.fromNode.vy += fy;
-        edge.toNode.vx -= fx;
-        edge.toNode.vy -= fy;
-      }
-
-      for (const node of state.nodes) {
-        node.vx *= 0.84;
-        node.vy *= 0.84;
-        node.x = clamp(node.x + node.vx, 28, width() - 120);
-        node.y = clamp(node.y + node.vy, 28, height() - 28);
-      }
-
-      render();
-      requestAnimationFrame(tick);
-    }
+    });
 
     function selectNode(id) {
-      const node = nodesById.get(id);
+      const node = cy.getElementById(id);
 
-      if (!node) {
+      if (node.empty()) {
         return;
       }
 
-      state.selected = id;
-      detailTitle.textContent = node.label;
+      cy.elements().removeClass('selected');
+      node.addClass('selected');
+      detailTitle.textContent = node.data('label');
       detailMeta.innerHTML = [
-        \`<strong>Kind</strong> \${escapeMarkup(node.kind)}\`,
-        \`<strong>ID</strong> \${escapeMarkup(node.id)}\`,
-        \`<strong>Degree</strong> \${edges.filter((edge) => edge.from === id || edge.to === id).length}\`
+        \`<strong>Kind</strong> \${escapeMarkup(node.data('kind'))}\`,
+        \`<strong>ID</strong> \${escapeMarkup(node.id())}\`,
+        \`<strong>Degree</strong> \${node.connectedEdges().length}\`
       ].join('<br>');
-      detailJson.textContent = JSON.stringify(node.metadata || {}, null, 2);
-      render();
-    }
-
-    function dragNode(event, node) {
-      event.preventDefault();
-      svg.setPointerCapture(event.pointerId);
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const nodeX = node.x;
-      const nodeY = node.y;
-
-      function move(moveEvent) {
-        node.x = nodeX + moveEvent.clientX - startX;
-        node.y = nodeY + moveEvent.clientY - startY;
-        node.vx = 0;
-        node.vy = 0;
-        render();
-      }
-
-      function up(upEvent) {
-        svg.releasePointerCapture(upEvent.pointerId);
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-      }
-
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
+      detailJson.textContent = JSON.stringify(node.data('metadata') || {}, null, 2);
     }
 
     function shorten(value, max) {
-      return value.length > max ? \`\${value.slice(0, max - 1)}...\` : value;
-    }
-
-    function clamp(value, min, max) {
-      return Math.max(min, Math.min(max, value));
+      const text = String(value || '');
+      return text.length > max ? \`\${text.slice(0, max - 1)}...\` : text;
     }
 
     function escapeMarkup(value) {
@@ -581,11 +536,15 @@ function renderGraphVisualizationHtml(graph: GraphExploreResult): string {
       }[char]));
     }
 
-    window.addEventListener('resize', render);
-    if (state.nodes.length > 0) {
-      selectNode(state.nodes[0].id);
-    }
-    tick();
+    cy.on('tap', 'node', (event) => selectNode(event.target.id()));
+    cy.ready(() => {
+      if (graph.nodes.length > 0) {
+        selectNode(graph.nodes[0].id);
+      }
+
+      cy.fit(undefined, 42);
+    });
+    window.addEventListener('resize', () => cy.fit(undefined, 42));
   </script>
 </body>
 </html>
@@ -607,6 +566,10 @@ function escapeHtml(value: string): string {
         return '&#39;';
     }
   });
+}
+
+function escapeInlineScript(value: string): string {
+  return value.replace(/<\/script/gi, '<\\/script');
 }
 
 type GraphExploreResult = Awaited<ReturnType<DevMeshClientRuntime['exploreKnowledgeGraph']>>;

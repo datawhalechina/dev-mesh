@@ -133,6 +133,7 @@ describe('dmx CLI local flow', () => {
       expect(graphIndex.sourceItemCount).toBe(1);
       expect(visualize.stdout).toContain(graphHtmlPath);
       expect(graphHtml).toContain('DevMesh Knowledge Graph');
+      expect(graphHtml).toContain('Cytoscape.js');
       expect(graphHtml).toContain('Run focused tests');
       expect(graphHtml).toContain(`knowledge:${captureJson.id}`);
     } finally {
