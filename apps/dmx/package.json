@@ -1,6 +1,6 @@
 {
   "name": "mcp-dev-mesh",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Local-first MCP project context mesh CLI",
   "type": "module",
   "repository": {
