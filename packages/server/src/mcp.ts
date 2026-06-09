@@ -11,6 +11,7 @@ import type {
 } from '@devmesh/core';
 import { buildKnowledgeGraph, exploreKnowledgeGraph } from '@devmesh/graph';
 import {
+  DEV_MESH_MCP_INSTRUCTIONS,
   registerMeshTools,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
@@ -31,10 +32,15 @@ import {
 } from '@devmesh/local-store';
 
 export function createMeshMcpServer(core: DevMeshCore): McpServer {
-  const mcp = new McpServer({
-    name: 'devmesh',
-    version: '0.1.0'
-  });
+  const mcp = new McpServer(
+    {
+      name: 'devmesh',
+      version: '0.1.0'
+    },
+    {
+      instructions: DEV_MESH_MCP_INSTRUCTIONS
+    }
+  );
   const agent = createAgentContextService({ core });
 
   registerMeshTools(mcp, {

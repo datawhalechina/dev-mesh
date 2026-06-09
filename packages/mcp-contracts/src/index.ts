@@ -110,8 +110,17 @@ export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
 export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
 export type MeshExploreKnowledgeGraphInput = z.infer<typeof meshExploreKnowledgeGraphInputSchema>;
 
+export const DEV_MESH_MCP_INSTRUCTIONS = [
+  'DevMesh is an assistant-led project knowledge memory. Treat knowledge capture as part of normal coding work, not as an optional user-requested step.',
+  'Before final responses after meaningful coding, debugging, review, design, setup, release, deployment, or documentation work, decide whether you learned durable project knowledge.',
+  'Capture durable decisions, conventions, commands, architecture notes, debugging lessons, pitfalls, setup/deployment steps, release notes, and handoffs with mesh_capture_knowledge.',
+  'Capture task state, blockers, verification status, and next actions with mesh_capture_task when work starts, changes state, finishes, or needs handoff.',
+  'Do not capture secrets, credentials, raw private transcripts, large source blocks, noisy step-by-step logs, or facts that are already obvious from the code.',
+  'Prefer one concise high-signal item over many small items. Search or explore existing knowledge first when duplication is likely.'
+].join(' ');
+
 const assistantLedCaptureReminder =
-  'IMPORTANT: Do not wait for the user to ask for knowledge capture. Before you answer the user at the end of any meaningful coding, debugging, review, design, setup, or documentation task, quickly decide whether you learned durable project knowledge. If yes, summarize it yourself and call mesh_capture_knowledge or mesh_capture_task before the final response.';
+  'IMPORTANT: Treat capture as a default end-of-task habit. Do not wait for the user to ask. Before the final response for meaningful coding, debugging, review, design, setup, release, deployment, or documentation work, decide whether the session produced durable project knowledge. If yes, summarize it yourself and call mesh_capture_knowledge or mesh_capture_task first.';
 
 export interface MeshToolHandlers {
   searchContext(input: MeshSearchContextInput): Promise<unknown>;
@@ -130,7 +139,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Search project context',
       description:
-        'IMPORTANT: For non-trivial project work, search DevMesh knowledge before starting or continuing so you can reuse prior decisions, conventions, pitfalls, commands, and handoffs. After using the returned context, keep watching for new durable knowledge to capture.',
+        'IMPORTANT: For non-trivial project work, search DevMesh knowledge before starting or continuing so you can reuse prior decisions, conventions, pitfalls, commands, and handoffs. After using the returned context, keep watching for new durable knowledge to capture before your final response.',
       inputSchema: meshSearchContextInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.searchContext(meshSearchContextInputSchema.parse(args)))
@@ -141,7 +150,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Capture knowledge',
       description:
-        `${assistantLedCaptureReminder} Use this tool for durable decisions, conventions, pitfalls, commands, architecture notes, debugging lessons, setup/deployment steps, or handoffs discovered from the current conversation, code reading, edits, command output, reviews, or tests. Capture concise summaries only; do not store secrets, raw private transcript text, credentials, large source blocks, or noisy step-by-step logs.`,
+        `${assistantLedCaptureReminder} Use this tool for durable decisions, conventions, pitfalls, commands, architecture notes, debugging lessons, setup/deployment steps, release/publish notes, or handoffs discovered from the current conversation, code reading, edits, command output, reviews, or tests. Capture concise summaries only. Prefer one high-signal item over many tiny items. Skip duplicates and do not store secrets, raw private transcript text, credentials, large source blocks, or noisy step-by-step logs.`,
       inputSchema: meshCaptureKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.captureKnowledge(meshCaptureKnowledgeInputSchema.parse(args)))
@@ -152,7 +161,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Capture task progress',
       description:
-        `${assistantLedCaptureReminder} Use this tool when a meaningful task starts, changes state, finishes, is blocked, or needs a handoff. Summarize what changed, what remains, verification status, and any next action that future assistants or teammates should know.`,
+        `${assistantLedCaptureReminder} Use this tool when a meaningful task starts, changes state, finishes, is blocked, or needs a handoff. Summarize what changed, what remains, verification status, and any next action that future assistants or teammates should know. Use this especially before stopping after partial work.`,
       inputSchema: meshCaptureTaskInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.captureTask(meshCaptureTaskInputSchema.parse(args)))

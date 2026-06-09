@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DEV_MESH_MCP_INSTRUCTIONS,
   meshCaptureKnowledgeInputSchema,
   meshRateKnowledgeInputSchema,
   meshSearchContextInputSchema,
@@ -89,8 +90,10 @@ describe('MCP tool contract schemas', () => {
     const toolDescriptions = Object.fromEntries(registered.map((tool) => [tool.name, tool.config.description ?? '']));
 
     expect(toolDescriptions.mesh_capture_knowledge).toContain('Do not wait for the user');
-    expect(toolDescriptions.mesh_capture_knowledge).toContain('before the final response');
+    expect(toolDescriptions.mesh_capture_knowledge).toContain('Before the final response');
+    expect(toolDescriptions.mesh_capture_knowledge).toContain('Prefer one high-signal item');
     expect(toolDescriptions.mesh_capture_task).toContain('Summarize what changed');
+    expect(toolDescriptions.mesh_capture_task).toContain('before stopping after partial work');
     expect(toolDescriptions.mesh_scan_project_knowledge).toContain('Capture only durable conclusions');
     expect(toolDescriptions.mesh_explore_knowledge_graph).toContain('related decisions');
 
@@ -109,5 +112,13 @@ describe('MCP tool contract schemas', () => {
         limit: 8
       })
     );
+  });
+
+  it('publishes assistant-led capture server instructions', () => {
+    expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('assistant-led project knowledge memory');
+    expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('Before final responses');
+    expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_capture_knowledge');
+    expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_capture_task');
+    expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('Do not capture secrets');
   });
 });

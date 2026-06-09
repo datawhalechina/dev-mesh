@@ -9,6 +9,7 @@ import type {
 } from '@devmesh/core';
 import type { CaptureProjectTaskInput } from '@devmesh/local-store';
 import {
+  DEV_MESH_MCP_INSTRUCTIONS,
   registerMeshTools,
   type MeshToolHandlers,
   type MeshCaptureKnowledgeInput,
@@ -25,10 +26,15 @@ export function createLocalMeshMcpServer(runtime: DevMeshClientRuntime): McpServ
 }
 
 export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers): McpServer {
-  const mcp = new McpServer({
-    name: 'devmesh-local',
-    version: '0.1.0'
-  });
+  const mcp = new McpServer(
+    {
+      name: 'devmesh-local',
+      version: '0.1.0'
+    },
+    {
+      instructions: DEV_MESH_MCP_INSTRUCTIONS
+    }
+  );
 
   registerMeshTools(mcp, handlers);
 

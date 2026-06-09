@@ -138,7 +138,7 @@ Website: http://127.0.0.1:3000
 dmx init
 ```
 
-该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `devmesh` MCP server 配置。真实终端中完成后会继续用 TUI 展示写入结果；CI、管道重定向或显式 `--json` 时输出结构化 JSON。默认全局自动化策略启用 `auto_init`、`auto_reference` 和 `auto_sync`；助手自主知识沉淀由 MCP 工具强提示直接驱动，不再需要单独配置开关。
+该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `devmesh` MCP server 配置。真实终端中完成后会继续用 TUI 展示写入结果；CI、管道重定向或显式 `--json` 时输出结构化 JSON。默认全局自动化策略启用 `auto_init`、`auto_reference` 和 `auto_sync`；助手自主知识沉淀由 MCP server instructions 和工具描述双层提示驱动，不再需要单独配置开关。
 
 当前仓库开发期也可以通过 workspace dev script 运行：
 
@@ -155,7 +155,7 @@ pnpm --filter devmesh dev -- init --global --tools codex,claude,opencode --mcp-u
 ```
 
 该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `devmesh` MCP server 配置。
-默认写入的是 stdio MCP launcher 命令，语义等同于 `dmx serve --mcp --name <name>`；生产安装场景会尽量写成当前 Node 可执行文件直接运行 CLI 入口，避免经过 npm 生成的 shell shim（Windows 上尤其要避开 `dmx.cmd` 弹出控制台窗口）。配置不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。MCP 工具描述会持续提醒 Codex、Claude Code 或 opencode 根据当前对话、代码阅读、编辑和命令结果自主判断是否调用 `mesh_capture_knowledge` / `mesh_capture_task`；DevMesh 不再依赖后台 Git / filesystem 轮询。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
+默认写入的是 stdio MCP launcher 命令，语义等同于 `dmx serve --mcp --name <name>`；生产安装场景会尽量写成当前 Node 可执行文件直接运行 CLI 入口，避免经过 npm 生成的 shell shim（Windows 上尤其要避开 `dmx.cmd` 弹出控制台窗口）。配置不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。MCP server instructions 和工具描述会持续提醒 Codex、Claude Code 或 opencode 根据当前对话、代码阅读、编辑和命令结果自主判断是否调用 `mesh_capture_knowledge` / `mesh_capture_task`；DevMesh 不再依赖后台 Git / filesystem 轮询。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
 
 加入开发期 Hub Server 的 group：
 
@@ -181,7 +181,7 @@ pnpm --filter devmesh dev -- serve --mcp --root . --name local
 pnpm --filter devmesh dev -- proxy --root . --name local --port 8722
 ```
 
-`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。知识沉淀由 Codex、Claude Code 或 opencode 结合当前上下文自主触发：需要全项目巡检时可以按需调用 `mesh_scan_project_knowledge`，确认有长期价值后再调用 capture 工具。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
+`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。知识沉淀由 Codex、Claude Code 或 opencode 结合当前上下文自主触发：MCP 初始化 instructions 会提醒模型把沉淀作为默认工作习惯，工具 description 会在 search/scan/capture 时继续提示 final response 前的 capture decision；需要全项目巡检时可以按需调用 `mesh_scan_project_knowledge`，确认有长期价值后再调用 capture 工具。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
 
 初始化项目本地知识库：
 
@@ -530,7 +530,7 @@ pnpm typecheck:examples
 - 已完成 Git snapshot provider 和 filesystem snapshot provider，供 `mesh_scan_project_knowledge` 按需读取 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
 - 已完成内置 redactor 的 secret、PII、URL token、Authorization、cookie、private key 和 sensitive path 脱敏。
 - 已完成内置 quality scorers，覆盖 confidence、rating、adoption、freshness 和 source trust patch。
-- 已完成 assistant-led capture 主链路：MCP 工具强提示模型总结当前上下文，再调用 `mesh_capture_knowledge` / `mesh_capture_task` 写入本地知识库。
+- 已完成 assistant-led capture 主链路：MCP server instructions 和工具描述双层强提示模型总结当前上下文，再调用 `mesh_capture_knowledge` / `mesh_capture_task` 写入本地知识库。
 - 已完成 member-specific experience search 和内置 hybrid search backend，支持 keyword、deterministic embedding mock、recency、quality 和 adoption ranking。
 - 已完成知识图谱基础能力：从 Knowledge Item 派生 `.dev-mesh/index/graph.json`，并通过 `mesh_explore_knowledge_graph` 探索条目、PARA、tag、作者、来源和类型关系。
 - 已完成 web-admin 的 member 禁用、invite 创建/撤销，以及 Hub admin audit log 写入和查询。

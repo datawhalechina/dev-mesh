@@ -5,13 +5,13 @@ title: 自动沉淀
 
 # 自动沉淀
 
-当前实现里的“自动沉淀”主要由 MCP 工具调用触发。它不是一个默认后台扫描整个项目的守护进程，而是让 AI 客户端在合适的时机调用 DevMesh 工具，把重要上下文写入项目。
+当前实现里的“自动沉淀”主要由 MCP 工具调用触发。它不是一个默认后台扫描整个项目的守护进程，而是通过 MCP server instructions 和工具描述双层提示，让 AI 客户端在合适的时机调用 DevMesh 工具，把重要上下文写入项目。
 
 ## 三条路径
 
 ### MCP 工具驱动
 
-这是当前最稳的路径。AI 客户端连接本地 MCP proxy 后，可以调用：
+这是当前最稳的路径。AI 客户端连接本地 MCP proxy 后，会先看到 DevMesh 的全局 instructions：在有意义的编码、调试、评审、设计、部署、发布或文档工作结束前，主动判断是否需要沉淀知识；再通过各个工具的 description 获得更具体的 capture checklist。可调用工具包括：
 
 - `mesh_capture_knowledge`：沉淀架构决策、约定、术语、经验。
 - `mesh_capture_task`：沉淀任务进展和交付记录。
