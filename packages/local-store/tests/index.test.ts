@@ -68,13 +68,21 @@ describe('local project store', () => {
 
       expect(second.storeRoot).toBe(first.storeRoot);
       await expect(stat(first.paths.indexDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
+      await expect(stat(first.paths.visualizationsDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
       await expect(stat(first.paths.queueDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
       await expect(stat(first.paths.secretsDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
 
       const gitignore = await readFile(join(first.storeRoot, '.gitignore'), 'utf8');
       expect(gitignore).toContain('index/');
+      expect(gitignore).toContain('visualizations/');
       expect(gitignore).toContain('secrets/');
       expect(gitignore).toContain('knowledge/raw/');
+
+      await writeFile(join(first.storeRoot, '.gitignore'), 'index/\ncustom-local/\n', 'utf8');
+      await ensureProjectStore(projectRoot, { projectKey: 'org/repo' });
+      const migratedGitignore = await readFile(join(first.storeRoot, '.gitignore'), 'utf8');
+      expect(migratedGitignore).toContain('custom-local/');
+      expect(migratedGitignore).toContain('visualizations/');
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }

@@ -28,6 +28,7 @@ export function createProjectStorePaths(storeRoot: string): ProjectStorePaths {
     eventsDir: join(storeRoot, 'events'),
     knowledgeDir: join(storeRoot, 'knowledge'),
     indexDir: join(storeRoot, 'index'),
+    visualizationsDir: join(storeRoot, 'visualizations'),
     queueDir: join(storeRoot, 'queue'),
     syncDir: join(storeRoot, 'sync'),
     secretsDir: join(storeRoot, 'secrets')
@@ -88,6 +89,7 @@ async function bootstrapProjectStore(
     mkdir(join(paths.knowledgeDir, 'usage'), { recursive: true }),
     mkdir(join(paths.knowledgeDir, 'para'), { recursive: true }),
     mkdir(paths.indexDir, { recursive: true }),
+    mkdir(paths.visualizationsDir, { recursive: true }),
     mkdir(paths.queueDir, { recursive: true }),
     mkdir(paths.syncDir, { recursive: true }),
     mkdir(paths.secretsDir, { recursive: true })
@@ -95,7 +97,7 @@ async function bootstrapProjectStore(
 
   await Promise.all([
     writeFileIfMissing(paths.config, defaultProjectConfig(options)),
-    writeFileIfMissing(join(storeRoot, '.gitignore'), defaultStoreGitignore()),
+    ensureStoreGitignore(storeRoot),
     writeFileIfMissing(join(paths.knowledgeDir, 'extract', 'entries.jsonl'), ''),
     writeFileIfMissing(join(paths.knowledgeDir, 'canonical', 'entries.jsonl'), ''),
     writeFileIfMissing(join(paths.knowledgeDir, 'para', 'index.json'), `${JSON.stringify(defaultParaIndex(), null, 2)}\n`),
@@ -260,17 +262,44 @@ function projectConfigToToml(config: ProjectConfig): string {
 }
 
 function defaultStoreGitignore(): string {
+  return [...defaultStoreGitignoreLines(), ''].join('\n');
+}
+
+async function ensureStoreGitignore(storeRoot: string): Promise<void> {
+  const gitignorePath = join(storeRoot, '.gitignore');
+
+  try {
+    const current = await readFile(gitignorePath, 'utf8');
+    const lines = new Set(current.split(/\r?\n/).map((line) => line.trim()));
+    const missing = defaultStoreGitignoreLines().filter((line) => !lines.has(line));
+
+    if (missing.length === 0) {
+      return;
+    }
+
+    await writeFile(gitignorePath, `${current.trimEnd()}\n${missing.join('\n')}\n`, 'utf8');
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      await writeFile(gitignorePath, defaultStoreGitignore(), 'utf8');
+      return;
+    }
+
+    throw error;
+  }
+}
+
+function defaultStoreGitignoreLines(): string[] {
   return [
     'index/',
+    'visualizations/',
     'queue/',
     'sync/',
     'secrets/',
     'events/',
     'knowledge/raw/',
     '*.sqlite',
-    '*.db',
-    ''
-  ].join('\n');
+    '*.db'
+  ];
 }
 
 function defaultParaIndex(): Record<string, unknown> {
@@ -281,4 +310,8 @@ function defaultParaIndex(): Record<string, unknown> {
     resources: {},
     archives: {}
   };
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error;
 }

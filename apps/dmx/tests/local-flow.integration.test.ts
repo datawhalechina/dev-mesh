@@ -41,7 +41,7 @@ describe('dmx CLI local flow', () => {
       const status = await runDmx(['status', '--root', projectRoot]);
       const index = await runDmx(['index', 'rebuild', '--root', projectRoot]);
       const graph = await runDmx(['graph', 'explore', '--root', projectRoot, '--query', 'focused tests', '--depth', '1']);
-      const graphHtmlPath = join(projectRoot, 'graph.html');
+      const graphHtmlPath = join(projectRoot, '.dev-mesh', 'visualizations', 'graph.html');
       const visualize = await runDmx([
         'visualize',
         '--root',
@@ -50,8 +50,6 @@ describe('dmx CLI local flow', () => {
         'focused tests',
         '--depth',
         '1',
-        '--output',
-        graphHtmlPath,
         '--no-open'
       ]);
 

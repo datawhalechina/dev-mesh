@@ -61,13 +61,13 @@ function registerVisualizeCommand(parent: Command, name: string): void {
     const runtime = createDevMeshClientRuntime({
       projectRoot: options.root
     });
-      const input = createGraphExploreInput(options);
-      const graph = await runtime.exploreKnowledgeGraph(input);
-      const outputPath = await resolveGraphVisualizationOutputPath(runtime, options.output);
-      const cytoscapeBundle = await readCytoscapeBundle();
+    const input = createGraphExploreInput(options);
+    const graph = await runtime.exploreKnowledgeGraph(input);
+    const outputPath = await resolveGraphVisualizationOutputPath(runtime, options.output);
+    const cytoscapeBundle = await readCytoscapeBundle();
 
-      await mkdir(dirname(outputPath), { recursive: true });
-      await writeFile(outputPath, renderGraphVisualizationHtml(graph, cytoscapeBundle), 'utf8');
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, renderGraphVisualizationHtml(graph, cytoscapeBundle), 'utf8');
 
     if (options.open) {
       openGraphVisualization(outputPath);
@@ -113,7 +113,7 @@ async function resolveGraphVisualizationOutputPath(runtime: DevMeshClientRuntime
 
   const store = await runtime.ensureProjectStore();
 
-  return join(store.paths.indexDir, 'graph.html');
+  return join(store.paths.visualizationsDir, 'graph.html');
 }
 
 function parseNodeKind(value: string): (typeof NODE_KINDS)[number] {

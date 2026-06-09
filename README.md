@@ -241,7 +241,7 @@ pnpm --filter devmesh dev -- visualize --root . --query "focused tests"
 pnpm --filter devmesh dev -- graph visualize --root . --query "focused tests" --no-open
 ```
 
-可视化页面使用 Cytoscape.js 的 COSE force layout 生成，打开时会以引力/斥力动画收敛，输出为单个本地 HTML 文件。
+可视化页面使用 Cytoscape.js 的 COSE force layout 生成，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`。
 
 查看本地状态：
 
@@ -292,6 +292,7 @@ pnpm --filter devmesh dev -- doctor --root .
     para/
   events/
   index/
+  visualizations/
   queue/
   sync/
   secrets/
@@ -304,6 +305,7 @@ pnpm --filter devmesh dev -- doctor --root .
 - `knowledge/ratings/*.jsonl` 保存显式反馈事件，不会被当作普通知识检索。
 - `knowledge/usage/*.jsonl` 保存检索命中、inbox 接受等采纳信号，用来轻量调整 adoption/quality，也不会被当作普通知识检索。
 - `index/manifest.json` 和 `index/mesh.sqlite` 是可重建本地索引。
+- `visualizations/graph.html` 是可重建的本地图谱页面。
 - `queue/pending.jsonl` 保存待 review 候选，接受后写入 knowledge 和 events，拒绝后进入 `queue/rejected.jsonl`。
 - `secrets/` 永远不应该同步或提交。
 

@@ -4,6 +4,7 @@ coverage/
 *.tsbuildinfo
 *.tgz
 .dev-mesh/index/
+.dev-mesh/visualizations/
 .dev-mesh/queue/
 .dev-mesh/secrets/
 .dev-mesh/sync/

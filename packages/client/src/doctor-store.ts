@@ -15,6 +15,7 @@ export async function checkProjectStore(context: DoctorContext): Promise<DevMesh
       store.paths.eventsDir,
       store.paths.knowledgeDir,
       store.paths.indexDir,
+      store.paths.visualizationsDir,
       store.paths.queueDir,
       store.paths.syncDir,
       store.paths.secretsDir

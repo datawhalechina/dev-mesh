@@ -871,6 +871,7 @@ const DEFAULT_WORKSPACE_IGNORE_PATTERNS = [
   '**/coverage/**',
   '.dev-mesh/events/**',
   '.dev-mesh/index/**',
+  '.dev-mesh/visualizations/**',
   '.dev-mesh/queue/**'
 ];
 

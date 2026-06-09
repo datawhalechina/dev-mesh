@@ -18,6 +18,7 @@ export interface ProjectStorePaths {
   eventsDir: string;
   knowledgeDir: string;
   indexDir: string;
+  visualizationsDir: string;
   queueDir: string;
   syncDir: string;
   secretsDir: string;
