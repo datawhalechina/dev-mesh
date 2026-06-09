@@ -5,7 +5,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xy200303/mcp-dev-mesh.git"
+    "url": "git+https://github.com/xy200303/DevMesh.git"
   },
   "main": "./dist/index.js",
   "bin": {
