@@ -98,6 +98,7 @@ async function bootstrapProjectStore(
   await Promise.all([
     writeFileIfMissing(paths.config, defaultProjectConfig(options)),
     ensureStoreGitignore(storeRoot),
+    writeFileIfMissing(join(paths.knowledgeDir, 'edges.jsonl'), ''),
     writeFileIfMissing(join(paths.knowledgeDir, 'extract', 'entries.jsonl'), ''),
     writeFileIfMissing(join(paths.knowledgeDir, 'canonical', 'entries.jsonl'), ''),
     writeFileIfMissing(join(paths.knowledgeDir, 'para', 'index.json'), `${JSON.stringify(defaultParaIndex(), null, 2)}\n`),

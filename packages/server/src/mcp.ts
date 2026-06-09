@@ -16,6 +16,7 @@ import {
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
   type MeshExploreKnowledgeGraphInput,
+  type MeshLinkKnowledgeInput,
   type MeshRateKnowledgeInput,
   type MeshScanProjectKnowledgeInput,
   type MeshSearchContextInput
@@ -23,6 +24,7 @@ import {
 import {
   captureProjectKnowledge,
   captureProjectTask,
+  createProjectKnowledgeEdge,
   JsonlKnowledgeRepository,
   rateProjectKnowledge,
   type CaptureProjectKnowledgeResult,
@@ -33,6 +35,7 @@ import {
 
 export interface MeshMcpServerOptions {
   knowledgeEdges?: () => KnowledgeGraphSemanticEdge[] | Promise<KnowledgeGraphSemanticEdge[]>;
+  linkKnowledge?: (input: MeshLinkKnowledgeInput) => Promise<unknown>;
 }
 
 export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOptions = {}): McpServer {
@@ -75,6 +78,21 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
       }
 
       return core.rateKnowledge(rate);
+    },
+    async linkKnowledge(input) {
+      if (options.linkKnowledge !== undefined) {
+        return options.linkKnowledge(input);
+      }
+
+      if (isLocalStoreBacked(core)) {
+        return createProjectKnowledgeEdge(core.projectRoot, toProjectKnowledgeEdgeInput(input));
+      }
+
+      return {
+        instruction:
+          'Knowledge linking is only available when this MCP server is connected to a local project store or Hub knowledge edge backend.',
+        input
+      };
     },
     async searchMemberExperience(input) {
       return agent.buildContextPack({
@@ -121,6 +139,20 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
   });
 
   return mcp;
+}
+
+function toProjectKnowledgeEdgeInput(input: MeshLinkKnowledgeInput): Parameters<typeof createProjectKnowledgeEdge>[1] {
+  const link: Parameters<typeof createProjectKnowledgeEdge>[1] = {
+    kind: input.kind,
+    fromId: input.fromId,
+    toId: input.toId
+  };
+
+  if (input.reason !== undefined) {
+    link.reason = input.reason;
+  }
+
+  return link;
 }
 
 function toContextPackInput(input: MeshSearchContextInput): BuildContextPackInput {

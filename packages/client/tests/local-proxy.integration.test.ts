@@ -39,6 +39,27 @@ describe('local MCP proxy', () => {
         }
       });
       const captured = JSON.parse(readTextToolResult(captureResult));
+      const previousCaptureResult = await client.callTool({
+        name: 'mesh_capture_knowledge',
+        arguments: {
+          type: 'decision',
+          title: 'Previous local proxy graph decision',
+          summary: 'This older item should be linked from the newer capture.',
+          layer: 'canonical',
+          tags: ['mcp', 'proxy']
+        }
+      });
+      const previous = JSON.parse(readTextToolResult(previousCaptureResult));
+      const linkResult = await client.callTool({
+        name: 'mesh_link_knowledge',
+        arguments: {
+          kind: 'supersedes',
+          fromId: captured.id,
+          toId: previous.id,
+          reason: 'The newer local proxy decision supersedes the older one.'
+        }
+      });
+      const linked = JSON.parse(readTextToolResult(linkResult));
       const searchResult = await client.callTool({
         name: 'mesh_search_context',
         arguments: {
@@ -50,8 +71,9 @@ describe('local MCP proxy', () => {
       const graphResult = await client.callTool({
         name: 'mesh_explore_knowledge_graph',
         arguments: {
-          query: 'local proxy',
-          depth: 1
+          ids: [captured.id],
+          depth: 1,
+          edgeKinds: ['supersedes']
         }
       });
       const graph = JSON.parse(readTextToolResult(graphResult));
@@ -63,6 +85,7 @@ describe('local MCP proxy', () => {
         join(projectRoot, '.dev-mesh', 'knowledge', 'usage', `${contextPack.generatedAt.slice(0, 7)}.jsonl`),
         'utf8'
       );
+      const edgesJsonl = await readFile(join(projectRoot, '.dev-mesh', 'knowledge', 'edges.jsonl'), 'utf8');
 
       expect(health.body).toMatchObject({
         status: 'ok',
@@ -76,6 +99,7 @@ describe('local MCP proxy', () => {
           'mesh_capture_knowledge',
           'mesh_capture_task',
           'mesh_rate_knowledge',
+          'mesh_link_knowledge',
           'mesh_search_member_experience',
           'mesh_resolve_term',
           'mesh_explore_knowledge_graph'
@@ -95,27 +119,46 @@ describe('local MCP proxy', () => {
           }
         }
       });
-      expect(contextPack).toMatchObject({
-        query: 'local proxy',
-        items: [
-          {
+      expect(contextPack.query).toBe('local proxy');
+      expect(contextPack.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
             id: captured.id,
             title: 'Local proxy captures knowledge'
+          })
+        ])
+      );
+      expect(linked).toMatchObject({
+        edge: {
+          kind: 'supersedes',
+          fromId: captured.id,
+          toId: previous.id,
+          createdBy: {
+            displayName: 'Xiaoyun'
           }
-        ]
+        },
+        event: {
+          kind: 'knowledge.edge.created'
+        }
       });
       expect(graph.nodes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             id: `knowledge:${captured.id}`,
             kind: 'knowledge'
+          }),
+          expect.objectContaining({
+            id: `knowledge:${previous.id}`,
+            kind: 'knowledge'
           })
         ])
       );
       expect(graph.edges.map((edge: { kind: string }) => edge.kind)).toEqual(
-        expect.arrayContaining(['belongs_to_para', 'tagged_with'])
+        expect.arrayContaining(['supersedes'])
       );
       expect(knowledgeJsonl).toContain('"title":"Local proxy captures knowledge"');
+      expect(edgesJsonl).toContain('"kind":"supersedes"');
+      expect(edgesJsonl).toContain(`"fromId":"${captured.id}"`);
       expect(usageJsonl).toContain('"kind":"context_pack.hit"');
       expect(usageJsonl).toContain(`"knowledgeId":"${captured.id}"`);
       expect(usageJsonl).toContain('"query":"local proxy"');

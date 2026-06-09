@@ -17,6 +17,8 @@ dmx init --project --root . --name local
 dmx capture --root . --title "Run focused tests" --summary "Use pnpm test:unit before pushing." --type command
 dmx search "focused tests" --root .
 dmx graph explore --root . --query "focused tests"
+dmx graph edge add --root . --kind supersedes --from <new-id> --to <old-id>
+dmx graph edge list --root . --kind supersedes
 dmx visualize --root . --query "focused tests"
 dmx serve --mcp --root .
 dmx proxy --root . --port 8722

@@ -15,6 +15,7 @@ title: 自动沉淀
 
 - `mesh_capture_knowledge`：沉淀架构决策、约定、术语、经验。
 - `mesh_capture_task`：沉淀任务进展和交付记录。
+- `mesh_link_knowledge`：把明确的替代、重复、冲突关系写入知识图谱。
 - `mesh_search_context`：按关键词检索项目上下文。
 - `mesh_scan_project_knowledge`：让 AI 客户端读取项目扫描发现项后自行总结并沉淀。
 - `mesh_explore_knowledge_graph`：围绕条目、PARA、tag、作者、来源、类型，以及 `supersedes`、`duplicates`、`contradicts` 语义边探索关系子图。

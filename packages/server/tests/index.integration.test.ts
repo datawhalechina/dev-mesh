@@ -2112,7 +2112,7 @@ describe('hub server HTTP integration', () => {
 
       const tools = await client.listTools();
       expect(tools.tools.map((tool) => tool.name)).toEqual(
-        expect.arrayContaining(['mesh_search_context', 'mesh_capture_knowledge'])
+        expect.arrayContaining(['mesh_search_context', 'mesh_capture_knowledge', 'mesh_link_knowledge'])
       );
 
       const capture = await client.callTool({
@@ -2143,15 +2143,16 @@ describe('hub server HTTP integration', () => {
         }
       });
       const previous = JSON.parse(readTextToolResult(previousCapture));
-      const edge = await requestJson(`${url}/api/v1/admin/knowledge-edges`, {
-        method: 'POST',
-        body: {
+      const edgeResult = await client.callTool({
+        name: 'mesh_link_knowledge',
+        arguments: {
           kind: 'supersedes',
           fromId: captured.id,
           toId: previous.id,
           reason: 'MCP graph should include Hub semantic edges.'
         }
       });
+      const edge = JSON.parse(readTextToolResult(edgeResult));
 
       const search = await client.callTool({
         name: 'mesh_search_context',
@@ -2175,7 +2176,7 @@ describe('hub server HTTP integration', () => {
         ]
       });
 
-      expect(edge.body).toMatchObject({
+      expect(edge).toMatchObject({
         kind: 'supersedes',
         fromId: captured.id,
         toId: previous.id

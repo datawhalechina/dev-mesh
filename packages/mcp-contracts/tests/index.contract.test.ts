@@ -3,6 +3,7 @@ import {
   DEV_MESH_MCP_INSTRUCTIONS,
   meshCaptureKnowledgeInputSchema,
   meshExploreKnowledgeGraphInputSchema,
+  meshLinkKnowledgeInputSchema,
   meshRateKnowledgeInputSchema,
   meshSearchContextInputSchema,
   registerMeshTools,
@@ -62,6 +63,22 @@ describe('MCP tool contract schemas', () => {
     expect(input.edgeKinds).toEqual(['supersedes', 'duplicates', 'contradicts']);
   });
 
+  it('accepts knowledge link inputs', () => {
+    const input = meshLinkKnowledgeInputSchema.parse({
+      kind: 'supersedes',
+      fromId: 'ki_new',
+      toId: 'ki_old',
+      reason: 'The new decision replaces the old one.'
+    });
+
+    expect(input).toMatchObject({
+      kind: 'supersedes',
+      fromId: 'ki_new',
+      toId: 'ki_old',
+      project: 'auto'
+    });
+  });
+
   it('registers the expected public tools', async () => {
     const registered: Array<{
       name: string;
@@ -78,6 +95,7 @@ describe('MCP tool contract schemas', () => {
       captureKnowledge: vi.fn(async () => ({ ok: 'capture' })),
       captureTask: vi.fn(async () => ({ ok: 'task' })),
       rateKnowledge: vi.fn(async () => ({ ok: 'rate' })),
+      linkKnowledge: vi.fn(async () => ({ ok: 'link' })),
       searchMemberExperience: vi.fn(async () => ({ ok: 'member' })),
       resolveTerm: vi.fn(async () => ({ ok: 'term' })),
       scanProjectKnowledge: vi.fn(async () => ({ ok: 'scan' })),
@@ -91,6 +109,7 @@ describe('MCP tool contract schemas', () => {
       'mesh_capture_knowledge',
       'mesh_capture_task',
       'mesh_rate_knowledge',
+      'mesh_link_knowledge',
       'mesh_search_member_experience',
       'mesh_resolve_term',
       'mesh_scan_project_knowledge',
@@ -104,6 +123,7 @@ describe('MCP tool contract schemas', () => {
     expect(toolDescriptions.mesh_capture_knowledge).toContain('Prefer one high-signal item');
     expect(toolDescriptions.mesh_capture_task).toContain('Summarize what changed');
     expect(toolDescriptions.mesh_capture_task).toContain('before stopping after partial work');
+    expect(toolDescriptions.mesh_link_knowledge).toContain('supersedes, duplicates, or contradicts');
     expect(toolDescriptions.mesh_scan_project_knowledge).toContain('Capture only durable conclusions');
     expect(toolDescriptions.mesh_explore_knowledge_graph).toContain('related decisions');
 
@@ -129,6 +149,7 @@ describe('MCP tool contract schemas', () => {
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('Before final responses');
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_capture_knowledge');
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_capture_task');
+    expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_link_knowledge');
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('Do not capture secrets');
   });
 });

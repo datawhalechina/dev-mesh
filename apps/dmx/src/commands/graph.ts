@@ -19,12 +19,14 @@ const EDGE_KINDS = [
   'duplicates',
   'contradicts'
 ] as const;
+const SEMANTIC_EDGE_KINDS = ['supersedes', 'duplicates', 'contradicts'] as const;
 const nodeRequire = createRequire(import.meta.url);
 
 export function registerGraphCommand(program: Command): void {
   const graph = program.command('graph').description('Explore the local DevMesh knowledge graph');
 
   registerExploreCommand(graph);
+  registerEdgeCommand(graph);
   registerVisualizeCommand(graph, 'visualize');
   registerVisualizeCommand(program, 'visualize');
 }
@@ -87,6 +89,52 @@ function registerVisualizeCommand(parent: Command, name: string): void {
   });
 }
 
+function registerEdgeCommand(parent: Command): void {
+  const edge = parent.command('edge').description('Manage local semantic knowledge graph edges');
+
+  edge
+    .command('list')
+    .description('List local semantic knowledge graph edges')
+    .option('--root <path>', 'project root', process.cwd())
+    .option('--kind <kind>', 'edge kind filter: supersedes, duplicates, or contradicts')
+    .option('--from <id>', 'source knowledge item id filter')
+    .option('--to <id>', 'target knowledge item id filter')
+    .action(async (options: GraphEdgeListOptions) => {
+      const runtime = createDevMeshClientRuntime({
+        projectRoot: options.root
+      });
+
+      console.log(JSON.stringify(await runtime.listKnowledgeEdges(createGraphEdgeQuery(options)), null, 2));
+    });
+
+  edge
+    .command('add')
+    .description('Create a local semantic knowledge graph edge')
+    .requiredOption('--kind <kind>', 'edge kind: supersedes, duplicates, or contradicts')
+    .requiredOption('--from <id>', 'source knowledge item id')
+    .requiredOption('--to <id>', 'target knowledge item id')
+    .option('--reason <reason>', 'short reason for the relationship')
+    .option('--root <path>', 'project root', process.cwd())
+    .option('--name <displayName>', 'member display name', 'local')
+    .action(async (options: GraphEdgeAddOptions) => {
+      const runtime = createDevMeshClientRuntime({
+        projectRoot: options.root,
+        memberName: options.name
+      });
+      const input: Parameters<DevMeshClientRuntime['linkKnowledge']>[0] = {
+        kind: parseSemanticEdgeKind(options.kind),
+        fromId: options.from,
+        toId: options.to
+      };
+
+      if (options.reason !== undefined) {
+        input.reason = options.reason;
+      }
+
+      console.log(JSON.stringify(await runtime.linkKnowledge(input), null, 2));
+    });
+}
+
 function collectOption(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
@@ -140,6 +188,34 @@ function parseEdgeKind(value: string): (typeof EDGE_KINDS)[number] {
   }
 
   throw new Error(`Expected --edge-kind to be one of ${EDGE_KINDS.join(', ')}`);
+}
+
+function parseSemanticEdgeKind(value: string): (typeof SEMANTIC_EDGE_KINDS)[number] {
+  if (SEMANTIC_EDGE_KINDS.includes(value as (typeof SEMANTIC_EDGE_KINDS)[number])) {
+    return value as (typeof SEMANTIC_EDGE_KINDS)[number];
+  }
+
+  throw new Error(`Expected edge kind to be one of ${SEMANTIC_EDGE_KINDS.join(', ')}`);
+}
+
+function createGraphEdgeQuery(
+  options: GraphEdgeListOptions
+): NonNullable<Parameters<DevMeshClientRuntime['listKnowledgeEdges']>[0]> {
+  const query: NonNullable<Parameters<DevMeshClientRuntime['listKnowledgeEdges']>[0]> = {};
+
+  if (options.kind !== undefined) {
+    query.kind = parseSemanticEdgeKind(options.kind);
+  }
+
+  if (options.from !== undefined) {
+    query.fromId = options.from;
+  }
+
+  if (options.to !== undefined) {
+    query.toId = options.to;
+  }
+
+  return query;
 }
 
 function openGraphVisualization(outputPath: string): void {
@@ -685,4 +761,20 @@ interface GraphExploreOptions {
 interface GraphVisualizeOptions extends GraphExploreOptions {
   output?: string;
   open: boolean;
+}
+
+interface GraphEdgeListOptions {
+  root: string;
+  kind?: string;
+  from?: string;
+  to?: string;
+}
+
+interface GraphEdgeAddOptions {
+  root: string;
+  name: string;
+  kind: string;
+  from: string;
+  to: string;
+  reason?: string;
 }

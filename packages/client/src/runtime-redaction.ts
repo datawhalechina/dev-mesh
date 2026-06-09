@@ -1,5 +1,10 @@
 import type { CaptureKnowledgeInput } from '@devmesh/core';
-import type { CaptureProjectTaskInput, EnqueuePendingKnowledgeOptions, RateProjectKnowledgeOptions } from '@devmesh/local-store';
+import type {
+  CaptureProjectTaskInput,
+  CreateProjectKnowledgeEdgeInput,
+  EnqueuePendingKnowledgeOptions,
+  RateProjectKnowledgeOptions
+} from '@devmesh/local-store';
 import type { Redactor } from '@devmesh/extension-api';
 
 export async function redactCaptureKnowledgeInput(
@@ -102,6 +107,27 @@ export async function redactRateOptions(
   return output;
 }
 
+export async function redactKnowledgeEdgeInput(
+  input: CreateProjectKnowledgeEdgeInput,
+  redactor: Redactor
+): Promise<CreateProjectKnowledgeEdgeInput> {
+  const output: CreateProjectKnowledgeEdgeInput = {
+    kind: input.kind,
+    fromId: input.fromId,
+    toId: input.toId
+  };
+
+  if (input.reason !== undefined) {
+    output.reason = (await redactor.redact({ text: input.reason })).text;
+  }
+
+  if (input.createdBy !== undefined) {
+    output.createdBy = input.createdBy;
+  }
+
+  return output;
+}
+
 export function withDefaultMember(input: CaptureKnowledgeInput, memberName?: string): CaptureKnowledgeInput {
   if (input.createdBy || !memberName) {
     return input;
@@ -138,6 +164,22 @@ export function withDefaultRatingMember(
 
   return {
     ...options,
+    createdBy: {
+      displayName: memberName
+    }
+  };
+}
+
+export function withDefaultEdgeMember(
+  input: CreateProjectKnowledgeEdgeInput,
+  memberName?: string
+): CreateProjectKnowledgeEdgeInput {
+  if (input.createdBy || !memberName) {
+    return input;
+  }
+
+  return {
+    ...input,
     createdBy: {
       displayName: memberName
     }

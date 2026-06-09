@@ -76,6 +76,16 @@ export const meshRateKnowledgeInputSchema = z.object({
   weightDelta: z.number().min(-10).max(10).optional()
 });
 
+const knowledgeGraphSemanticEdgeKinds = ['supersedes', 'duplicates', 'contradicts'] as const;
+
+export const meshLinkKnowledgeInputSchema = z.object({
+  kind: z.enum(knowledgeGraphSemanticEdgeKinds),
+  fromId: z.string().min(1),
+  toId: z.string().min(1),
+  reason: z.string().optional(),
+  project: z.string().default('auto')
+});
+
 export const meshSearchMemberExperienceInputSchema = meshSearchContextInputSchema.extend({
   memberName: z.string().min(1)
 });
@@ -98,9 +108,7 @@ const knowledgeGraphEdgeKinds = [
   'parent_para',
   'sourced_from',
   'tagged_with',
-  'supersedes',
-  'duplicates',
-  'contradicts'
+  ...knowledgeGraphSemanticEdgeKinds
 ] as const;
 
 export const meshExploreKnowledgeGraphInputSchema = z.object({
@@ -116,6 +124,7 @@ export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema
 export type MeshCaptureKnowledgeInput = z.infer<typeof meshCaptureKnowledgeInputSchema>;
 export type MeshCaptureTaskInput = z.infer<typeof meshCaptureTaskInputSchema>;
 export type MeshRateKnowledgeInput = z.infer<typeof meshRateKnowledgeInputSchema>;
+export type MeshLinkKnowledgeInput = z.infer<typeof meshLinkKnowledgeInputSchema>;
 export type MeshSearchMemberExperienceInput = z.infer<typeof meshSearchMemberExperienceInputSchema>;
 export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
 export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
@@ -126,6 +135,7 @@ export const DEV_MESH_MCP_INSTRUCTIONS = [
   'Before final responses after meaningful coding, debugging, review, design, setup, release, deployment, or documentation work, decide whether you learned durable project knowledge.',
   'Capture durable decisions, conventions, commands, architecture notes, debugging lessons, pitfalls, setup/deployment steps, release notes, and handoffs with mesh_capture_knowledge.',
   'Capture task state, blockers, verification status, and next actions with mesh_capture_task when work starts, changes state, finishes, or needs handoff.',
+  'When new or existing knowledge clearly supersedes, duplicates, or contradicts another item, link the items with mesh_link_knowledge so the graph stays navigable.',
   'Do not capture secrets, credentials, raw private transcripts, large source blocks, noisy step-by-step logs, or facts that are already obvious from the code.',
   'Prefer one concise high-signal item over many small items. Search or explore existing knowledge first when duplication is likely.'
 ].join(' ');
@@ -138,6 +148,7 @@ export interface MeshToolHandlers {
   captureKnowledge(input: MeshCaptureKnowledgeInput): Promise<unknown>;
   captureTask(input: MeshCaptureTaskInput): Promise<unknown>;
   rateKnowledge(input: MeshRateKnowledgeInput): Promise<unknown>;
+  linkKnowledge(input: MeshLinkKnowledgeInput): Promise<unknown>;
   searchMemberExperience(input: MeshSearchMemberExperienceInput): Promise<unknown>;
   resolveTerm(input: MeshResolveTermInput): Promise<unknown>;
   scanProjectKnowledge(input: MeshScanProjectKnowledgeInput): Promise<unknown>;
@@ -187,6 +198,17 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
       inputSchema: meshRateKnowledgeInputSchema.shape
     },
     async (args) => jsonToolResult(await handlers.rateKnowledge(meshRateKnowledgeInputSchema.parse(args)))
+  );
+
+  server.registerTool(
+    'mesh_link_knowledge',
+    {
+      title: 'Link knowledge',
+      description:
+        `${assistantLedCaptureReminder} Use this tool when you discover that one knowledge item supersedes, duplicates, or contradicts another. Link only explicit relationships you can justify from the current context or existing knowledge, include a concise reason when helpful, and prefer linking durable items over creating duplicate captures.`,
+      inputSchema: meshLinkKnowledgeInputSchema.shape
+    },
+    async (args) => jsonToolResult(await handlers.linkKnowledge(meshLinkKnowledgeInputSchema.parse(args)))
   );
 
   server.registerTool(

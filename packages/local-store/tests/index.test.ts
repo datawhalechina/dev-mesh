@@ -7,9 +7,11 @@ import {
   acceptPendingKnowledge,
   captureProjectKnowledge,
   captureProjectTask,
+  createProjectKnowledgeEdge,
   enqueuePendingKnowledge,
   ensureProjectStore,
   JsonlKnowledgeRepository,
+  listProjectKnowledgeEdges,
   listPendingKnowledge,
   migrateProjectStore,
   PROJECT_STORE_SCHEMA_VERSION,
@@ -17,6 +19,7 @@ import {
   recordKnowledgeUsage,
   rateProjectKnowledge,
   rebuildProjectIndex,
+  rebuildProjectGraph,
   rejectPendingKnowledge,
   searchProjectIndex
 } from '../src/index.js';
@@ -245,6 +248,76 @@ describe('local project store', () => {
         id: item.id,
         title: 'Rebuild local index'
       });
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('stores local semantic knowledge edges and includes them in graph rebuilds', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const oldDecision = await captureProjectKnowledge(projectRoot, {
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Use background polling',
+        summary: 'The daemon scans Git and filesystem changes on an interval.'
+      });
+      const newDecision = await captureProjectKnowledge(projectRoot, {
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Use assistant-led capture',
+        summary: 'Assistants decide when durable knowledge should be captured.'
+      });
+      const linked = await createProjectKnowledgeEdge(
+        projectRoot,
+        {
+          kind: 'supersedes',
+          fromId: newDecision.item.id,
+          toId: oldDecision.item.id,
+          reason: 'Assistant-led capture replaced background polling.'
+        },
+        {
+          projectKey: 'org/repo'
+        }
+      );
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const graph = await rebuildProjectGraph(projectRoot);
+      const graphJson = JSON.parse(await readFile(graph.graphPath, 'utf8')) as {
+        edges: Array<{ kind: string; from: string; to: string }>;
+      };
+
+      await expect(repository.get(oldDecision.item.id)).resolves.toMatchObject({
+        status: 'superseded'
+      });
+      await expect(listProjectKnowledgeEdges(projectRoot)).resolves.toMatchObject([
+        {
+          id: linked.edge.id,
+          kind: 'supersedes',
+          fromId: newDecision.item.id,
+          toId: oldDecision.item.id,
+          projectKey: 'org/repo'
+        }
+      ]);
+      expect(linked.event).toMatchObject({
+        kind: 'knowledge.edge.created',
+        projectKey: 'org/repo',
+        payload: {
+          edgeId: linked.edge.id,
+          kind: 'supersedes',
+          fromId: newDecision.item.id,
+          toId: oldDecision.item.id
+        }
+      });
+      expect(graphJson.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'supersedes',
+            from: `knowledge:${newDecision.item.id}`,
+            to: `knowledge:${oldDecision.item.id}`
+          })
+        ])
+      );
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }

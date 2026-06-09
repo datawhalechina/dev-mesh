@@ -7,6 +7,7 @@ import { nowIso } from '@devmesh/shared';
 import { ensureProjectStore } from './project-store.js';
 import { getSqliteIndexFile, pathExists } from './files.js';
 import { writeProjectGraphIndex } from './graph-indexer.js';
+import { listProjectKnowledgeEdges } from './knowledge-edges.js';
 import { loadProjectKnowledgeItems } from './knowledge-files.js';
 import {
   PROJECT_STORE_SCHEMA_VERSION,
@@ -20,6 +21,7 @@ const requireNodeBuiltin = createRequire(import.meta.url);
 export async function rebuildProjectIndex(projectRoot: string): Promise<RebuildProjectIndexResult> {
   const store = await ensureProjectStore(projectRoot);
   const items = await loadProjectKnowledgeItems(projectRoot);
+  const semanticEdges = await listProjectKnowledgeEdges(projectRoot);
   const rebuiltAt = nowIso();
   const documents: ProjectIndexDocument[] = items.map((item) => ({
     id: item.id,
@@ -34,7 +36,7 @@ export async function rebuildProjectIndex(projectRoot: string): Promise<RebuildP
   }));
   const indexPath = join(store.paths.indexDir, 'manifest.json');
   const sqlitePath = getSqliteIndexFile(store.paths.indexDir);
-  const graph = await writeProjectGraphIndex(store.paths.indexDir, items, rebuiltAt);
+  const graph = await writeProjectGraphIndex(store.paths.indexDir, items, rebuiltAt, semanticEdges);
 
   await writeFile(
     indexPath,

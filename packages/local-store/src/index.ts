@@ -7,6 +7,8 @@ export type {
   CaptureProjectKnowledgeResult,
   CaptureProjectTaskInput,
   CaptureProjectTaskResult,
+  CreateProjectKnowledgeEdgeInput,
+  CreateProjectKnowledgeEdgeResult,
   DevMeshEvent,
   EnqueuePendingKnowledgeOptions,
   EnsureProjectStoreOptions,
@@ -20,6 +22,8 @@ export type {
   ProjectConfig,
   ProjectIndexDocument,
   ProjectIndexSearchResult,
+  ProjectKnowledgeEdge,
+  ProjectKnowledgeEdgeQuery,
   ProjectKnowledgeGraph,
   ProjectKnowledgeGraphExploreInput,
   ProjectKnowledgeGraphExploreResult,
@@ -48,6 +52,10 @@ export {
   readProjectGraph,
   rebuildProjectGraph
 } from './graph-indexer.js';
+export {
+  createProjectKnowledgeEdge,
+  listProjectKnowledgeEdges
+} from './knowledge-edges.js';
 export {
   appendKnowledgeRating,
   captureProjectKnowledge,

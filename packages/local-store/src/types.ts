@@ -7,7 +7,12 @@ import type {
   ParaRef,
   RateKnowledgeInput
 } from '@devmesh/core';
-import type { ExploreKnowledgeGraphInput, ExploreKnowledgeGraphResult, KnowledgeGraph } from '@devmesh/graph';
+import type {
+  ExploreKnowledgeGraphInput,
+  ExploreKnowledgeGraphResult,
+  KnowledgeGraph,
+  KnowledgeGraphSemanticEdgeKind
+} from '@devmesh/graph';
 
 export const DEV_MESH_DIR = '.dev-mesh';
 export const PROJECT_STORE_SCHEMA_VERSION = 1;
@@ -98,6 +103,36 @@ export type ProjectKnowledgeGraph = KnowledgeGraph & {
 
 export type ProjectKnowledgeGraphExploreResult = ExploreKnowledgeGraphResult;
 export type ProjectKnowledgeGraphExploreInput = ExploreKnowledgeGraphInput;
+
+export interface ProjectKnowledgeEdge {
+  id: string;
+  kind: KnowledgeGraphSemanticEdgeKind;
+  fromId: string;
+  toId: string;
+  projectKey: string;
+  createdAt: string;
+  reason?: string;
+  createdBy?: MemberIdentity;
+}
+
+export interface CreateProjectKnowledgeEdgeInput {
+  kind: KnowledgeGraphSemanticEdgeKind;
+  fromId: string;
+  toId: string;
+  reason?: string;
+  createdBy?: MemberIdentity;
+}
+
+export interface ProjectKnowledgeEdgeQuery {
+  kind?: KnowledgeGraphSemanticEdgeKind;
+  fromId?: string;
+  toId?: string;
+}
+
+export interface CreateProjectKnowledgeEdgeResult {
+  edge: ProjectKnowledgeEdge;
+  event: DevMeshEvent;
+}
 
 export interface ProjectIndexSearchResult {
   id: string;

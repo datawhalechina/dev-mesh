@@ -3,10 +3,12 @@ import type { KnowledgeItem } from '@devmesh/core';
 import {
   buildKnowledgeGraph,
   exploreKnowledgeGraph,
-  type ExploreKnowledgeGraphInput
+  type ExploreKnowledgeGraphInput,
+  type KnowledgeGraphSemanticEdge
 } from '@devmesh/graph';
 import { nowIso } from '@devmesh/shared';
 import { getKnowledgeGraphIndexFile, pathExists } from './files.js';
+import { listProjectKnowledgeEdges } from './knowledge-edges.js';
 import { loadProjectKnowledgeItems } from './knowledge-files.js';
 import { ensureProjectStore } from './project-store.js';
 import {
@@ -19,18 +21,21 @@ import {
 export async function rebuildProjectGraph(projectRoot: string): Promise<RebuildProjectGraphResult> {
   const store = await ensureProjectStore(projectRoot);
   const items = await loadProjectKnowledgeItems(projectRoot);
+  const semanticEdges = await listProjectKnowledgeEdges(projectRoot);
 
-  return writeProjectGraphIndex(store.paths.indexDir, items, nowIso());
+  return writeProjectGraphIndex(store.paths.indexDir, items, nowIso(), semanticEdges);
 }
 
 export async function writeProjectGraphIndex(
   indexDir: string,
   items: KnowledgeItem[],
-  rebuiltAt: string
+  rebuiltAt: string,
+  semanticEdges: KnowledgeGraphSemanticEdge[] = []
 ): Promise<RebuildProjectGraphResult> {
   const graphPath = getKnowledgeGraphIndexFile(indexDir);
   const graph = buildKnowledgeGraph(items, {
-    now: () => new Date(rebuiltAt)
+    now: () => new Date(rebuiltAt),
+    semanticEdges
   });
   const payload: ProjectKnowledgeGraph = {
     schemaVersion: PROJECT_STORE_SCHEMA_VERSION,
@@ -65,7 +70,10 @@ export async function exploreProjectGraph(
   input: ExploreKnowledgeGraphInput = {}
 ): Promise<ProjectKnowledgeGraphExploreResult> {
   const items = await loadProjectKnowledgeItems(projectRoot);
-  const graph = buildKnowledgeGraph(items);
+  const semanticEdges = await listProjectKnowledgeEdges(projectRoot);
+  const graph = buildKnowledgeGraph(items, {
+    semanticEdges
+  });
 
   return exploreKnowledgeGraph(graph, input);
 }

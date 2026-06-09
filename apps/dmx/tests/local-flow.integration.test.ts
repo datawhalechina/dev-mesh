@@ -25,10 +25,45 @@ describe('dmx CLI local flow', () => {
         '--para',
         'resources:test-commands'
       ]);
+      const captureJson = JSON.parse(capture.stdout);
+      const previousCapture = await runDmx([
+        'capture',
+        '--root',
+        projectRoot,
+        '--name',
+        'Xiaoyun',
+        '--title',
+        'Run broad tests',
+        '--summary',
+        'Use pnpm test for every change.',
+        '--type',
+        'command',
+        '--para',
+        'resources:test-commands'
+      ]);
+      const previousCaptureJson = JSON.parse(previousCapture.stdout);
+      const edgeAdd = await runDmx([
+        'graph',
+        'edge',
+        'add',
+        '--root',
+        projectRoot,
+        '--name',
+        'Xiaoyun',
+        '--kind',
+        'supersedes',
+        '--from',
+        captureJson.id,
+        '--to',
+        previousCaptureJson.id,
+        '--reason',
+        'Focused tests supersede the broad test note.'
+      ]);
+      const edgeList = await runDmx(['graph', 'edge', 'list', '--root', projectRoot, '--kind', 'supersedes']);
       const search = await runDmx(['search', 'focused tests', '--root', projectRoot]);
       const rate = await runDmx([
         'rate',
-        JSON.parse(capture.stdout).id,
+        captureJson.id,
         '--root',
         projectRoot,
         '--name',
@@ -40,7 +75,18 @@ describe('dmx CLI local flow', () => {
       ]);
       const status = await runDmx(['status', '--root', projectRoot]);
       const index = await runDmx(['index', 'rebuild', '--root', projectRoot]);
-      const graph = await runDmx(['graph', 'explore', '--root', projectRoot, '--query', 'focused tests', '--depth', '1']);
+      const graph = await runDmx([
+        'graph',
+        'explore',
+        '--root',
+        projectRoot,
+        '--id',
+        captureJson.id,
+        '--depth',
+        '1',
+        '--edge-kind',
+        'supersedes'
+      ]);
       const graphHtmlPath = join(projectRoot, '.dev-mesh', 'visualizations', 'graph.html');
       const visualize = await runDmx([
         'visualize',
@@ -54,7 +100,8 @@ describe('dmx CLI local flow', () => {
       ]);
 
       const initJson = JSON.parse(init.stdout);
-      const captureJson = JSON.parse(capture.stdout);
+      const edgeAddJson = JSON.parse(edgeAdd.stdout);
+      const edgeListJson = JSON.parse(edgeList.stdout);
       const searchJson = JSON.parse(search.stdout);
       const rateJson = JSON.parse(rate.stdout);
       const statusJson = JSON.parse(status.stdout);
@@ -108,27 +155,64 @@ describe('dmx CLI local flow', () => {
       expect(statusJson).toMatchObject({
         mode: 'local-only',
         schemaVersion: 1,
-        knowledgeItems: 1
+        knowledgeItems: 2
       });
       expect(indexJson).toMatchObject({
-        documentCount: 1,
+        documentCount: 2,
         graphNodeCount: expect.any(Number),
         graphEdgeCount: expect.any(Number),
         schemaVersion: 1
       });
-      expect(indexManifest.documents[0]).toMatchObject({
-        id: captureJson.id,
-        title: 'Run focused tests'
-      });
+      expect(indexManifest.documents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: captureJson.id,
+            title: 'Run focused tests'
+          }),
+          expect.objectContaining({
+            id: previousCaptureJson.id,
+            title: 'Run broad tests'
+          })
+        ])
+      );
       expect(graphJson.nodes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             id: `knowledge:${captureJson.id}`,
             kind: 'knowledge'
+          }),
+          expect.objectContaining({
+            id: `knowledge:${previousCaptureJson.id}`,
+            kind: 'knowledge'
           })
         ])
       );
-      expect(graphIndex.sourceItemCount).toBe(1);
+      expect(graphJson.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'supersedes',
+            from: `knowledge:${captureJson.id}`,
+            to: `knowledge:${previousCaptureJson.id}`
+          })
+        ])
+      );
+      expect(edgeAddJson).toMatchObject({
+        edge: {
+          kind: 'supersedes',
+          fromId: captureJson.id,
+          toId: previousCaptureJson.id
+        }
+      });
+      expect(edgeListJson).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'supersedes',
+            fromId: captureJson.id,
+            toId: previousCaptureJson.id
+          })
+        ])
+      );
+      expect(graphIndex.sourceItemCount).toBe(2);
       expect(visualize.stdout).toContain(graphHtmlPath);
       expect(graphHtml).toContain('DevMesh Knowledge Graph');
       expect(graphHtml).toContain('Cytoscape.js');
@@ -136,6 +220,7 @@ describe('dmx CLI local flow', () => {
       expect(graphHtml).toContain('gravity: 1.2');
       expect(graphHtml).toContain('Run focused tests');
       expect(graphHtml).toContain(`knowledge:${captureJson.id}`);
+      expect(graphHtml).toContain('supersedes');
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }

@@ -9,6 +9,7 @@ import type {
   MeshCaptureKnowledgeInput,
   MeshCaptureTaskInput,
   MeshExploreKnowledgeGraphInput,
+  MeshLinkKnowledgeInput,
   MeshScanProjectKnowledgeInput,
   MeshRateKnowledgeInput,
   MeshResolveTermInput,
@@ -73,6 +74,7 @@ type DaemonToolName =
   | 'mesh_capture_knowledge'
   | 'mesh_capture_task'
   | 'mesh_rate_knowledge'
+  | 'mesh_link_knowledge'
   | 'mesh_search_member_experience'
   | 'mesh_resolve_term'
   | 'mesh_scan_project_knowledge'
@@ -243,6 +245,8 @@ function createDaemonAwareHandlers(localHandlers: MeshToolHandlers, options: Loc
     captureTask: (input) =>
       callDaemonOrLocal('mesh_capture_task', input, () => localHandlers.captureTask(input), options),
     rateKnowledge: (input) => callDaemonOrLocal('mesh_rate_knowledge', input, () => localHandlers.rateKnowledge(input), options),
+    linkKnowledge: (input) =>
+      callDaemonOrLocal('mesh_link_knowledge', input, () => localHandlers.linkKnowledge(input), options),
     scanProjectKnowledge: (input) =>
       callDaemonOrLocal(
         'mesh_scan_project_knowledge',
@@ -275,6 +279,7 @@ async function callDaemonOrLocal(
     | MeshCaptureKnowledgeInput
     | MeshCaptureTaskInput
     | MeshExploreKnowledgeGraphInput
+    | MeshLinkKnowledgeInput
     | MeshScanProjectKnowledgeInput
     | MeshRateKnowledgeInput
     | MeshSearchMemberExperienceInput

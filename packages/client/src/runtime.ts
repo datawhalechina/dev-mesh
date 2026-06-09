@@ -15,8 +15,10 @@ import {
   acceptPendingKnowledge,
   captureProjectKnowledge,
   captureProjectTask,
+  createProjectKnowledgeEdge,
   enqueuePendingKnowledge,
   readProjectConfig,
+  listProjectKnowledgeEdges,
   rateProjectKnowledge,
   recordKnowledgeUsage,
   exploreProjectGraph,
@@ -24,10 +26,14 @@ import {
   rejectPendingKnowledge,
   listPendingKnowledge,
   type AcceptPendingKnowledgeResult,
+  type CreateProjectKnowledgeEdgeInput,
+  type CreateProjectKnowledgeEdgeResult,
   type CaptureProjectTaskInput,
   type EnqueuePendingKnowledgeOptions,
   type KnowledgeUsageOptions,
   type PendingKnowledgeReviewItem,
+  type ProjectKnowledgeEdge,
+  type ProjectKnowledgeEdgeQuery,
   type ProjectStore,
   type ProjectKnowledgeGraphExploreInput,
   type ProjectKnowledgeGraphExploreResult,
@@ -38,9 +44,11 @@ import {
 import {
   redactCaptureKnowledgeInput,
   redactCaptureProjectTaskInput,
+  redactKnowledgeEdgeInput,
   redactRateOptions,
   redactReviewOptions,
   storeOptions,
+  withDefaultEdgeMember,
   withDefaultMember,
   withDefaultRatingMember,
   withDefaultTaskMember
@@ -82,6 +90,8 @@ export interface DevMeshClientRuntime {
   captureKnowledge(input: CaptureKnowledgeInput): Promise<unknown>;
   captureTask(input: CaptureProjectTaskInput): Promise<unknown>;
   rateKnowledge(input: RateKnowledgeInput, options?: RateProjectKnowledgeOptions): Promise<unknown>;
+  linkKnowledge(input: CreateProjectKnowledgeEdgeInput): Promise<CreateProjectKnowledgeEdgeResult>;
+  listKnowledgeEdges(input?: ProjectKnowledgeEdgeQuery): Promise<ProjectKnowledgeEdge[]>;
   enqueueKnowledgeForReview(
     input: CaptureKnowledgeInput,
     options?: EnqueuePendingKnowledgeOptions
@@ -140,6 +150,12 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
         event: result.event
       };
     },
+    async linkKnowledge(input) {
+      const safeInput = await redactKnowledgeEdgeInput(withDefaultEdgeMember(input, options.memberName), redactor);
+
+      return createProjectKnowledgeEdge(projectRoot, safeInput);
+    },
+    listKnowledgeEdges: (input = {}) => listProjectKnowledgeEdges(projectRoot, input),
     async enqueueKnowledgeForReview(input, reviewOptions = {}) {
       const redacted = await redactCaptureKnowledgeInput(withDefaultMember(input, options.memberName), redactor);
       const safeOptions = await redactReviewOptions(reviewOptions, redactor);

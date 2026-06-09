@@ -654,7 +654,26 @@ async function createMcpHttpSession(
     }
   });
   const server = createMeshMcpServer(core, {
-    knowledgeEdges: () => hub.knowledgeEdges
+    knowledgeEdges: () => hub.knowledgeEdges,
+    async linkKnowledge(input) {
+      const edgeInput: AdminKnowledgeEdgeInput = {
+        kind: input.kind,
+        fromId: input.fromId,
+        toId: input.toId
+      };
+
+      if (input.reason !== undefined) {
+        edgeInput.reason = input.reason;
+      }
+
+      const result = await createAdminKnowledgeEdge(hub, core, edgeInput);
+
+      return result.ok
+        ? result.value
+        : {
+            error: result.error
+          };
+    }
   });
 
   session = {

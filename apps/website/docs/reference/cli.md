@@ -57,10 +57,12 @@ pnpm --filter devmesh dev -- proxy --root C:\path\to\project --name local --port
 pnpm --filter devmesh dev -- capture --root C:\path\to\project --name local --title "Decision" --summary "Persist project knowledge." --type decision --layer canonical --tag smoke
 pnpm --filter devmesh dev -- search --root C:\path\to\project --query "project knowledge"
 pnpm --filter devmesh dev -- graph explore --root C:\path\to\project --query "project knowledge" --depth 2
+pnpm --filter devmesh dev -- graph edge add --root C:\path\to\project --kind supersedes --from <new-id> --to <old-id> --reason "New decision replaces the old one"
+pnpm --filter devmesh dev -- graph edge list --root C:\path\to\project --kind supersedes
 pnpm --filter devmesh dev -- visualize --root C:\path\to\project --query "project knowledge"
 ```
 
-`visualize` 会生成一个基于 Cytoscape.js COSE force layout 的本地交互 HTML 图谱，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`；语义边会用方向、颜色和标签区分 `supersedes`、`duplicates`、`contradicts`。
+`dmx graph edge add` 会把本地已确认的语义关系写入 `.dev-mesh/knowledge/edges.jsonl`；`supersedes` 会把被替代条目标记为 superseded。`visualize` 会生成一个基于 Cytoscape.js COSE force layout 的本地交互 HTML 图谱，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`；语义边会用方向、颜色和标签区分 `supersedes`、`duplicates`、`contradicts`。
 
 ## 诊断
 
