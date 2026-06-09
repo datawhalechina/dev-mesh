@@ -437,7 +437,8 @@ async function runGit(
 ): Promise<GitCommandResult> {
   try {
     const result = await execFileAsync(options.command ?? 'git', ['-C', projectRoot, ...args], {
-      maxBuffer: 1024 * 1024
+      maxBuffer: 1024 * 1024,
+      windowsHide: true
     });
 
     return {

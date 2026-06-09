@@ -156,7 +156,8 @@ async function runCodexCommand(
     const env = createCodexProcessEnv(options);
     const result = await execFileAsync(options.command ?? 'codex', args, {
       env,
-      shell: process.platform === 'win32' && options.command === undefined
+      shell: process.platform === 'win32' && options.command === undefined,
+      windowsHide: true
     });
 
     return {

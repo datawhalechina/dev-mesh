@@ -154,7 +154,8 @@ async function runClaudeCommand(
   try {
     const result = await execFileAsync(options.command ?? 'claude', args, {
       env: createClaudeProcessEnv(options),
-      shell: process.platform === 'win32' && options.command === undefined
+      shell: process.platform === 'win32' && options.command === undefined,
+      windowsHide: true
     });
 
     return {

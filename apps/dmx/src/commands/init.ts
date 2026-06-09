@@ -1,5 +1,7 @@
 import { cancel, intro, isCancel, log, multiselect, note, outro, select, spinner } from '@clack/prompts';
 import type { Command } from 'commander';
+import { existsSync } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
 import {
   createDevMeshClientRuntime,
   initGlobalConfig,
@@ -369,16 +371,49 @@ function parseScopeOption(value: string): GlobalToolScope {
 }
 
 function createDmxServeMcpCommand(options: InitCommandOptions): { command: string; args: string[] } {
-  const args = ['serve', '--mcp', '--name', options.name];
+  const launcher = createCurrentDmxLauncherCommand();
+  const args = [...launcher.args, 'serve', '--mcp', '--name', options.name];
 
   if (options.rootExplicit) {
-    args.splice(2, 0, '--root', options.root);
+    args.splice(launcher.args.length + 2, 0, '--root', options.root);
+  }
+
+  return {
+    command: launcher.command,
+    args
+  };
+}
+
+function createCurrentDmxLauncherCommand(): { command: string; args: string[] } {
+  const entry = process.argv[1];
+
+  if (entry !== undefined && isRunnableNodeEntry(entry)) {
+    return {
+      command: resolveWindowlessNodeCommand(),
+      args: [entry]
+    };
   }
 
   return {
     command: 'dmx',
-    args
+    args: []
   };
+}
+
+function isRunnableNodeEntry(entry: string): boolean {
+  const extension = extname(entry).toLowerCase();
+
+  return extension === '.js' || extension === '.mjs' || extension === '.cjs';
+}
+
+function resolveWindowlessNodeCommand(): string {
+  if (process.platform !== 'win32') {
+    return process.execPath;
+  }
+
+  const nodewPath = join(dirname(process.execPath), 'nodew.exe');
+
+  return existsSync(nodewPath) ? nodewPath : process.execPath;
 }
 
 interface InitCommandOptions {

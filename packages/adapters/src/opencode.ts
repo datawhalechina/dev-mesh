@@ -164,7 +164,8 @@ async function runOpencodeCommand(
   try {
     const result = await execFileAsync(options.command ?? 'opencode', args, {
       env: createOpencodeProcessEnv(options),
-      shell: process.platform === 'win32' && options.command === undefined
+      shell: process.platform === 'win32' && options.command === undefined,
+      windowsHide: true
     });
 
     return {
