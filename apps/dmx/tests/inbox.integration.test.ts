@@ -23,11 +23,13 @@ describe('dmx CLI inbox flow', () => {
         '--summary',
         'Accepted inbox items should become searchable knowledge.',
         '--type',
-        'decision'
+        'decision',
+        '--json'
       ]);
       const queuedJson = JSON.parse(queued.stdout);
-      const inbox = await runDmx(['inbox', '--root', projectRoot]);
+      const inbox = await runDmx(['inbox', '--root', projectRoot, '--json']);
       const inboxJson = JSON.parse(inbox.stdout);
+      const inboxText = await runDmx(['inbox', '--root', projectRoot]);
 
       expect(queuedJson).toMatchObject({
         kind: 'knowledge',
@@ -47,16 +49,20 @@ describe('dmx CLI inbox flow', () => {
           title: 'Review accepted candidate'
         }
       });
+      expect(inboxText.stdout).toContain('DevMesh inbox');
+      expect(inboxText.stdout).toContain(`id=${queuedJson.id}`);
+      expect(inboxText.stdout).toContain('risk=high');
+      expect(inboxText.stdout.trim()).not.toMatch(/^\{/);
 
-      const accepted = await runDmx(['inbox', 'accept', queuedJson.id, '--root', projectRoot]);
+      const accepted = await runDmx(['inbox', 'accept', queuedJson.id, '--root', projectRoot, '--json']);
       const acceptedJson = JSON.parse(accepted.stdout);
       const usageAfterAcceptJsonl = await readFile(
         join(projectRoot, '.dev-mesh', 'knowledge', 'usage', `${acceptedJson.item.updatedAt.slice(0, 7)}.jsonl`),
         'utf8'
       );
-      const search = await runDmx(['search', 'accepted candidate', '--root', projectRoot]);
+      const search = await runDmx(['search', 'accepted candidate', '--root', projectRoot, '--json']);
       const searchJson = JSON.parse(search.stdout);
-      const emptyInbox = JSON.parse((await runDmx(['inbox', 'list', '--root', projectRoot])).stdout);
+      const emptyInbox = JSON.parse((await runDmx(['inbox', 'list', '--root', projectRoot, '--json'])).stdout);
 
       expect(acceptedJson.item).toMatchObject({
         id: queuedJson.input.id,
@@ -82,7 +88,8 @@ describe('dmx CLI inbox flow', () => {
             '--summary',
             'This item should stay out of knowledge.',
             '--type',
-            'pitfall'
+            'pitfall',
+            '--json'
           ])
         ).stdout
       );
@@ -93,7 +100,8 @@ describe('dmx CLI inbox flow', () => {
         '--root',
         projectRoot,
         '--reason',
-        'Not durable enough.'
+        'Not durable enough.',
+        '--json'
       ]);
       const rejectedJson = JSON.parse(rejected.stdout);
       const rejectedJsonl = await readFile(join(projectRoot, '.dev-mesh', 'queue', 'rejected.jsonl'), 'utf8');

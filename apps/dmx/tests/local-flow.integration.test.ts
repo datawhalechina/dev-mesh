@@ -59,9 +59,10 @@ describe('dmx CLI local flow', () => {
         '--to',
         previousCaptureJson.id,
         '--reason',
-        'Focused tests supersede the broad test note.'
+        'Focused tests supersede the broad test note.',
+        '--json'
       ]);
-      const edgeList = await runDmx(['graph', 'edge', 'list', '--root', projectRoot, '--kind', 'supersedes']);
+      const edgeList = await runDmx(['graph', 'edge', 'list', '--root', projectRoot, '--kind', 'supersedes', '--json']);
       const search = await runDmx(['search', 'focused tests', '--root', projectRoot, '--json']);
       const rate = await runDmx([
         'rate',
@@ -77,7 +78,7 @@ describe('dmx CLI local flow', () => {
         '--json'
       ]);
       const status = await runDmx(['status', '--root', projectRoot, '--json']);
-      const index = await runDmx(['index', 'rebuild', '--root', projectRoot]);
+      const index = await runDmx(['index', 'rebuild', '--root', projectRoot, '--json']);
       const graph = await runDmx([
         'graph',
         'explore',
@@ -88,7 +89,8 @@ describe('dmx CLI local flow', () => {
         '--depth',
         '1',
         '--edge-kind',
-        'supersedes'
+        'supersedes',
+        '--json'
       ]);
       const graphHtmlPath = join(projectRoot, '.dev-mesh', 'visualizations', 'graph.html');
       const visualize = await runDmx([
@@ -167,6 +169,8 @@ describe('dmx CLI local flow', () => {
       ]);
       const statusText = await runDmx(['status', '--root', projectRoot]);
       const searchText = await runDmx(['search', 'focused tests', '--root', projectRoot]);
+      const edgeListText = await runDmx(['graph', 'edge', 'list', '--root', projectRoot, '--kind', 'supersedes']);
+      const indexText = await runDmx(['index', 'rebuild', '--root', projectRoot]);
 
       const initJson = JSON.parse(init.stdout);
       const edgeAddJson = JSON.parse(edgeAdd.stdout);
@@ -348,6 +352,12 @@ describe('dmx CLI local flow', () => {
       expect(searchText.stdout).toContain('DevMesh context results');
       expect(searchText.stdout).toContain(`id=${captureJson.id}`);
       expect(searchText.stdout.trim()).not.toMatch(/^\{/);
+      expect(edgeListText.stdout).toContain('Knowledge graph edges');
+      expect(edgeListText.stdout).toContain(`from=${captureJson.id}`);
+      expect(edgeListText.stdout.trim()).not.toMatch(/^\{/);
+      expect(indexText.stdout).toContain('DevMesh index rebuilt');
+      expect(indexText.stdout).toContain('documents: 2');
+      expect(indexText.stdout.trim()).not.toMatch(/^\{/);
       expect(graphIndex.sourceItemCount).toBe(2);
       expect(visualize.stdout).toContain(graphHtmlPath);
       expect(graphHtml).toContain('DevMesh Knowledge Graph');
@@ -360,5 +370,5 @@ describe('dmx CLI local flow', () => {
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
-  }, 45000);
+  }, 60000);
 });

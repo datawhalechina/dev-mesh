@@ -68,7 +68,7 @@ pnpm --filter devmesh dev -- graph edge list --root C:\path\to\project --kind su
 pnpm --filter devmesh dev -- visualize --root C:\path\to\project --query "project knowledge"
 ```
 
-`dmx status`、`dmx search`、`dmx capture`、`dmx rate` 和 `dmx knowledge` 默认输出精简文本；需要给脚本解析时追加 `--json`。`dmx graph edge add` 会把本地已确认的语义关系写入 `.dev-mesh/knowledge/edges.jsonl`；`supersedes` 会把被替代条目标记为 superseded。`visualize` 会生成一个基于 Cytoscape.js COSE force layout 的本地交互 HTML 图谱，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`；语义边会用方向、颜色和标签区分 `supersedes`、`duplicates`、`contradicts`。
+`dmx status`、`dmx search`、`dmx capture`、`dmx rate`、`dmx inbox`、`dmx index`、`dmx graph`、`dmx join` 和 `dmx knowledge` 默认输出精简文本；需要给脚本解析时追加 `--json`。`dmx graph edge add` 会把本地已确认的语义关系写入 `.dev-mesh/knowledge/edges.jsonl`；`supersedes` 会把被替代条目标记为 superseded。`visualize` 会生成一个基于 Cytoscape.js COSE force layout 的本地交互 HTML 图谱，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`；语义边会用方向、颜色和标签区分 `supersedes`、`duplicates`、`contradicts`。
 
 ## 诊断
 

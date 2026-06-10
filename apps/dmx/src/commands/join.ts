@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
 import { joinServerGroup, type JoinServerOptions } from '@devmesh/client';
+import { formatFields, printJsonOrCustomText } from './output.js';
 
 export function registerJoinCommand(program: Command): void {
   program
@@ -11,6 +12,7 @@ export function registerJoinCommand(program: Command): void {
     .option('--handle <handle>', 'member handle')
     .requiredOption('--token <inviteToken>', 'invite token')
     .option('--yes', 'confirm non-interactively')
+    .option('--json', 'print structured JSON')
     .action(async (server: string, options: JoinCommandOptions) => {
       const joinOptions: JoinServerOptions = {
         serverUrl: server,
@@ -25,9 +27,25 @@ export function registerJoinCommand(program: Command): void {
 
       const result = await joinServerGroup(joinOptions);
 
-      console.log(JSON.stringify(result, null, 2));
+      printJsonOrCustomText(result, options.json, formatJoinResult);
     });
 }
+
+function formatJoinResult(result: JoinServerResult): string {
+  return formatFields('Joined DevMesh server', [
+    ['serverUrl', result.serverUrl],
+    ['mcpUrl', result.mcpUrl],
+    ['groupKey', result.groupKey],
+    ['memberId', result.memberId],
+    ['clientId', result.clientId],
+    ['globalRoot', result.globalRoot],
+    ['configPath', result.configPath],
+    ['identityPath', result.identityPath],
+    ['expiresAt', result.expiresAt]
+  ]);
+}
+
+type JoinServerResult = Awaited<ReturnType<typeof joinServerGroup>>;
 
 interface JoinCommandOptions {
   group: string;
@@ -35,4 +53,5 @@ interface JoinCommandOptions {
   handle?: string;
   token: string;
   yes?: boolean;
+  json?: boolean;
 }

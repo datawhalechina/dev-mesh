@@ -46,7 +46,8 @@ describe('dmx CLI join', () => {
           'xiaoyun',
           '--token',
           'inv_frontend',
-          '--yes'
+          '--yes',
+          '--json'
         ],
         {
           DEV_MESH_HOME: globalRoot

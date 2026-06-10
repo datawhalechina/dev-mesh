@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Command } from 'commander';
 import { createDevMeshClientRuntime, type DevMeshClientRuntime } from '@devmesh/client';
+import { formatCountedList, formatInlineFields, formatScalar, printJsonOrCustomText, printJsonOrText, truncate } from './output.js';
 import { parseIntOption } from './shared.js';
 
 const NODE_KINDS = ['knowledge', 'para', 'type', 'tag', 'member', 'source'] as const;
@@ -42,12 +43,17 @@ function registerExploreCommand(parent: Command): void {
     .option('--limit <n>', 'maximum number of nodes', parseIntOption, 40)
     .option('--node-kind <kind>', 'node kind filter', collectOption, [])
     .option('--edge-kind <kind>', 'edge kind filter', collectOption, [])
+    .option('--json', 'print structured JSON')
     .action(async (options: GraphExploreOptions) => {
       const runtime = createDevMeshClientRuntime({
         projectRoot: options.root
       });
 
-      console.log(JSON.stringify(await runtime.exploreKnowledgeGraph(createGraphExploreInput(options)), null, 2));
+      printJsonOrText(
+        'mesh_explore_knowledge_graph',
+        await runtime.exploreKnowledgeGraph(createGraphExploreInput(options)),
+        options.json
+      );
     });
 }
 
@@ -99,12 +105,17 @@ function registerEdgeCommand(parent: Command): void {
     .option('--kind <kind>', 'edge kind filter: supersedes, duplicates, or contradicts')
     .option('--from <id>', 'source knowledge item id filter')
     .option('--to <id>', 'target knowledge item id filter')
+    .option('--json', 'print structured JSON')
     .action(async (options: GraphEdgeListOptions) => {
       const runtime = createDevMeshClientRuntime({
         projectRoot: options.root
       });
 
-      console.log(JSON.stringify(await runtime.listKnowledgeEdges(createGraphEdgeQuery(options)), null, 2));
+      printJsonOrCustomText(
+        await runtime.listKnowledgeEdges(createGraphEdgeQuery(options)),
+        options.json,
+        formatGraphEdgeList
+      );
     });
 
   edge
@@ -116,6 +127,7 @@ function registerEdgeCommand(parent: Command): void {
     .option('--reason <reason>', 'short reason for the relationship')
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
+    .option('--json', 'print structured JSON')
     .action(async (options: GraphEdgeAddOptions) => {
       const runtime = createDevMeshClientRuntime({
         projectRoot: options.root,
@@ -131,7 +143,7 @@ function registerEdgeCommand(parent: Command): void {
         input.reason = options.reason;
       }
 
-      console.log(JSON.stringify(await runtime.linkKnowledge(input), null, 2));
+      printJsonOrText('mesh_link_knowledge', await runtime.linkKnowledge(input), options.json);
     });
 }
 
@@ -216,6 +228,25 @@ function createGraphEdgeQuery(
   }
 
   return query;
+}
+
+function formatGraphEdgeList(edges: GraphEdgeListResult): string {
+  return formatCountedList(
+    'Knowledge graph edges',
+    edges,
+    (edge, index) => {
+      const details = formatInlineFields([
+        ['kind', edge.kind],
+        ['from', edge.fromId],
+        ['to', edge.toId],
+        ['createdAt', edge.createdAt]
+      ]);
+      const reason = edge.reason === undefined ? '' : `\n   reason: ${truncate(edge.reason)}`;
+
+      return `${index + 1}. id=${formatScalar(edge.id)}${details.length > 0 ? ` | ${details}` : ''}${reason}`;
+    },
+    'No semantic edges found.'
+  );
 }
 
 function openGraphVisualization(outputPath: string): void {
@@ -747,6 +778,7 @@ function escapeInlineScript(value: string): string {
 }
 
 type GraphExploreResult = Awaited<ReturnType<DevMeshClientRuntime['exploreKnowledgeGraph']>>;
+type GraphEdgeListResult = Awaited<ReturnType<DevMeshClientRuntime['listKnowledgeEdges']>>;
 
 interface GraphExploreOptions {
   root: string;
@@ -756,6 +788,7 @@ interface GraphExploreOptions {
   limit: number;
   nodeKind: string[];
   edgeKind: string[];
+  json?: boolean;
 }
 
 interface GraphVisualizeOptions extends GraphExploreOptions {
@@ -768,6 +801,7 @@ interface GraphEdgeListOptions {
   kind?: string;
   from?: string;
   to?: string;
+  json?: boolean;
 }
 
 interface GraphEdgeAddOptions {
@@ -777,4 +811,5 @@ interface GraphEdgeAddOptions {
   from: string;
   to: string;
   reason?: string;
+  json?: boolean;
 }
