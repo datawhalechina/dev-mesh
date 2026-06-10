@@ -88,11 +88,12 @@ export async function serveLocalMcpStdio(options: LocalMcpDaemonOptions = {}): P
     projectRoot
   });
 
-  void ensureLocalMcpDaemon(daemonOptions).catch((error) => {
+  const daemonStartup = ensureLocalMcpDaemon(daemonOptions).catch((error) => {
     process.stderr.write(`DevMesh daemon startup skipped: ${serializeError(error)}\n`);
+    return undefined;
   });
 
-  const server = createLocalMeshMcpServerWithHandlers(createDaemonAwareHandlers(localHandlers, daemonOptions));
+  const server = createLocalMeshMcpServerWithHandlers(createDaemonAwareHandlers(localHandlers, daemonOptions, daemonStartup));
   await server.connect(new StdioServerTransport());
 }
 
@@ -233,10 +234,15 @@ export async function readLocalMcpDaemonState(projectRoot = process.cwd()): Prom
   }
 }
 
-function createDaemonAwareHandlers(localHandlers: MeshToolHandlers, options: LocalMcpDaemonOptions): MeshToolHandlers {
+function createDaemonAwareHandlers(
+  localHandlers: MeshToolHandlers,
+  options: LocalMcpDaemonOptions,
+  daemonStartup?: Promise<LocalMcpDaemonState | undefined>
+): MeshToolHandlers {
   return {
     async getStatus(input) {
       const status = await localHandlers.getStatus(input);
+      await daemonStartup;
       const daemon = await inspectLocalMcpDaemon(options.projectRoot ?? process.cwd());
 
       return formatMeshToolOutput('mesh_get_status', withProxyRuntimeStatus(status, daemon));
