@@ -167,6 +167,18 @@ describe('MCP tool contract schemas', () => {
         limit: 8
       })
     );
+
+    vi.mocked(handlers.getStatus).mockResolvedValueOnce('DevMesh status');
+    const textResult = await registered[0]?.callback({});
+
+    expect(textResult).toEqual({
+      content: [
+        {
+          type: 'text',
+          text: 'DevMesh status'
+        }
+      ]
+    });
   });
 
   it('publishes assistant-led capture server instructions', () => {

@@ -171,7 +171,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         'Inspect the current running DevMesh version, runtime status, project store path, automation flags, and knowledge counts before assuming which version or mode is active.',
       inputSchema: meshGetStatusInputSchema.shape
     },
-    async (args) => jsonToolResult(await handlers.getStatus(meshGetStatusInputSchema.parse(args)))
+    async (args) => textToolResult('mesh_get_status', await handlers.getStatus(meshGetStatusInputSchema.parse(args)))
   );
 
   server.registerTool(
@@ -182,7 +182,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         'IMPORTANT: For non-trivial project work, search DevMesh knowledge before starting or continuing so you can reuse prior decisions, conventions, pitfalls, commands, and handoffs. After using the returned context, keep watching for new durable knowledge to capture before your final response.',
       inputSchema: meshSearchContextInputSchema.shape
     },
-    async (args) => jsonToolResult(await handlers.searchContext(meshSearchContextInputSchema.parse(args)))
+    async (args) =>
+      textToolResult('mesh_search_context', await handlers.searchContext(meshSearchContextInputSchema.parse(args)))
   );
 
   server.registerTool(
@@ -193,7 +194,11 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         `${assistantLedCaptureReminder} Use this tool for durable decisions, conventions, pitfalls, commands, architecture notes, debugging lessons, setup/deployment steps, release/publish notes, or handoffs discovered from the current conversation, code reading, edits, command output, reviews, or tests. Capture concise summaries only. Prefer one high-signal item over many tiny items. Skip duplicates and do not store secrets, raw private transcript text, credentials, large source blocks, or noisy step-by-step logs.`,
       inputSchema: meshCaptureKnowledgeInputSchema.shape
     },
-    async (args) => jsonToolResult(await handlers.captureKnowledge(meshCaptureKnowledgeInputSchema.parse(args)))
+    async (args) =>
+      textToolResult(
+        'mesh_capture_knowledge',
+        await handlers.captureKnowledge(meshCaptureKnowledgeInputSchema.parse(args))
+      )
   );
 
   server.registerTool(
@@ -204,7 +209,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         `${assistantLedCaptureReminder} Use this tool when a meaningful task starts, changes state, finishes, is blocked, or needs a handoff. Summarize what changed, what remains, verification status, and any next action that future assistants or teammates should know. Use this especially before stopping after partial work.`,
       inputSchema: meshCaptureTaskInputSchema.shape
     },
-    async (args) => jsonToolResult(await handlers.captureTask(meshCaptureTaskInputSchema.parse(args)))
+    async (args) =>
+      textToolResult('mesh_capture_task', await handlers.captureTask(meshCaptureTaskInputSchema.parse(args)))
   );
 
   server.registerTool(
@@ -215,7 +221,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         'Apply explicit quality feedback to a knowledge item when the user or your work shows it is useful, stale, wrong, adopted, or should be deprioritized.',
       inputSchema: meshRateKnowledgeInputSchema.shape
     },
-    async (args) => jsonToolResult(await handlers.rateKnowledge(meshRateKnowledgeInputSchema.parse(args)))
+    async (args) =>
+      textToolResult('mesh_rate_knowledge', await handlers.rateKnowledge(meshRateKnowledgeInputSchema.parse(args)))
   );
 
   server.registerTool(
@@ -226,7 +233,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         `${assistantLedCaptureReminder} Use this tool when you discover that one knowledge item supersedes, duplicates, or contradicts another. Link only explicit relationships you can justify from the current context or existing knowledge, include a concise reason when helpful, and prefer linking durable items over creating duplicate captures.`,
       inputSchema: meshLinkKnowledgeInputSchema.shape
     },
-    async (args) => jsonToolResult(await handlers.linkKnowledge(meshLinkKnowledgeInputSchema.parse(args)))
+    async (args) =>
+      textToolResult('mesh_link_knowledge', await handlers.linkKnowledge(meshLinkKnowledgeInputSchema.parse(args)))
   );
 
   server.registerTool(
@@ -238,7 +246,10 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
       inputSchema: meshSearchMemberExperienceInputSchema.shape
     },
     async (args) =>
-      jsonToolResult(await handlers.searchMemberExperience(meshSearchMemberExperienceInputSchema.parse(args)))
+      textToolResult(
+        'mesh_search_member_experience',
+        await handlers.searchMemberExperience(meshSearchMemberExperienceInputSchema.parse(args))
+      )
   );
 
   server.registerTool(
@@ -249,7 +260,8 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         'Resolve a project glossary term before assuming local vocabulary, product names, or team-specific concepts. If the current task clarifies or corrects a term, summarize the durable glossary insight with mesh_capture_knowledge.',
       inputSchema: meshResolveTermInputSchema.shape
     },
-    async (args) => jsonToolResult(await handlers.resolveTerm(meshResolveTermInputSchema.parse(args)))
+    async (args) =>
+      textToolResult('mesh_resolve_term', await handlers.resolveTerm(meshResolveTermInputSchema.parse(args)))
   );
 
   server.registerTool(
@@ -260,7 +272,11 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         `${assistantLedCaptureReminder} On demand, scan the current project for high-signal Git and filesystem context when you decide a project-wide sweep would help. Inspect the returned highlights and relevant files yourself; do not store raw scan output. Capture only durable conclusions worth keeping.`,
       inputSchema: meshScanProjectKnowledgeInputSchema.shape
     },
-    async (args) => jsonToolResult(await handlers.scanProjectKnowledge(meshScanProjectKnowledgeInputSchema.parse(args)))
+    async (args) =>
+      textToolResult(
+        'mesh_scan_project_knowledge',
+        await handlers.scanProjectKnowledge(meshScanProjectKnowledgeInputSchema.parse(args))
+      )
   );
 
   server.registerTool(
@@ -272,16 +288,19 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
       inputSchema: meshExploreKnowledgeGraphInputSchema.shape
     },
     async (args) =>
-      jsonToolResult(await handlers.exploreKnowledgeGraph(meshExploreKnowledgeGraphInputSchema.parse(args)))
+      textToolResult(
+        'mesh_explore_knowledge_graph',
+        await handlers.exploreKnowledgeGraph(meshExploreKnowledgeGraphInputSchema.parse(args))
+      )
   );
 }
 
-function jsonToolResult(value: unknown) {
+function textToolResult(_toolName: string, value: unknown) {
   return {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(value, null, 2)
+        text: typeof value === 'string' ? value : JSON.stringify(value, null, 2)
       }
     ]
   };

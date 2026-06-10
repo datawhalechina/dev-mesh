@@ -45,7 +45,7 @@ describe('dmx serve --mcp', () => {
         name: 'mesh_get_status',
         arguments: {}
       });
-      const status = JSON.parse(readTextToolResult(statusResult));
+      const statusText = readTextToolResult(statusResult);
       const captureResult = await client.callTool({
         name: 'mesh_capture_knowledge',
         arguments: {
@@ -56,7 +56,7 @@ describe('dmx serve --mcp', () => {
           tags: ['stdio', 'daemon']
         }
       });
-      const captured = JSON.parse(readTextToolResult(captureResult));
+      const captureText = readTextToolResult(captureResult);
       const daemon = await waitForJson(join(projectRoot, '.dev-mesh', 'daemon.json'));
       const knowledgeJsonl = await readFile(
         join(projectRoot, '.dev-mesh', 'knowledge', 'canonical', 'entries.jsonl'),
@@ -66,25 +66,13 @@ describe('dmx serve --mcp', () => {
       expect(tools.tools.map((tool) => tool.name)).toEqual(
         expect.arrayContaining(['mesh_get_status', 'mesh_search_context', 'mesh_capture_knowledge'])
       );
-      expect(status).toMatchObject({
-        service: 'devmesh',
-        version: DEV_MESH_VERSION,
-        projectRoot,
-        mcp: {
-          entrypoint: 'stdio-proxy',
-          daemon: {
-            running: true,
-            projectRoot,
-            version: DEV_MESH_VERSION
-          }
-        }
-      });
-      expect(captured).toMatchObject({
-        title: 'Stdio launcher starts daemon',
-        createdBy: {
-          displayName: 'Xiaoyun'
-        }
-      });
+      expect(statusText).toContain('DevMesh status');
+      expect(statusText).toContain(`version: ${DEV_MESH_VERSION}`);
+      expect(statusText).toContain(`projectRoot: ${projectRoot}`);
+      expect(statusText).toContain('mcp: entrypoint=stdio-proxy');
+      expect(statusText).toContain('daemon: running=true');
+      expect(captureText).toContain('Captured knowledge');
+      expect(captureText).toContain('title: Stdio launcher starts daemon');
       expect(daemon).toMatchObject({
         projectRoot,
         version: DEV_MESH_VERSION

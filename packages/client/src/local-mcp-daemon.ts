@@ -245,39 +245,77 @@ function createDaemonAwareHandlers(localHandlers: MeshToolHandlers, options: Loc
       const status = await callDaemonOrLocal('mesh_get_status', input, () => localHandlers.getStatus(input), options);
       const daemon = await inspectLocalMcpDaemon(options.projectRoot ?? process.cwd());
 
-      return withProxyRuntimeStatus(status, daemon);
+      return formatStdioProxyToolOutput('mesh_get_status', withProxyRuntimeStatus(status, daemon));
     },
-    searchContext: (input) =>
-      callDaemonOrLocal('mesh_search_context', input, () => localHandlers.searchContext(input), options),
-    captureKnowledge: (input) =>
-      callDaemonOrLocal('mesh_capture_knowledge', input, () => localHandlers.captureKnowledge(input), options),
-    captureTask: (input) =>
-      callDaemonOrLocal('mesh_capture_task', input, () => localHandlers.captureTask(input), options),
-    rateKnowledge: (input) => callDaemonOrLocal('mesh_rate_knowledge', input, () => localHandlers.rateKnowledge(input), options),
-    linkKnowledge: (input) =>
-      callDaemonOrLocal('mesh_link_knowledge', input, () => localHandlers.linkKnowledge(input), options),
-    scanProjectKnowledge: (input) =>
-      callDaemonOrLocal(
+    async searchContext(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_search_context',
+        await callDaemonOrLocal('mesh_search_context', input, () => localHandlers.searchContext(input), options)
+      );
+    },
+    async captureKnowledge(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_capture_knowledge',
+        await callDaemonOrLocal('mesh_capture_knowledge', input, () => localHandlers.captureKnowledge(input), options)
+      );
+    },
+    async captureTask(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_capture_task',
+        await callDaemonOrLocal('mesh_capture_task', input, () => localHandlers.captureTask(input), options)
+      );
+    },
+    async rateKnowledge(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_rate_knowledge',
+        await callDaemonOrLocal('mesh_rate_knowledge', input, () => localHandlers.rateKnowledge(input), options)
+      );
+    },
+    async linkKnowledge(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_link_knowledge',
+        await callDaemonOrLocal('mesh_link_knowledge', input, () => localHandlers.linkKnowledge(input), options)
+      );
+    },
+    async scanProjectKnowledge(input) {
+      return formatStdioProxyToolOutput(
         'mesh_scan_project_knowledge',
-        input,
-        () => localHandlers.scanProjectKnowledge(input),
-        options
-      ),
-    exploreKnowledgeGraph: (input) =>
-      callDaemonOrLocal(
+        await callDaemonOrLocal(
+          'mesh_scan_project_knowledge',
+          input,
+          () => localHandlers.scanProjectKnowledge(input),
+          options
+        )
+      );
+    },
+    async exploreKnowledgeGraph(input) {
+      return formatStdioProxyToolOutput(
         'mesh_explore_knowledge_graph',
-        input,
-        () => localHandlers.exploreKnowledgeGraph(input),
-        options
-      ),
-    searchMemberExperience: (input) =>
-      callDaemonOrLocal(
+        await callDaemonOrLocal(
+          'mesh_explore_knowledge_graph',
+          input,
+          () => localHandlers.exploreKnowledgeGraph(input),
+          options
+        )
+      );
+    },
+    async searchMemberExperience(input) {
+      return formatStdioProxyToolOutput(
         'mesh_search_member_experience',
-        input,
-        () => localHandlers.searchMemberExperience(input),
-        options
-      ),
-    resolveTerm: (input) => callDaemonOrLocal('mesh_resolve_term', input, () => localHandlers.resolveTerm(input), options)
+        await callDaemonOrLocal(
+          'mesh_search_member_experience',
+          input,
+          () => localHandlers.searchMemberExperience(input),
+          options
+        )
+      );
+    },
+    async resolveTerm(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_resolve_term',
+        await callDaemonOrLocal('mesh_resolve_term', input, () => localHandlers.resolveTerm(input), options)
+      );
+    }
   };
 }
 
@@ -348,6 +386,371 @@ function formatDaemonRuntimeStatus(status: LocalMcpDaemonStatus): Record<string,
   }
 
   return daemon;
+}
+
+function formatStdioProxyToolOutput(toolName: DaemonToolName, value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  switch (toolName) {
+    case 'mesh_get_status':
+      return formatStatus(value);
+    case 'mesh_search_context':
+    case 'mesh_search_member_experience':
+      return formatContextPack(value);
+    case 'mesh_capture_knowledge':
+      return formatKnowledgeMutation('Captured knowledge', value);
+    case 'mesh_capture_task':
+      return formatKnowledgeMutation('Captured task', value);
+    case 'mesh_rate_knowledge':
+      return formatKnowledgeMutation('Rated knowledge', value);
+    case 'mesh_link_knowledge':
+      return formatKnowledgeLink(value);
+    case 'mesh_resolve_term':
+      return formatKnowledgeList('Resolved terms', value);
+    case 'mesh_scan_project_knowledge':
+      return formatProjectScan(value);
+    case 'mesh_explore_knowledge_graph':
+      return formatKnowledgeGraph(value);
+  }
+
+  return formatGeneric(value);
+}
+
+function formatStatus(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = ['DevMesh status'];
+  pushField(lines, 'service', value.service);
+  pushField(lines, 'version', value.version);
+  pushField(lines, 'mode', value.mode);
+  pushField(lines, 'projectRoot', value.projectRoot);
+  pushField(lines, 'storeRoot', value.storeRoot);
+  pushField(lines, 'repository', value.repository);
+  pushField(lines, 'schemaVersion', value.schemaVersion);
+  pushField(lines, 'knowledgeItems', value.knowledgeItems);
+  pushBoolean(lines, 'autoInit', value.autoInit);
+  pushBoolean(lines, 'autoReference', value.autoReference);
+  pushBoolean(lines, 'autoSync', value.autoSync);
+
+  if (isRecord(value.mcp)) {
+    lines.push(`mcp: ${formatRecordInline(value.mcp, ['entrypoint'])}`);
+
+    if (isRecord(value.mcp.daemon)) {
+      lines.push(`daemon: ${formatRecordInline(value.mcp.daemon, ['running', 'pid', 'version', 'mcpUrl'])}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function formatContextPack(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatKnowledgeList('Context results', value);
+  }
+
+  const items = toRecordArray(value.items);
+  const lines = ['DevMesh context results'];
+  pushField(lines, 'query', value.query);
+  pushField(lines, 'generatedAt', value.generatedAt);
+  lines.push(`items: ${items.length}`);
+
+  if (items.length === 0) {
+    lines.push('No matching knowledge found.');
+    return lines.join('\n');
+  }
+
+  for (const [index, item] of items.slice(0, 8).entries()) {
+    lines.push(formatKnowledgeListItem(index + 1, item));
+  }
+
+  if (items.length > 8) {
+    lines.push(`... ${items.length - 8} more items omitted.`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatKnowledgeMutation(title: string, value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = [title];
+  pushField(lines, 'id', value.id);
+  pushField(lines, 'title', value.title);
+  pushField(lines, 'type', value.type);
+  pushField(lines, 'layer', value.layer);
+  pushField(lines, 'status', value.taskStatus ?? value.status);
+  pushField(lines, 'entryKey', value.entryKey);
+  pushField(lines, 'summary', scalarToString(value.summary));
+
+  if (isRecord(value.quality)) {
+    lines.push(`quality: ${formatRecordInline(value.quality, ['qualityScore', 'confidence', 'rating'])}`);
+  }
+
+  if (isRecord(value.event)) {
+    lines.push(`event: ${formatRecordInline(value.event, ['kind', 'createdAt'])}`);
+  }
+
+  if (isRecord(value.ratingEvent)) {
+    lines.push(`ratingEvent: ${formatRecordInline(value.ratingEvent, ['rating', 'createdAt'])}`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatKnowledgeLink(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const edge = isRecord(value.edge) ? value.edge : value;
+  const lines = ['Linked knowledge'];
+  pushField(lines, 'kind', edge.kind);
+  pushField(lines, 'fromId', edge.fromId);
+  pushField(lines, 'toId', edge.toId);
+  pushField(lines, 'reason', edge.reason);
+
+  if (isRecord(value.event)) {
+    lines.push(`event: ${formatRecordInline(value.event, ['kind', 'createdAt'])}`);
+  }
+
+  if (typeof value.instruction === 'string') {
+    lines.push(`instruction: ${truncate(value.instruction)}`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatKnowledgeList(title: string, value: unknown): string {
+  const items = Array.isArray(value) ? toRecordArray(value) : toRecordArray(isRecord(value) ? value.items : undefined);
+  const lines = [title, `items: ${items.length}`];
+
+  if (items.length === 0) {
+    lines.push('No items returned.');
+    return lines.join('\n');
+  }
+
+  for (const [index, item] of items.slice(0, 8).entries()) {
+    lines.push(formatKnowledgeListItem(index + 1, item));
+  }
+
+  if (items.length > 8) {
+    lines.push(`... ${items.length - 8} more items omitted.`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatProjectScan(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const findings = toRecordArray(value.findings);
+  const lines = ['Project knowledge scan'];
+  pushField(lines, 'projectRoot', value.projectRoot);
+  pushField(lines, 'limit', value.limit);
+  lines.push(`findings: ${findings.length}`);
+
+  if (isRecord(value.highlights)) {
+    lines.push(`highlights: ${formatRecordInline(value.highlights, ['changedFiles', 'fileCount', 'todoFiles'])}`);
+  }
+
+  for (const [index, finding] of findings.slice(0, 8).entries()) {
+    lines.push(formatKnowledgeListItem(index + 1, finding));
+  }
+
+  if (findings.length > 8) {
+    lines.push(`... ${findings.length - 8} more findings omitted.`);
+  }
+
+  if (typeof value.instruction === 'string') {
+    lines.push(`instruction: ${truncate(value.instruction)}`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatKnowledgeGraph(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const nodes = toRecordArray(value.nodes);
+  const edges = toRecordArray(value.edges);
+  const lines = ['Knowledge graph', `nodes: ${nodes.length}`, `edges: ${edges.length}`];
+
+  for (const [index, node] of nodes.slice(0, 8).entries()) {
+    const label = scalarToString(node.label ?? node.title ?? node.id) ?? 'untitled';
+    const id = scalarToString(node.id) ?? 'unknown';
+    const kind = scalarToString(node.kind) ?? 'unknown';
+    lines.push(`${index + 1}. node id=${id} | kind=${kind} | ${truncate(label, 120)}`);
+  }
+
+  for (const [index, edge] of edges.slice(0, 8).entries()) {
+    const kind = scalarToString(edge.kind) ?? 'unknown';
+    const from = scalarToString(edge.from) ?? scalarToString(edge.fromId) ?? 'unknown';
+    const to = scalarToString(edge.to) ?? scalarToString(edge.toId) ?? 'unknown';
+    lines.push(`${index + 1}. edge kind=${kind} | from=${from} | to=${to}`);
+  }
+
+  if (nodes.length > 8 || edges.length > 8) {
+    lines.push('Additional graph nodes or edges omitted.');
+  }
+
+  return lines.join('\n');
+}
+
+function formatKnowledgeListItem(index: number, item: Record<string, unknown>): string {
+  const title = scalarToString(item.title ?? item.label ?? item.name) ?? 'untitled';
+  const details = [
+    item.type === undefined ? undefined : `type=${scalarToString(item.type)}`,
+    item.layer === undefined ? undefined : `layer=${scalarToString(item.layer)}`,
+    item.kind === undefined ? undefined : `kind=${scalarToString(item.kind)}`,
+    formatPara(item.para),
+    formatQuality(item.quality)
+  ].filter((part): part is string => typeof part === 'string' && part.length > 0);
+  const summary = scalarToString(item.summary ?? item.content ?? item.text);
+  const lines = [`${index}. id=${scalarToString(item.id) ?? 'unknown'} | ${truncate(title, 120)}`];
+
+  if (details.length > 0) {
+    lines.push(`   ${details.join(' | ')}`);
+  }
+
+  if (summary !== undefined) {
+    lines.push(`   summary: ${truncate(summary)}`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatGeneric(value: unknown): string {
+  if (value === undefined) {
+    return 'No result.';
+  }
+
+  if (value === null || typeof value !== 'object') {
+    return scalarToString(value) ?? 'No result.';
+  }
+
+  if (Array.isArray(value)) {
+    return formatKnowledgeList('Result list', value);
+  }
+
+  const lines = ['Result'];
+
+  for (const [key, entryValue] of Object.entries(value).slice(0, 12)) {
+    lines.push(`${key}: ${summarizeValue(entryValue)}`);
+  }
+
+  return lines.join('\n');
+}
+
+function pushField(lines: string[], label: string, value: unknown): void {
+  const text = scalarToString(value);
+
+  if (text !== undefined) {
+    lines.push(`${label}: ${truncate(text)}`);
+  }
+}
+
+function pushBoolean(lines: string[], label: string, value: unknown): void {
+  if (typeof value === 'boolean') {
+    lines.push(`${label}: ${value ? 'true' : 'false'}`);
+  }
+}
+
+function formatPara(value: unknown): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const category = scalarToString(value.category);
+  const key = scalarToString(value.key);
+
+  if (category === undefined && key === undefined) {
+    return undefined;
+  }
+
+  return `para=${[category, key].filter(Boolean).join('/')}`;
+}
+
+function formatQuality(value: unknown): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  return formatRecordInline(value, ['qualityScore', 'confidence', 'rating']);
+}
+
+function formatRecordInline(value: Record<string, unknown>, keys: string[]): string {
+  const parts = keys
+    .map((key) => {
+      const entryValue = value[key];
+
+      if (Array.isArray(entryValue)) {
+        return `${key}=${entryValue.length}`;
+      }
+
+      const text = scalarToString(entryValue);
+      return text === undefined ? undefined : `${key}=${truncate(text, 80)}`;
+    })
+    .filter((part): part is string => part !== undefined);
+
+  return parts.length === 0 ? 'none' : parts.join(', ');
+}
+
+function summarizeValue(value: unknown): string {
+  const scalar = scalarToString(value);
+
+  if (scalar !== undefined) {
+    return truncate(scalar);
+  }
+
+  if (Array.isArray(value)) {
+    return `${value.length} item${value.length === 1 ? '' : 's'}`;
+  }
+
+  if (isRecord(value)) {
+    return formatRecordInline(value, Object.keys(value).slice(0, 4));
+  }
+
+  return 'unknown';
+}
+
+function scalarToString(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return undefined;
+}
+
+function truncate(value: string, maxLength = 240): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength - 3)}...`;
+}
+
+function toRecordArray(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isRecord);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -527,7 +930,11 @@ function parseTextToolResult(result: unknown): unknown {
     throw new Error('Daemon tool call did not return a text result.');
   }
 
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 function compactDaemonOptions(options: LocalMcpDaemonOptions): LocalMcpDaemonOptions {
