@@ -1,0 +1,22 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc" xmlns="http://www.w3.org/2000/svg">
+  <title id="title">DevMesh</title>
+  <desc id="desc">Local-first project knowledge for AI-assisted engineering teams.</desc>
+  <rect width="1200" height="630" fill="#fbfbf9"/>
+  <rect x="72" y="72" width="1056" height="486" rx="18" fill="#ffffff" stroke="#dfded8" stroke-width="2"/>
+  <rect x="112" y="112" width="88" height="88" rx="14" fill="#13201a"/>
+  <path d="M134 142h44M134 156h44M134 170h44" stroke="#f7efe2" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="134" cy="142" r="9" fill="#2aa889"/>
+  <circle cx="178" cy="156" r="9" fill="#d4634d"/>
+  <circle cx="134" cy="170" r="9" fill="#c59428"/>
+  <text x="232" y="155" fill="#151b17" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="68" font-weight="800">DevMesh</text>
+  <text x="234" y="208" fill="#626b65" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="30" font-weight="600">Local-first project knowledge for coding agents</text>
+  <rect x="112" y="280" width="604" height="64" rx="8" fill="#151b17"/>
+  <text x="142" y="322" fill="#f6f0e8" font-family="Consolas, SFMono-Regular, monospace" font-size="28" font-weight="700">npm install -g devmesh@alpha</text>
+  <rect x="112" y="374" width="192" height="48" rx="8" fill="#f4f7f4" stroke="#d7ddd5"/>
+  <text x="138" y="406" fill="#17644f" font-family="Consolas, SFMono-Regular, monospace" font-size="22" font-weight="700">dmx init</text>
+  <rect x="326" y="374" width="220" height="48" rx="8" fill="#fff7ec" stroke="#ead8b5"/>
+  <text x="352" y="406" fill="#8b6317" font-family="Consolas, SFMono-Regular, monospace" font-size="22" font-weight="700">dmx doctor</text>
+  <rect x="568" y="374" width="244" height="48" rx="8" fill="#fff3f0" stroke="#ecd0c9"/>
+  <text x="594" y="406" fill="#9b4332" font-family="Consolas, SFMono-Regular, monospace" font-size="22" font-weight="700">MCP tools</text>
+  <text x="112" y="492" fill="#626b65" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="600">Codex · Claude Code · opencode · optional Hub sync</text>
+</svg>
