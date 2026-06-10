@@ -8,55 +8,99 @@ aside: false
 <main class="mesh-home">
   <section class="mesh-hero">
     <div class="mesh-hero__inner">
-      <p class="mesh-super">本地优先</p>
-      <h1>DevMesh</h1>
+      <p class="mesh-kicker">DevMesh</p>
+      <h1>本地优先的项目知识库</h1>
       <p class="mesh-hero__lead">
-        安装 <code>devmesh</code> CLI 后，用 <code>dmx init</code> 接入 Codex、Claude Code 或 opencode。
-        项目决策、任务进展和命令经验会保存到 <code>.dev-mesh</code>，再通过 CLI 和 MCP 回到开发流程里。
+        用一个 CLI 把 Codex、Claude Code 和 opencode 接到同一个项目记忆里。知识默认写入
+        <code>.dev-mesh</code>，需要团队共享时再接入 Hub Server。
       </p>
       <div class="mesh-install" aria-label="DevMesh install command">
-        <span>安装</span>
+        <span>$</span>
         <code>npm install -g devmesh@alpha</code>
+      </div>
+      <div class="mesh-command-row" aria-label="Common DevMesh commands">
+        <code>dmx init</code>
+        <code>dmx status</code>
+        <code>dmx doctor</code>
       </div>
       <div class="mesh-actions">
         <a class="mesh-button" href="/getting-started">快速开始</a>
-        <a class="mesh-button mesh-button--secondary" href="/reference/cli">CLI 参考</a>
-        <a class="mesh-button mesh-button--outline" href="/deployment">部署</a>
+        <a class="mesh-button mesh-button--secondary" href="/reference/cli">全部命令</a>
+        <a class="mesh-button mesh-button--secondary" href="/reference/mcp">MCP 工具</a>
+        <a class="mesh-button mesh-button--outline" href="/reference/http">HTTP API</a>
       </div>
     </div>
   </section>
 
-  <section class="mesh-strip" aria-label="Project layers">
-    <div class="mesh-strip__inner">
-      <div>
-        <span>项目知识库</span>
-        <strong>.dev-mesh</strong>
+  <section class="mesh-section" aria-labelledby="mesh-command-map">
+    <div class="mesh-section__inner">
+      <div class="mesh-section-heading">
+        <p>CLI</p>
+        <h2 id="mesh-command-map">命令入口</h2>
       </div>
-      <div>
-        <span>本地入口</span>
-        <strong>dmx serve</strong>
-      </div>
-      <div>
-        <span>团队同步</span>
-        <strong>Hub Server</strong>
+      <div class="mesh-card-grid">
+        <article class="mesh-card">
+          <h3>初始化和运行</h3>
+          <div class="mesh-code-list">
+            <code>dmx init</code>
+            <code>dmx join</code>
+            <code>dmx status</code>
+            <code>dmx doctor</code>
+            <code>dmx serve --mcp</code>
+            <code>dmx proxy</code>
+          </div>
+        </article>
+        <article class="mesh-card">
+          <h3>知识条目</h3>
+          <div class="mesh-code-list">
+            <code>dmx capture</code>
+            <code>dmx search</code>
+            <code>dmx knowledge get</code>
+            <code>dmx knowledge list</code>
+            <code>dmx knowledge update</code>
+            <code>dmx knowledge delete</code>
+            <code>dmx rate</code>
+          </div>
+        </article>
+        <article class="mesh-card">
+          <h3>审查和图谱</h3>
+          <div class="mesh-code-list">
+            <code>dmx inbox</code>
+            <code>dmx index rebuild</code>
+            <code>dmx graph explore</code>
+            <code>dmx graph edge list</code>
+            <code>dmx graph edge add</code>
+            <code>dmx graph visualize</code>
+            <code>dmx visualize</code>
+          </div>
+        </article>
       </div>
     </div>
   </section>
 
-  <section class="mesh-section">
-    <div class="mesh-section__inner mesh-feature-grid">
-      <article class="mesh-feature">
-        <h2>易于落地</h2>
-        <p>通过 <code>npm install -g devmesh@alpha</code> 安装，用 <code>dmx init</code> 配置 AI 客户端，不需要先部署中心服务。</p>
-      </article>
-      <article class="mesh-feature">
-        <h2>可审查</h2>
-        <p>知识、事件和待处理队列都落在项目目录里，可以搜索、检查、接受或拒绝。</p>
-      </article>
-      <article class="mesh-feature">
-        <h2>可同步</h2>
-        <p>团队场景再加入 Hub Server，管理成员、邀请、同步状态和跨项目经验检索。</p>
-      </article>
+  <section class="mesh-section mesh-section--muted" aria-labelledby="mesh-interface-map">
+    <div class="mesh-section__inner">
+      <div class="mesh-section-heading">
+        <p>Interfaces</p>
+        <h2 id="mesh-interface-map">工具和接口</h2>
+      </div>
+      <div class="mesh-interface-grid">
+        <article class="mesh-card">
+          <h3>MCP tools</h3>
+          <p>给 AI 客户端使用的工具层，包含状态、检索、增删改、评分、图谱和项目扫描。</p>
+          <a href="/reference/mcp">查看 14 个 MCP tools</a>
+        </article>
+        <article class="mesh-card">
+          <h3>Hub HTTP API</h3>
+          <p>给团队同步和管理界面使用的 HTTP API，包含 join、push、pull、projects、admin 和 streamable HTTP MCP。</p>
+          <a href="/reference/http">查看全部 HTTP endpoints</a>
+        </article>
+        <article class="mesh-card">
+          <h3>本地存储</h3>
+          <p>项目知识、事件、索引、图谱边和可视化产物保存在项目内，便于审查和版本化策略控制。</p>
+          <a href="/knowledge-capture">查看沉淀流程</a>
+        </article>
+      </div>
     </div>
   </section>
 </main>

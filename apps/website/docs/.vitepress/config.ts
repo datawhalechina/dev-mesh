@@ -33,6 +33,8 @@ export default defineConfig({
         text: '参考',
         items: [
           { text: 'CLI 参考', link: '/reference/cli' },
+          { text: 'MCP 工具', link: '/reference/mcp' },
+          { text: 'HTTP API', link: '/reference/http' },
           { text: '环境变量', link: '/reference/env' },
         ],
       },
