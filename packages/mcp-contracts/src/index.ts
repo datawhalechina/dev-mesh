@@ -709,6 +709,7 @@ function formatKnowledgeListItem(index: number, item: Record<string, unknown>): 
   const details = [
     item.type === undefined ? undefined : `type=${scalarToString(item.type)}`,
     item.layer === undefined ? undefined : `layer=${scalarToString(item.layer)}`,
+    item.status === undefined ? undefined : `status=${scalarToString(item.status)}`,
     item.kind === undefined ? undefined : `kind=${scalarToString(item.kind)}`,
     formatPara(item.para),
     formatQuality(item.quality)

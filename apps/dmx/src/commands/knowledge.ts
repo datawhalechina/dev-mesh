@@ -7,6 +7,7 @@ import type {
   UpdateKnowledgeInput
 } from '@devmesh/core';
 import { createDevMeshClientRuntime } from '@devmesh/client';
+import { formatMeshToolOutput } from '@devmesh/mcp-contracts';
 import { parseIntOption, parseNumberOption, parsePara } from './shared.js';
 
 export function registerKnowledgeCommand(program: Command): void {
@@ -24,12 +25,13 @@ function registerGetCommand(parent: Command): void {
     .description('Get a local knowledge item by id')
     .argument('<id>', 'knowledge item id')
     .option('--root <path>', 'project root', process.cwd())
-    .action(async (id: string, options: RootOptions) => {
+    .option('--json', 'print structured JSON')
+    .action(async (id: string, options: JsonOutputOptions) => {
       const runtime = createDevMeshClientRuntime({
         projectRoot: options.root
       });
 
-      console.log(JSON.stringify(await runtime.getKnowledge(id), null, 2));
+      printKnowledgeResult('mesh_get_knowledge', await runtime.getKnowledge(id), options.json);
     });
 }
 
@@ -46,12 +48,13 @@ function registerListCommand(parent: Command): void {
     .option('--recency-days <n>', 'only include items updated within this many days', parseIntOption)
     .option('--limit <n>', 'maximum number of items', parseIntOption, 20)
     .option('--root <path>', 'project root', process.cwd())
+    .option('--json', 'print structured JSON')
     .action(async (options: KnowledgeListOptions) => {
       const runtime = createDevMeshClientRuntime({
         projectRoot: options.root
       });
 
-      console.log(JSON.stringify(await runtime.listKnowledge(createListInput(options)), null, 2));
+      printKnowledgeResult('mesh_list_knowledge', await runtime.listKnowledge(createListInput(options)), options.json);
     });
 }
 
@@ -75,6 +78,7 @@ function registerUpdateCommand(parent: Command): void {
     .option('--reason <reason>', 'update reason')
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
+    .option('--json', 'print structured JSON')
     .action(async (id: string, options: KnowledgeUpdateOptions) => {
       const runtime = createDevMeshClientRuntime({
         projectRoot: options.root,
@@ -82,7 +86,11 @@ function registerUpdateCommand(parent: Command): void {
       });
       const input = createUpdateInput(id, options);
 
-      console.log(JSON.stringify(await runtime.updateKnowledge(input, createMutationOptions(options.reason)), null, 2));
+      printKnowledgeResult(
+        'mesh_update_knowledge',
+        await runtime.updateKnowledge(input, createMutationOptions(options.reason)),
+        options.json
+      );
     });
 }
 
@@ -94,16 +102,27 @@ function registerDeleteCommand(parent: Command): void {
     .option('--reason <reason>', 'delete reason')
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
+    .option('--json', 'print structured JSON')
     .action(async (id: string, options: KnowledgeDeleteOptions) => {
       const runtime = createDevMeshClientRuntime({
         projectRoot: options.root,
         memberName: options.name
       });
 
-      console.log(
-        JSON.stringify(await runtime.deleteKnowledge({ id }, createMutationOptions(options.reason)), null, 2)
+      printKnowledgeResult(
+        'mesh_delete_knowledge',
+        await runtime.deleteKnowledge({ id }, createMutationOptions(options.reason)),
+        options.json
       );
     });
+}
+
+function printKnowledgeResult(
+  toolName: 'mesh_get_knowledge' | 'mesh_list_knowledge' | 'mesh_update_knowledge' | 'mesh_delete_knowledge',
+  value: unknown,
+  json?: boolean
+): void {
+  console.log(json === true ? JSON.stringify(value, null, 2) : formatMeshToolOutput(toolName, value));
 }
 
 function createListInput(options: KnowledgeListOptions): Parameters<ReturnType<typeof createDevMeshClientRuntime>['listKnowledge']>[0] {
@@ -258,7 +277,11 @@ interface RootOptions {
   root: string;
 }
 
-interface KnowledgeListOptions extends RootOptions {
+interface JsonOutputOptions extends RootOptions {
+  json?: boolean;
+}
+
+interface KnowledgeListOptions extends JsonOutputOptions {
   layer: string[];
   type: KnowledgeType[];
   tag: string[];
@@ -269,7 +292,7 @@ interface KnowledgeListOptions extends RootOptions {
   limit: number;
 }
 
-interface KnowledgeUpdateOptions extends RootOptions {
+interface KnowledgeUpdateOptions extends JsonOutputOptions {
   title?: string;
   summary?: string;
   content?: string;
@@ -286,7 +309,7 @@ interface KnowledgeUpdateOptions extends RootOptions {
   name: string;
 }
 
-interface KnowledgeDeleteOptions extends RootOptions {
+interface KnowledgeDeleteOptions extends JsonOutputOptions {
   reason?: string;
   name: string;
 }

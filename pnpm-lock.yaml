@@ -72,6 +72,9 @@ importers:
       '@devmesh/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@devmesh/mcp-contracts':
+        specifier: workspace:*
+        version: link:../../packages/mcp-contracts
       '@devmesh/shared':
         specifier: workspace:*
         version: link:../../packages/shared

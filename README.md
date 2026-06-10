@@ -237,6 +237,8 @@ pnpm --filter devmesh dev -- knowledge update <knowledge-id> --root . --summary 
 pnpm --filter devmesh dev -- knowledge delete <knowledge-id> --root . --reason "Superseded by a newer decision"
 ```
 
+`dmx knowledge` 默认输出与 MCP 工具一致的精简文本，便于终端查看；脚本需要结构化结果时可在 get/list/update/delete 子命令上加 `--json`。
+
 探索本地知识图谱：
 
 ```bash

@@ -98,12 +98,13 @@ describe('dmx CLI local flow', () => {
         '1',
         '--no-open'
       ]);
-      const knowledgeGet = await runDmx(['knowledge', 'get', captureJson.id, '--root', projectRoot]);
+      const knowledgeGet = await runDmx(['knowledge', 'get', captureJson.id, '--root', projectRoot, '--json']);
       const knowledgeList = await runDmx([
         'knowledge',
         'list',
         '--root',
         projectRoot,
+        '--json',
         '--layer',
         'extract',
         '--type',
@@ -117,6 +118,7 @@ describe('dmx CLI local flow', () => {
         captureJson.id,
         '--root',
         projectRoot,
+        '--json',
         '--name',
         'Xiaoyun',
         '--summary',
@@ -134,12 +136,24 @@ describe('dmx CLI local flow', () => {
         previousCaptureJson.id,
         '--root',
         projectRoot,
+        '--json',
         '--name',
         'Xiaoyun',
         '--reason',
         'Focused test guidance supersedes the broad note.'
       ]);
       const knowledgeListAll = await runDmx([
+        'knowledge',
+        'list',
+        '--root',
+        projectRoot,
+        '--json',
+        '--include-superseded',
+        '--limit',
+        '5'
+      ]);
+      const knowledgeGetText = await runDmx(['knowledge', 'get', captureJson.id, '--root', projectRoot]);
+      const knowledgeListText = await runDmx([
         'knowledge',
         'list',
         '--root',
@@ -315,6 +329,14 @@ describe('dmx CLI local flow', () => {
           })
         ])
       );
+      expect(knowledgeGetText.stdout).toContain('Knowledge item');
+      expect(knowledgeGetText.stdout).toContain(`id: ${captureJson.id}`);
+      expect(knowledgeGetText.stdout).toContain('summary: Use pnpm test:unit for fast focused checks.');
+      expect(knowledgeGetText.stdout.trim()).not.toMatch(/^\{/);
+      expect(knowledgeListText.stdout).toContain('Knowledge items');
+      expect(knowledgeListText.stdout).toContain(`id=${previousCaptureJson.id}`);
+      expect(knowledgeListText.stdout).toContain('status=tombstone');
+      expect(knowledgeListText.stdout.trim()).not.toMatch(/^\{/);
       expect(graphIndex.sourceItemCount).toBe(2);
       expect(visualize.stdout).toContain(graphHtmlPath);
       expect(graphHtml).toContain('DevMesh Knowledge Graph');
