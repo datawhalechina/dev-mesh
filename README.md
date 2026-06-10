@@ -1,9 +1,13 @@
 <div align="center">
   <img src="apps/website/docs/public/img/logo.svg" width="72" alt="DevMesh logo">
   <h1>DevMesh</h1>
-  <h3>Local-first project memory for Codex, Claude Code, and opencode</h3>
-  <p><strong>MCP-native</strong> · <strong>knowledge follows the repo</strong> · <strong>team sync optional</strong></p>
-  <p><a href="https://devmesh.xyun.dev/"><strong>Documentation & Website -></strong></a></p>
+  <h3>给 AI 编程助手使用的本地优先项目记忆</h3>
+  <p><strong>MCP 原生</strong> · <strong>知识跟随仓库</strong> · <strong>团队同步可选</strong></p>
+  <p>
+    <a href="https://devmesh.xyun.dev/"><strong>Documentation & Website -></strong></a>
+    ·
+    <a href="./README-EN.md">English</a>
+  </p>
   <p>
     <a href="https://www.npmjs.com/package/devmesh"><img alt="npm alpha version" src="https://img.shields.io/npm/v/devmesh/alpha?label=npm&color=2f7f68"></a>
     <a href="https://www.npmjs.com/package/devmesh"><img alt="npm monthly downloads" src="https://img.shields.io/npm/dm/devmesh?label=downloads&color=4b5563"></a>
@@ -23,598 +27,153 @@
   <p><code>npm install -g devmesh@alpha</code></p>
 </div>
 
-`DevMesh` 是一个面向多人协作开发的 local-first 知识共享层。它通过 MCP 为 Codex、Claude Code、opencode 等 AI 编程工具提供项目知识检索、经验沉淀、本地缓存和可选团队同步能力。
+## DevMesh 是什么
 
-当前仓库处于产品骨架阶段：已搭建 TypeScript monorepo、核心领域模型、`.dev-mesh/` 本地项目知识库、基础 CLI、Hub Server skeleton、MCP tool contract 和分层测试框架。
+DevMesh 是一个面向 Codex、Claude Code、opencode 等 AI 编程工具的项目知识层。它把稳定的开发经验、架构决策、任务进展、命令习惯和踩坑记录沉淀到项目里的 `.dev-mesh/`，让同一个仓库里的后续 AI 会话可以继续检索和复用这些上下文。
 
-## 核心目标
+默认模式完全本地优先：不需要先部署服务端，也不会上传原始对话。需要团队共享时，再通过 Hub Server 做可选同步。
 
-- 让 AI 编程工具可以检索项目决策、约定、任务进度、命令经验和踩坑记录。
-- 默认使用本地 `.dev-mesh/`，未加入服务端时也能作为 local-only 项目知识库使用。
-- 加入团队 Server Group 后，再按策略同步脱敏后的知识和事件。
-- 使用成员身份标记知识来源，例如检索“小云的前端样式设计经验”。
-- 通过 `confidence`、`weight`、`rating`、`adoptionScore`、`qualityScore` 管理知识可靠性和排序。
-
-## 当前能力
-
-- `pnpm` workspace monorepo
-- `apps/dmx`：`dmx` CLI，本地 init/capture/search/status/rate/inbox/index/doctor/serve/proxy、全局 init 工具选择和远端 group join
-- `apps/mesh-server`：Koa2 Hub Server 启动入口
-- `apps/web-admin`：Vue 3 + Element Plus 管理后台
-- `apps/website`：VitePress 项目官网和使用文档
-- `packages/core`：知识条目、PARA、质量信号、搜索和评分
-- `packages/agent`：Context Pack 构建
-- `packages/client`：本地 runtime、local-only 组合、stdio launcher、按需 daemon 和 Koa2 + 官方 MCP SDK 本地 proxy
-- `packages/server`：Koa2 Hub HTTP API、官方 MCP SDK Streamable HTTP `/mcp` 和工具调用映射
-- `packages/local-store`：`.dev-mesh/` bootstrap、JSONL 本地存储、事件日志、review queue、ratings 和 SQLite FTS 索引
-- `packages/mcp-contracts`：MCP tools schema 和注册函数
-- `packages/extension-api`、`packages/registry`：扩展接口和注册解析
-- 分层测试脚本：unit、integration、contract、security、e2e
-
-## 项目结构
-
-```text
-apps/
-  dmx/
-    src/                  # CLI 可执行入口和 commands/*
-    tests/                # CLI 集成测试
-  mesh-server/
-    src/                  # Hub Server 可执行入口
-    tests/                # E2E smoke 测试
-  web-admin/              # Vue + Element Plus 管理后台
-  website/                # VitePress 官网
-packages/
-  */src/                  # 生产代码
-  */tests/                # 单元、集成、契约、安全测试
-  core/                   # 纯领域模型和核心服务
-  agent/                  # Agent context pack 编排
-  client/                 # 本地 runtime、全局初始化和项目 store 组合
-  server/                 # Hub Server、HTTP API、MCP endpoint
-  extension-api/          # Adapter / Provider / Redactor / Scorer 等接口
-  registry/               # 扩展注册和 capability resolve
-  mcp-contracts/          # MCP tool schema 和注册
-  protocol/               # Sync / join / well-known API 类型
-  graph/                  # 知识条目关系图谱
-  local-store/            # .dev-mesh 本地知识库
-  adapters/               # 内置 Codex / Claude Code / opencode 工具适配器
-  providers/              # 内置项目扫描 provider skeleton
-  redaction/              # 内置 redactor
-  quality/                # 质量评分器 skeleton
-  search/                 # 搜索 backend skeleton
-  storage/                # 存储 backend skeleton
-docs/
-  README.md              # 文档索引
-  technical-design.md     # 技术设计文档
-  TODO.md                 # 阶段任务清单
-  adr/                    # ADR 模板和记录
-examples/                 # 二次开发示例
-```
-
-## 环境要求
-
-- Node.js 22+
-- pnpm 10.6.2+
-
-安装依赖：
+## 快速开始
 
 ```bash
-pnpm install
-```
-
-## 常用命令
-
-```bash
-pnpm typecheck
-pnpm typecheck:examples
-pnpm test
-pnpm test:unit
-pnpm test:integration
-pnpm test:contract
-pnpm test:security
-pnpm test:e2e
-pnpm build
-pnpm npm:smoke
-pnpm release:check
-pnpm docker:config
-pnpm docker:up
-pnpm docker:smoke
-```
-
-启动开发期 Hub Server：
-
-```bash
-pnpm dev:server
-```
-
-启动管理后台：
-
-```bash
-pnpm dev:admin
-```
-
-启动项目官网：
-
-```bash
-pnpm dev:website
-```
-
-启动本地 MCP Proxy：
-
-```bash
-pnpm dev:client -- serve --mcp --root .
-```
-
-默认地址：
-
-```text
-Hub Server: http://127.0.0.1:8721
-MCP endpoint: http://127.0.0.1:8721/mcp
-Local MCP Proxy: http://127.0.0.1:8722/mcp
-Web Admin: http://127.0.0.1:5173
-Website: http://127.0.0.1:3000
-```
-
-## CLI 示例
-
-安装后的 CLI 入口是 `dmx`。首次安装后直接运行：
-
-```bash
+npm install -g devmesh@alpha
 dmx init
 ```
 
-该命令会扫描本机 Codex、Claude Code 和 opencode，进入基于 Clack 的交互式选择器来选择要配置的 MCP Host 和配置 scope，并写入对应工具的 `devmesh` MCP server 配置。真实终端中完成后会继续用 TUI 展示写入结果；CI、管道重定向或显式 `--json` 时输出结构化 JSON。默认全局自动化策略启用 `auto_init`、`auto_reference` 和 `auto_sync`；助手自主知识沉淀由 MCP server instructions 和工具描述双层提示驱动，不再需要单独配置开关。
+`dmx init` 会扫描本机已安装的 Codex、Claude Code 和 opencode，并把它们配置为启动 DevMesh 的 stdio MCP launcher。之后你在项目里打开 AI 编程工具时，DevMesh 会按项目读取或创建 `.dev-mesh/`，并通过 MCP 工具提醒助手在合适的时候沉淀知识。
 
-当前仓库开发期也可以通过 workspace dev script 运行：
-
-初始化全局配置，并选择要注册的 MCP Host 工具：
+常用检查命令：
 
 ```bash
-pnpm --filter devmesh dev -- init --global --yes --tool codex --tool opencode
+dmx status
+dmx doctor
+dmx search "release workflow"
 ```
 
-也可以用逗号列表：
+加入团队共享 Hub：
 
 ```bash
-pnpm --filter devmesh dev -- init --global --tools codex,claude,opencode --mcp-url http://127.0.0.1:8722/mcp --yes
+dmx join https://your-devmesh-hub.example.com \
+  --group frontend \
+  --name Alice \
+  --token <invite-token>
 ```
 
-该命令会写入 `~/.dev-mesh/config.toml` 和 `~/.dev-mesh/identity.json`。在交互终端中会展示 detected/configured 状态，支持键盘 toggle 和 scope 切换；选择 Codex、Claude Code 或 opencode 时会同时写入对应 scope 的 `devmesh` MCP server 配置。
-默认写入的是 stdio MCP launcher 命令，语义等同于 `dmx serve --mcp --name <name>`；生产安装场景会尽量写成当前 Node 可执行文件直接运行 CLI 入口，避免经过 npm 生成的 shell shim（Windows 上尤其要避开 `dmx.cmd` 弹出控制台窗口）。配置不会把运行 `dmx init` 时的目录固化成项目根。MCP host 在具体项目里启动这个前台 launcher 后，launcher 使用 host 的当前工作目录作为项目根，并按项目检查 `.dev-mesh/daemon.pid` / `.dev-mesh/daemon.json`，复用已有 daemon；如果 daemon 不存在，会用同一个 CLI detached spawn 一个后台子进程。daemon 冷启动期间，launcher 仍能立即响应 MCP initialize 和 tools/list，后续 tool call 优先转发给 daemon，失败时降级为本进程执行。MCP server instructions 和工具描述会持续提醒 Codex、Claude Code 或 opencode 根据当前对话、代码阅读、编辑和命令结果自主判断是否调用 `mesh_capture_knowledge` / `mesh_capture_task`；DevMesh 不再依赖后台 Git / filesystem 轮询。只有显式执行 `dmx init --global --root <project>` 时，配置才会固定 `--root <project>`。加入 Hub 后，远端共享同步也由这个项目 daemon 执行：它读取本机 `identity.json` 的 joined server 记录，按 `.dev-mesh/sync/cursors.json` 增量 push/pull，把远端 knowledge 快照回放到本地 `.dev-mesh/knowledge/`，并把最近状态写入 `.dev-mesh/sync/status.json`。
+## 工作方式
 
-加入开发期 Hub Server 的 group：
+DevMesh 使用“前台 MCP launcher 按需拉起项目 daemon”的模式：
 
-```bash
-pnpm --filter devmesh dev -- join http://127.0.0.1:8721 \
-  --group default \
-  --name Xiaoyun \
-  --token devmesh-local-invite \
-  --yes
-```
+- MCP host 只需要运行标准命令 `dmx serve --mcp`。
+- launcher 会优先复用当前项目的后台 daemon；没有 daemon 时自动启动。
+- 冷启动时 launcher 先响应 MCP 初始化和工具列表，避免 AI 工具等待超时。
+- 知识沉淀由 AI 助手根据当前对话、代码阅读、编辑和命令结果自主判断，再调用 DevMesh MCP 工具写入。
+- DevMesh 不依赖后台 Git 或文件系统轮询来强行分析项目。
 
-`dmx join` 会先读取 `/.well-known/devmesh`，再调用 `/api/v1/join`。成功后会在全局 `config.toml` 写入 `[[servers]]` 和 `[[groups]]`，并把 access token 保存在本机 `identity.json`，不会写入可检查或可分享的 TOML 配置。
+## 会保存什么
 
-启动当前项目的 stdio MCP launcher：
+适合随仓库共享的知识：
 
-```bash
-pnpm --filter devmesh dev -- serve --mcp --root . --name local
-```
+- `.dev-mesh/knowledge/extract/entries.jsonl`
+- `.dev-mesh/knowledge/canonical/entries.jsonl`
+- `.dev-mesh/knowledge/para/index.json`
+- `.dev-mesh/knowledge/edges.jsonl`
 
-直接启动当前项目的 HTTP MCP Proxy 调试入口：
+不会进入仓库的本机运行态：
 
-```bash
-pnpm --filter devmesh dev -- proxy --root . --name local --port 8722
-```
+- `.dev-mesh/daemon.json`
+- `.dev-mesh/daemon.pid`
+- `.dev-mesh/events/`
+- `.dev-mesh/index/`
+- `.dev-mesh/sync/`
+- `.dev-mesh/queue/`
+- `.dev-mesh/secrets/`
+- `.dev-mesh/knowledge/raw/`
+- `.dev-mesh/knowledge/ratings/`
+- `.dev-mesh/knowledge/usage/`
 
-`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。知识沉淀由 Codex、Claude Code 或 opencode 结合当前上下文自主触发：MCP 初始化 instructions 会提醒模型把沉淀作为默认工作习惯，工具 description 会在 search/scan/capture 时继续提示 final response 前的 capture decision；需要全项目巡检时可以按需调用 `mesh_scan_project_knowledge`，确认有长期价值后再调用 capture 工具。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/update/delete/rate 写入当前项目 `.dev-mesh/`。
+这意味着别人 clone 一个带有 DevMesh 知识的项目后，本地 DevMesh 会加载项目里的共享知识；索引、daemon 状态、同步游标和敏感运行态会在对方机器上重新生成。
 
-初始化项目本地知识库：
+## 常用命令
 
-```bash
-pnpm --filter devmesh dev -- init --project --root . --name local
-```
-
-写入一条本地知识：
-
-```bash
-pnpm --filter devmesh dev -- capture \
-  --root . \
-  --name local \
-  --title "Run focused tests" \
-  --summary "Use pnpm test:unit before pushing." \
-  --type command \
-  --para resources:test-commands
-```
-
-将高风险候选放入 review queue：
-
-```bash
-pnpm --filter devmesh dev -- capture \
-  --root . \
-  --name local \
-  --review \
-  --reason "High-risk knowledge capture" \
-  --title "Review before publishing" \
-  --summary "This candidate should be accepted before it becomes project knowledge." \
-  --type decision
-```
-
-查看、接受或拒绝 inbox 候选：
-
-```bash
-pnpm --filter devmesh dev -- inbox --root .
-pnpm --filter devmesh dev -- inbox accept <queue-id> --root .
-pnpm --filter devmesh dev -- inbox reject <queue-id> --root . --reason "Not durable enough"
-```
-
-检索本地知识：
-
-```bash
-pnpm --filter devmesh dev -- search "focused tests" --root .
-```
-
-维护已有知识条目：
-
-```bash
-pnpm --filter devmesh dev -- knowledge get <knowledge-id> --root .
-pnpm --filter devmesh dev -- knowledge list --root . --layer canonical --type decision
-pnpm --filter devmesh dev -- knowledge update <knowledge-id> --root . --summary "Updated summary." --tag tests --reason "Refresh stale wording"
-pnpm --filter devmesh dev -- knowledge delete <knowledge-id> --root . --reason "Superseded by a newer decision"
-```
-
-`dmx status`、`dmx search`、`dmx capture`、`dmx rate`、`dmx inbox`、`dmx index`、`dmx graph`、`dmx join` 和 `dmx knowledge` 默认输出精简文本，便于终端查看；脚本需要结构化结果时可追加 `--json`。
-
-探索本地知识图谱：
-
-```bash
-pnpm --filter devmesh dev -- graph explore --root . --query "focused tests" --depth 2
-pnpm --filter devmesh dev -- graph edge add --root . --kind supersedes --from <new-id> --to <old-id> --reason "New decision replaces the old one"
-pnpm --filter devmesh dev -- graph edge list --root . --kind supersedes
-```
-
-生成并打开本地知识图谱可视化：
-
-```bash
-pnpm --filter devmesh dev -- visualize --root . --query "focused tests"
-pnpm --filter devmesh dev -- graph visualize --root . --query "focused tests" --no-open
-```
-
-可视化页面使用 Cytoscape.js 的 COSE force layout 生成，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`。
-
-查看本地状态：
-
-```bash
-pnpm --filter devmesh dev -- status --root .
-```
-
-提交显式反馈：
-
-```bash
-pnpm --filter devmesh dev -- rate <knowledge-id> \
-  --root . \
-  --name local \
-  --rating 1 \
-  --reason "Useful local command"
-```
-
-重建本地索引 manifest：
-
-```bash
-pnpm --filter devmesh dev -- index rebuild --root .
-```
-
-该命令会同时重建 `.dev-mesh/index/manifest.json`、`.dev-mesh/index/mesh.sqlite` 和 `.dev-mesh/index/graph.json`。SQLite 文件包含可重建的本地关键词 FTS 索引，graph 文件是从知识条目派生出的本地关系索引。
-
-运行 doctor：
-
-```bash
-pnpm --filter devmesh dev -- doctor --root .
-```
-
-`dmx doctor` 会检查本地 store、privacy 配置、assistant-led capture 提示、sync 身份、daemon sync 状态、stdio launcher/daemon 状态和内置 adapter 状态。真实终端中会用 Clack TUI 按类别展示检查结果和修复建议；需要机器读取时可使用 `dmx doctor --json`。
-
-## `.dev-mesh/` 本地知识库
-
-执行 `dmx init` 或 runtime 初始化后，项目目录下会生成 `.dev-mesh/`：
-
-```text
-.dev-mesh/
-  config.toml
-  .gitignore
-  daemon.pid
-  daemon.json
-  knowledge/
-    raw/
-    extract/
-    canonical/
-    ratings/
-    usage/
-    para/
-  events/
-  index/
-  visualizations/
-  queue/
-  sync/
-  secrets/
-```
-
-约定：
-
-- `knowledge/*.jsonl` 保存本地知识视图。
-- `knowledge/extract/`、`knowledge/canonical/`、`knowledge/para/` 和 `knowledge/edges.jsonl` 保存可审查的项目级知识，适合进入仓库。
-- `daemon.pid` 和 `daemon.json` 是本机 daemon 运行态，可能包含本机绝对路径、PID、端口等信息，默认忽略。
-- `events/*.jsonl` 是 append-only 事件日志，默认忽略。
-- `knowledge/ratings/*.jsonl` 保存显式反馈事件，不会被当作普通知识检索，默认忽略。
-- `knowledge/usage/*.jsonl` 保存检索命中、inbox 接受等采纳信号，用来轻量调整 adoption/quality，也不会被当作普通知识检索，默认忽略。
-- `knowledge/raw/` 保存原始材料，默认忽略。
-- `index/manifest.json` 和 `index/mesh.sqlite` 是可重建本地索引。
-- `visualizations/graph.html` 是可重建的本地图谱页面。
-- `queue/pending.jsonl` 保存待 review 候选，接受后写入 knowledge 和 events，拒绝后进入 `queue/rejected.jsonl`。
-- `secrets/` 永远不应该同步或提交。
-
-## 本地 MCP Proxy
-
-本地 MCP 入口由 `packages/client` 提供。推荐让 MCP host 启动 stdio launcher；`dmx init` 写入的全局配置默认不包含 `--root`，让 Codex 等 MCP host 按当前项目目录启动：
-
-```bash
-dmx serve --mcp
-```
-
-手动调试时可以显式指定项目根：
-
-```bash
-dmx serve --mcp --root .
-```
-
-launcher 会按需拉起项目级 daemon，daemon 状态写入：
-
-```text
-.dev-mesh/daemon.pid
-.dev-mesh/daemon.json
-```
-
-HTTP proxy 仍可作为库嵌入，也可通过 `dmx proxy` 启动：
-
-```text
-GET  /healthz
-GET  /mcp
-POST /mcp
-```
-
-MCP tools 与 Hub Server 核心工具保持一致：
-
-```text
-mesh_get_status
-mesh_search_context
-mesh_get_knowledge
-mesh_list_knowledge
-mesh_capture_knowledge
-mesh_update_knowledge
-mesh_delete_knowledge
-mesh_capture_task
-mesh_rate_knowledge
-mesh_link_knowledge
-mesh_search_member_experience
-mesh_resolve_term
-mesh_scan_project_knowledge
-mesh_explore_knowledge_graph
-```
-
-集成测试覆盖 stdio launcher 启动 daemon、SDK client 调用 `tools/list` / `mesh_get_status` / `mesh_capture_knowledge`，以及 HTTP proxy 调用 `tools/list`、`mesh_get_status`、`mesh_get_knowledge`、`mesh_list_knowledge`、`mesh_capture_knowledge`、`mesh_update_knowledge`、`mesh_delete_knowledge`、`mesh_link_knowledge`、`mesh_search_context`、`mesh_explore_knowledge_graph`，并验证默认写入当前项目 store。
-
-## HTTP API Skeleton
-
-开发期 Hub Server 使用 Koa2 提供以下基础端点，MCP `/mcp` 使用官方 MCP TypeScript SDK：
-
-```text
-GET  /healthz
-GET  /.well-known/devmesh
-GET  /api/v1/groups
-POST /api/v1/join
-POST /api/v1/auth/rotate
-POST /api/v1/sync/push
-GET  /api/v1/sync/pull
-GET  /api/v1/projects
-POST /api/v1/projects
-GET  /api/v1/projects/:id/brief
-GET  /api/v1/admin/overview
-GET  /api/v1/admin/groups
-POST /api/v1/admin/groups
-GET  /api/v1/admin/members
-POST /api/v1/admin/members/:memberId/disable
-GET  /api/v1/admin/invites
-POST /api/v1/admin/invites
-DELETE /api/v1/admin/invites/:token
-GET  /api/v1/admin/projects
-POST /api/v1/admin/projects
-PUT  /api/v1/admin/projects/:groupKey/:id/acl
-GET  /api/v1/admin/glossary
-POST /api/v1/admin/glossary
-PUT  /api/v1/admin/glossary/:id
-GET  /api/v1/admin/knowledge
-GET  /api/v1/admin/knowledge-edges
-POST /api/v1/admin/knowledge-edges
-GET  /api/v1/admin/quality-review
-GET  /api/v1/admin/task-digest
-GET  /api/v1/admin/review-queue
-GET  /api/v1/admin/audit
-GET  /mcp
-POST /mcp
-```
-
-MCP `/mcp` 已使用 SDK Streamable HTTP transport 接入，集成测试覆盖 `tools/list` 和 `tools/call`。MCP tool contract 目前包含：
-
-```text
-mesh_get_status
-mesh_search_context
-mesh_get_knowledge
-mesh_list_knowledge
-mesh_capture_knowledge
-mesh_update_knowledge
-mesh_delete_knowledge
-mesh_capture_task
-mesh_rate_knowledge
-mesh_link_knowledge
-mesh_search_member_experience
-mesh_resolve_term
-mesh_scan_project_knowledge
-mesh_explore_knowledge_graph
-```
-
-所有 MCP tool 的 `content` 都统一返回精简纯文本，避免 Codex 等客户端直接收到大段 JSON；内部仍使用结构化对象，最后由 `packages/mcp-contracts` 负责格式化。`mesh_get_status` 会展示当前 DevMesh MCP 运行版本、模式、项目根、store 路径、知识数量；通过 stdio launcher 连接时还会包含前台 proxy 和共享 daemon 的运行状态，方便 Codex 先确认实际连接状态。`mesh_search_context` 会展示 Context Pack 摘要：包含 `query`、`generatedAt`、命中数量和前几个带 PARA / 质量信号的条目。`mesh_get_knowledge` / `mesh_list_knowledge` 读取单条或按 layer/type/PARA/tag/author/recency 过滤列表；`mesh_update_knowledge` 会追加同 id 的新版 JSONL 条目并写入 `knowledge.updated` 事件；`mesh_delete_knowledge` 会写入 tombstone，让默认搜索隐藏该条目但保留审计和同步历史。`mesh_link_knowledge` 会把明确的 `supersedes`、`duplicates`、`contradicts` 关系写入本地 edge store 或 Hub knowledge edges。`mesh_explore_knowledge_graph` 会围绕条目、PARA、tag、作者、来源、类型和语义边返回关系子图摘要，适合回答“这个决策关联哪些坑点/模块/成员经验”。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_update_knowledge`、`mesh_delete_knowledge`、`mesh_rate_knowledge` 和 `mesh_link_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志、ratings 反馈文件或 semantic edge 文件；检索命中和 inbox 接受会写入 usage 反馈文件，并通过较小的 adoption/confidence 增量影响后续排序。
-
-开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token、projects、knowledge edges 和 audit logs：
-
-- `GET /api/v1/groups` 返回可加入的 group 摘要。
-- `POST /api/v1/join` 需要有效 `inviteToken`，成功后签发 group-scoped Bearer access token。
-- `POST /api/v1/auth/rotate` 需要当前 Bearer token，成功后签发新的 access token、撤销旧 token、保持 sync signing secret 稳定，并写入不含 token 明文的 audit。
-- `POST /api/v1/admin/members/:memberId/rotate-token` 支持管理后台按 member 轮换 access token，撤销该 member 旧 token，并只在响应中一次性返回新 token。
-- `POST /api/v1/sync/push`、`GET /api/v1/sync/pull`、`GET /api/v1/projects`、`POST /api/v1/projects` 和 `GET /api/v1/projects/:id/brief` 都需要 `Authorization: Bearer <token>`。
-- `POST /api/v1/admin/invites` 创建的 admin invite 未显式提供 `expiresAt` 时默认 24 小时后过期；seed 的本地开发 invite 不套用该默认策略。
-- sync push/pull 目前使用开发期内存 event log：事件按 group 隔离，cursor 使用 `cur_<groupKey>_<offset>`，重复 event id 不会重复追加，pull 只返回当前 group 的增量事件。
-- 客户端 daemon 会在 `auto_sync = true` 且存在 joined server identity 时自动调用 sync push/pull；本地已推送事件和远端 pull cursor 存在 `.dev-mesh/sync/cursors.json`，最近一次同步状态存在 `.dev-mesh/sync/status.json`。pull 到的 replayable knowledge snapshot 会写入本地 `.dev-mesh/knowledge/`，不会追加新的本地 event，避免同步回环。
-- `knowledge.deleted` sync event 需要携带 `{ knowledgeId, tombstone: true }`，有效 tombstone 会按 knowledge id 写入 admin audit，并在 replay 时把目标 knowledge 标记为 `tombstone`；缺少 tombstone 语义的删除事件会被拒绝。
-- `knowledge.updated` sync event 可携带 `{ knowledgeId, revisionId, conflict: true, reason? }` 表示离线分支；恢复连接后 replay 会为同一 base knowledge 的不同 revision 创建幂等 `contradicts` edge，并写入 `sync.conflict_replayed` audit。
-- 服务端接受的 sync event 会附加 `log.sequence` / `log.hash` / `log.previousHash` 元数据，用于开发期 append-only event log 的 tamper-evident 链式校验基础。
-- join 会签发开发期 `syncSigningSecret` 并只保存在本机 `identity.json`；带 `hmac-sha256` 签名的 sync event 会被校验，篡改或无效签名会被拒绝并写入 admin audit。
-- `packages/server` 暴露 `federateHubSyncEvents` 和 `federateHubSyncEventsFromHttpPeer`：可在两个 HubState 之间或通过 HTTP peer event-log endpoint 按 peer/group cursor 增量复制 sync event，重复复制幂等跳过，并写入 federation audit。
-- project list 和 project brief 默认只返回当前 token 所属 group 内且 ACL 允许的项目；跨 group 或未授权项目返回 404，避免泄露 project id。brief 内容会过滤其他 group 的非 org knowledge，但允许 `visibility: "org"` 的 canonical knowledge 作为组织级共享上下文进入已授权项目 brief。
-- 禁用 member 后，该 member 已签发的 Bearer token 会被服务端拒绝。
-- `createHubServer({ hubStatePath })` 可把开发期 HubState 持久化到 JSON 文件；`createHubServer({ hubStateStore })` 可接入自定义持久化 store。`packages/storage` 提供 PostgreSQL-backed Hub state store，可通过 JSONB snapshot 在重启后恢复 groups、invites、members、tokens、projects、sync cursor 和 audit log。
-- 本地开发默认 seed 一个 `default` group 和 `devmesh-local-invite` invite token。生产部署前需要替换为数据库持久化、短期 token 默认策略和更完整 ACL。
-- `apps/web-admin` 通过 `/api/v1/admin/*` 查看 server health、groups、members、invites、projects、glossary、knowledge、knowledge edges、quality review、task digest、review queue 和 audit log，并支持创建 group / project、创建或撤销 invite、禁用 member、轮换 member token、配置 project ACL、创建和编辑 glossary term，以及创建 supersede / duplicate / contradict edge。
-
-## 测试策略
-
-本仓库按测试类型拆分 Vitest 配置：
-
-| 命令 | 范围 |
+| 命令 | 用途 |
 | --- | --- |
-| `pnpm test:unit` | 纯领域逻辑、local-store、registry、依赖方向检查等单元测试 |
-| `pnpm test:integration` | CLI local-only flow、Hub Server HTTP flow 等集成测试 |
-| `pnpm test:contract` | MCP tool schema 和 contract 测试 |
-| `pnpm test:security` | redaction pipeline 和敏感内容写入安全测试 |
-| `pnpm test:e2e` | 启动真实 `dmx-server` 的 Streamable HTTP MCP smoke 测试 |
-| `pnpm test` | 运行全部已发现测试 |
+| `dmx init` | 初始化本机 MCP host 配置，或初始化当前项目。 |
+| `dmx join <server>` | 加入团队 Hub group，启用可选同步。 |
+| `dmx status` | 查看版本、项目 store、daemon 和知识数量。 |
+| `dmx doctor` | 检查本地 store、隐私、同步、daemon 和 MCP host 配置。 |
+| `dmx capture` | 手动写入一条知识，或放入 review inbox。 |
+| `dmx search <query>` | 搜索当前项目知识。 |
+| `dmx knowledge get/list/update/delete` | 查看和维护知识条目。 |
+| `dmx graph explore` | 探索知识图谱关系。 |
+| `dmx visualize` | 生成并打开本地知识图谱页面。 |
+| `dmx serve --mcp` | stdio MCP launcher，通常由 AI 工具启动。 |
+| `dmx proxy` | 启动本地 Streamable HTTP MCP proxy，主要用于调试。 |
 
-PostgreSQL storage 集成测试默认跳过；如需运行真实数据库测试，先提供专用测试库连接：
+完整命令见 [CLI 参考](https://devmesh.xyun.dev/reference/cli)。
+
+## 接口
+
+DevMesh 暴露两类接口：
+
+- MCP tools：供 Codex、Claude Code、opencode 等工具读取、沉淀、维护和关联项目知识。
+- Hub HTTP API：供团队同步、管理后台、邀请、项目 ACL、知识图谱和审计使用。
+
+文档入口：
+
+- [MCP 工具](https://devmesh.xyun.dev/reference/mcp)
+- [HTTP API](https://devmesh.xyun.dev/reference/http)
+- [环境变量](https://devmesh.xyun.dev/reference/env)
+- [部署指南](https://devmesh.xyun.dev/deployment)
+
+## 本地开发
 
 ```bash
-DEV_MESH_POSTGRES_URL=postgres://devmesh:devmesh@127.0.0.1:5432/devmesh_test pnpm exec vitest run packages/storage/tests/postgres.integration.test.ts
-```
-
-## 服务端部署
-
-`apps/mesh-server` 可直接通过 CLI 参数、环境变量或 dotenv-style env file 启动。优先级为 CLI 参数 > 进程环境变量 > `--env-file`。
-
-```bash
+pnpm install
+pnpm typecheck
+pnpm test:unit
 pnpm build
-node apps/mesh-server/dist/index.js --env-file /etc/dev-mesh/mesh-server.env
 ```
 
-常用环境变量：
-
-```env
-DEV_MESH_HOST=0.0.0.0
-DEV_MESH_PORT=8721
-DEV_MESH_BASE_URL=https://mesh.example.com
-DEV_MESH_PROJECT_ROOT=/var/lib/devmesh
-DEV_MESH_HUB_STATE_PATH=/var/lib/devmesh/hub-state.json
-DEV_MESH_POSTGRES_URL=postgres://devmesh:devmesh@postgres:5432/devmesh
-DEV_MESH_POSTGRES_KNOWLEDGE_TABLE=dev_mesh_knowledge_items
-DEV_MESH_POSTGRES_HUB_STATE_TABLE=dev_mesh_hub_state
-DEV_MESH_LOGGER=true
-```
-
-未配置 `DEV_MESH_POSTGRES_URL` 时，knowledge repository 使用本地 JSONL，Hub state 可通过 `DEV_MESH_HUB_STATE_PATH` 使用 JSON file persistence；配置 `DEV_MESH_POSTGRES_URL` 后，server 会自动迁移并使用 PostgreSQL knowledge repository，且在未设置 `DEV_MESH_HUB_STATE_PATH` 时使用 PostgreSQL Hub state store。
-
-Alpha 发布骨架见 [docs/release.md](docs/release.md)。本地容器栈可通过以下命令启动：
+完整发布检查：
 
 ```bash
-pnpm docker:up
+pnpm release:check
 ```
 
-更多 Compose 操作见 [deploy/README.md](deploy/README.md)。
+开发入口：
 
-## 开发规范
-
-后续开发遵循 [docs/development-guide.md](./docs/development-guide.md)：代码组织以包职责和依赖方向为核心，避免过度耦合和过早抽象；实现保持简洁清晰，复杂边界、持久化格式、安全策略和跨包例外需要写清楚注释。
-
-## 二次开发示例
-
-Agent context pack：
-
-```ts
-import { createAgentContextService } from '@devmesh/agent';
-import { createDevMeshCore } from '@devmesh/core';
-
-const core = createDevMeshCore({ projectRoot: process.cwd() });
-const agent = createAgentContextService({ core });
-
-const contextPack = await agent.buildContextPack({
-  query: 'login state',
-  para: {
-    category: 'areas',
-    key: 'backend/auth'
-  },
-  layers: ['canonical', 'extract']
-});
+```bash
+pnpm dev:server
+pnpm dev:admin
+pnpm dev:website
+pnpm dev:client -- --help
 ```
 
-更多 typed examples 见 [examples](./examples)：
+仓库结构：
 
 ```text
-custom-agent.ts        # 组合 core 和 agent 构建 Context Pack
-custom-scorer.ts       # 注册自定义 QualityScorer extension
-client-runtime.ts      # 嵌入 client runtime、review queue、索引和检索
-local-store-index.ts   # JSONL store + SQLite FTS 本地索引
-embedded-server.ts     # 作为库启动 Hub server 和 MCP endpoint
+apps/
+  dmx/          # npm CLI, installs the dmx command
+  mesh-server/  # Hub Server entrypoint
+  web-admin/    # Vue admin console
+  website/      # VitePress website
+packages/
+  core/         # domain model and knowledge service
+  client/       # local runtime, launcher, daemon, CLI support
+  local-store/  # .dev-mesh JSONL store and indexes
+  server/       # Hub HTTP API and MCP endpoint
+  mcp-contracts/# MCP tool schemas and formatting
 ```
 
-示例类型检查：
+贡献前请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。发布流程见 [docs/release.md](./docs/release.md)。
 
-```bash
-pnpm typecheck:examples
-```
-
-## 开发状态
-
-阶段 5 分布式 Mesh 已完成，当前进入发布前验证和生产化准备：
-
-- 已完成 `dmx init --global` TUI、`dmx join` join flow、`dmx serve --mcp` stdio launcher、按需项目 daemon、daemon 自动 sync push/pull 和远端 knowledge replay、`dmx proxy` 本地 MCP Proxy、Codex/Claude Code/opencode adapter detect/configure/remove/doctor，以及 MCP session 自动初始化项目 store。
-- 已完成 Git snapshot provider 和 filesystem snapshot provider，供 `mesh_scan_project_knowledge` 按需读取 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
-- 已完成内置 redactor 的 secret、PII、URL token、Authorization、cookie、private key 和 sensitive path 脱敏。
-- 已完成内置 quality scorers，覆盖 confidence、rating、adoption、freshness 和 source trust patch。
-- 已完成 assistant-led capture 主链路：MCP server instructions 和工具描述双层强提示模型总结当前上下文，再调用 `mesh_capture_knowledge` / `mesh_capture_task` 写入本地知识库，并可通过 `mesh_get_knowledge` / `mesh_list_knowledge` / `mesh_update_knowledge` / `mesh_delete_knowledge` 维护已有条目。
-- 已完成 member-specific experience search 和内置 hybrid search backend，支持 keyword、deterministic embedding mock、recency、quality 和 adoption ranking。
-- 已完成知识图谱基础能力：从 Knowledge Item 和本地/Hub 语义边派生 `.dev-mesh/index/graph.json`，并通过 `mesh_explore_knowledge_graph` 探索条目、PARA、tag、作者、来源、类型和 `supersedes` / `duplicates` / `contradicts` 关系。
-- 已完成 web-admin 的 member 禁用、invite 创建/撤销，以及 Hub admin audit log 写入和查询。
-- 已完成 project ACL 管理：支持 group/restricted visibility、成员角色配置、项目列表和 brief ACL 过滤。
-- 已完成 glossary 管理：支持 admin API 和 web-admin 创建、查询、编辑 canonical glossary term，并复用 `mesh_resolve_term` 检索。
-- 已完成 knowledge edge 管理：支持 supersede / duplicate / contradict edge，supersede 后默认检索仅返回 active 项，可通过 `includeSuperseded=true` 查看旧项。
-- 已完成 quality review dashboard：按 qualityScore、confidence、rating、adoption、stale 和非 active 状态汇总待复审知识。
-- 已完成 task digest：按任务 key 聚合 task knowledge，展示最新状态、owner、标签、历史片段和状态汇总。
-- 已完成 group-scoped sync event log 基础：支持 push/pull cursor、重复 push 幂等和跨 group 隔离。
-- 已完成 signed sync event 校验基础：支持开发期 HMAC 签名验证、篡改事件拒绝和 audit 记录。
-- 已完成 server-to-server federation：支持 HubState 之间和 HTTP peer event-log endpoint 的 group/cursor 增量复制、重复复制幂等、tombstone event 传播和 audit 记录。
-- 已完成 tombstone sync：`knowledge.deleted` 必须指向 knowledge id，push / federation merge 会写入 tombstone audit，并可 replay 到 repository 的 `tombstone` 状态。
-- 已完成 signed event log 验证基础：服务端为 group sync log 生成 sequence、hash 和 previousHash，并可复验 hash chain、HMAC 签名和写入 verification failure audit。
-- 已完成 offline-first conflict replay：`knowledge.updated` 离线分支恢复后会按 base knowledge 合并检测冲突，使用 `contradicts` edge 表达并保留 replay audit。
-- 已完成 org-level knowledge sharing：project brief 保持 group/project ACL 隔离，同时允许 org-visible canonical knowledge 跨 group 共享。
-- 已完成 access token rotation：旧 Bearer token 立即失效，新 token 保持原 client identity 和 sync signing secret，并写入 rotation audit。
-- 已完成短期 invite 默认策略：admin 创建 invite 时默认 24 小时有效，显式 `expiresAt` / `maxUses` 仍可覆盖。
-- 已完成开发期 Hub state persistence：`hubStatePath` 支持 JSON 文件恢复 Hub 状态和 audit log。
-- 已完成 web-admin ACL 和 token rotation 管理：members 表支持按 member 轮换 token，projects 表支持 group/restricted ACL。
-- 已完成 PostgreSQL-backed Hub state store：`packages/storage` 提供 migration helper 和 JSONB snapshot store，可通过 `hubStateStore` 注入 Hub Server。
-- 已完成 mesh-server 部署配置：CLI 支持 `--env-file`、`DEV_MESH_*` 环境变量、PostgreSQL repository / Hub state store 自动迁移和启动接入。
-- 扩展自动沉淀的质量评分、低风险自动发布策略和发布包体优化。
-
-后续任务清单见 [docs/TODO.md](./docs/TODO.md)。
-
-详细设计见 [docs/technical-design.md](./docs/technical-design.md)。
-
-## 安全说明
+## 安全和隐私
 
 - 默认不上传原始对话全文。
-- 默认启用脱敏策略，后续高风险内容应进入 review queue。
-- `.dev-mesh/secrets/`、credential 文件、`.env`、`*.pem`、`*.key` 不应同步或提交。
-- 生产部署前仍需接入外部认证、运行时密钥管理、备份恢复和运维监控策略。
+- 默认使用本地 `.dev-mesh/`，未执行 `dmx join` 时不连接团队 Hub。
+- `.dev-mesh/secrets/`、`.env`、`*.pem`、`*.key` 和凭据文件不应提交。
+- 高风险知识应进入 review inbox，确认后再发布到项目知识库。
+
+## 当前状态
+
+DevMesh 当前处于 alpha 阶段，CLI 已发布到 npm，网站和核心文档位于 [devmesh.xyun.dev](https://devmesh.xyun.dev/)。接口和存储格式会继续演进，生产部署前请结合自己的认证、密钥管理、备份和监控策略进行评估。

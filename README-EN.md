@@ -1,0 +1,179 @@
+<div align="center">
+  <img src="apps/website/docs/public/img/logo.svg" width="72" alt="DevMesh logo">
+  <h1>DevMesh</h1>
+  <h3>Local-first project memory for AI coding agents</h3>
+  <p><strong>MCP-native</strong> · <strong>knowledge follows the repo</strong> · <strong>team sync is optional</strong></p>
+  <p>
+    <a href="https://devmesh.xyun.dev/"><strong>Documentation & Website -></strong></a>
+    ·
+    <a href="./README.md">简体中文</a>
+  </p>
+  <p>
+    <a href="https://www.npmjs.com/package/devmesh"><img alt="npm alpha version" src="https://img.shields.io/npm/v/devmesh/alpha?label=npm&color=2f7f68"></a>
+    <a href="https://www.npmjs.com/package/devmesh"><img alt="npm monthly downloads" src="https://img.shields.io/npm/dm/devmesh?label=downloads&color=4b5563"></a>
+    <img alt="Node.js" src="https://img.shields.io/badge/Node.js-%3E%3D22-5fa04e">
+  </p>
+  <p>
+    <img alt="Windows supported" src="https://img.shields.io/badge/Windows-supported-3b72b9">
+    <img alt="macOS supported" src="https://img.shields.io/badge/macOS-supported-3b72b9">
+    <img alt="Linux supported" src="https://img.shields.io/badge/Linux-supported-3b72b9">
+  </p>
+  <p>
+    <img alt="Codex supported" src="https://img.shields.io/badge/Codex-supported-6d3fc8">
+    <img alt="Claude Code supported" src="https://img.shields.io/badge/Claude%20Code-supported-6d3fc8">
+    <img alt="opencode supported" src="https://img.shields.io/badge/opencode-supported-6d3fc8">
+    <img alt="MCP tools" src="https://img.shields.io/badge/MCP-tools-2b6f73">
+  </p>
+  <p><code>npm install -g devmesh@alpha</code></p>
+</div>
+
+## What Is DevMesh
+
+DevMesh is a project knowledge layer for AI coding tools such as Codex, Claude Code, and opencode. It stores durable engineering context in the project's `.dev-mesh/` directory: decisions, conventions, task handoffs, useful commands, and pitfalls that future AI sessions should be able to retrieve.
+
+The default mode is local-first. You do not need to deploy a server, and raw conversations are not uploaded. When a team wants shared memory, DevMesh can optionally sync through a Hub Server.
+
+## Quick Start
+
+```bash
+npm install -g devmesh@alpha
+dmx init
+```
+
+`dmx init` scans installed MCP hosts such as Codex, Claude Code, and opencode, then configures them to start the DevMesh stdio MCP launcher. After that, when you open a project with an AI coding tool, DevMesh reads or creates `.dev-mesh/` for that project and exposes MCP tools that help the assistant capture useful knowledge at the right time.
+
+Common checks:
+
+```bash
+dmx status
+dmx doctor
+dmx search "release workflow"
+```
+
+Join a shared team Hub:
+
+```bash
+dmx join https://your-devmesh-hub.example.com \
+  --group frontend \
+  --name Alice \
+  --token <invite-token>
+```
+
+## How It Works
+
+DevMesh uses a foreground MCP launcher that starts or reuses a per-project daemon on demand:
+
+- The MCP host only needs to run `dmx serve --mcp`.
+- The launcher reuses the current project's daemon when it exists, or starts one when needed.
+- During cold starts, the launcher answers MCP initialize and tools/list immediately so the AI host does not time out.
+- Knowledge capture is assistant-led: the AI tool decides from the active conversation, code context, edits, and command output when to call DevMesh MCP tools.
+- DevMesh does not rely on background Git or filesystem polling to force project analysis.
+
+## What Gets Stored
+
+Knowledge that is intended to follow the repository:
+
+- `.dev-mesh/knowledge/extract/entries.jsonl`
+- `.dev-mesh/knowledge/canonical/entries.jsonl`
+- `.dev-mesh/knowledge/para/index.json`
+- `.dev-mesh/knowledge/edges.jsonl`
+
+Local runtime state that should not be committed:
+
+- `.dev-mesh/daemon.json`
+- `.dev-mesh/daemon.pid`
+- `.dev-mesh/events/`
+- `.dev-mesh/index/`
+- `.dev-mesh/sync/`
+- `.dev-mesh/queue/`
+- `.dev-mesh/secrets/`
+- `.dev-mesh/knowledge/raw/`
+- `.dev-mesh/knowledge/ratings/`
+- `.dev-mesh/knowledge/usage/`
+
+When someone clones a project that already contains DevMesh knowledge, their local DevMesh can load the shared knowledge from the repo. Indexes, daemon state, sync cursors, and sensitive runtime files are regenerated on their machine.
+
+## Common Commands
+
+| Command | Purpose |
+| --- | --- |
+| `dmx init` | Configure local MCP hosts or initialize the current project. |
+| `dmx join <server>` | Join a team Hub group and enable optional sync. |
+| `dmx status` | Show version, project store, daemon, and knowledge counts. |
+| `dmx doctor` | Check store, privacy, sync, daemon, and MCP host configuration. |
+| `dmx capture` | Manually capture a knowledge item or queue it for review. |
+| `dmx search <query>` | Search project knowledge. |
+| `dmx knowledge get/list/update/delete` | Inspect and maintain knowledge items. |
+| `dmx graph explore` | Explore knowledge graph relationships. |
+| `dmx visualize` | Generate and open a local knowledge graph page. |
+| `dmx serve --mcp` | Stdio MCP launcher, usually started by AI tools. |
+| `dmx proxy` | Start the local Streamable HTTP MCP proxy for debugging. |
+
+See the full [CLI reference](https://devmesh.xyun.dev/reference/cli).
+
+## Interfaces
+
+DevMesh exposes two interface surfaces:
+
+- MCP tools for AI clients to read, capture, update, delete, rate, and link project knowledge.
+- Hub HTTP APIs for team sync, admin workflows, invites, project ACLs, knowledge graph management, and audit trails.
+
+Documentation:
+
+- [MCP tools](https://devmesh.xyun.dev/reference/mcp)
+- [HTTP API](https://devmesh.xyun.dev/reference/http)
+- [Environment variables](https://devmesh.xyun.dev/reference/env)
+- [Deployment guide](https://devmesh.xyun.dev/deployment)
+
+## Local Development
+
+```bash
+pnpm install
+pnpm typecheck
+pnpm test:unit
+pnpm build
+```
+
+Full release check:
+
+```bash
+pnpm release:check
+```
+
+Development entrypoints:
+
+```bash
+pnpm dev:server
+pnpm dev:admin
+pnpm dev:website
+pnpm dev:client -- --help
+```
+
+Repository layout:
+
+```text
+apps/
+  dmx/          # npm CLI, installs the dmx command
+  mesh-server/  # Hub Server entrypoint
+  web-admin/    # Vue admin console
+  website/      # VitePress website
+packages/
+  core/         # domain model and knowledge service
+  client/       # local runtime, launcher, daemon, CLI support
+  local-store/  # .dev-mesh JSONL store and indexes
+  server/       # Hub HTTP API and MCP endpoint
+  mcp-contracts/# MCP tool schemas and formatting
+```
+
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before sending a pull request. Release details are in [docs/release.md](./docs/release.md).
+
+## Security And Privacy
+
+- Raw conversations are not uploaded by default.
+- DevMesh stays local until `dmx join` connects it to a team Hub.
+- `.dev-mesh/secrets/`, `.env`, `*.pem`, `*.key`, and credential files should never be committed.
+- High-risk knowledge should go through the review inbox before becoming project knowledge.
+
+## Status
+
+DevMesh is currently in alpha. The CLI is published on npm, and the website and core docs live at [devmesh.xyun.dev](https://devmesh.xyun.dev/). APIs and storage formats may still evolve, so production deployments should be evaluated with your own authentication, secret management, backup, and monitoring requirements.
