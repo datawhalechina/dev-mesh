@@ -13,6 +13,8 @@ title: 自动沉淀
 
 这是当前最稳的路径。AI 客户端连接本地 MCP proxy 后，会先看到 DevMesh 的全局 instructions：在有意义的编码、调试、评审、设计、部署、发布或文档工作结束前，主动判断是否需要沉淀知识；再通过各个工具的 description 获得更具体的 capture checklist。可调用工具包括：
 
+这些 MCP 工具返回给 AI 客户端的是精简纯文本摘要，而不是完整 JSON 对象；这样 Codex、Claude Code 或 opencode 可以直接阅读状态、id、摘要、质量信号和事件结果，不会因为结构化对象过大浪费上下文。
+
 - `mesh_get_status`：检查当前 DevMesh MCP 版本、运行模式、项目根、知识数量，以及 stdio launcher 背后的共享 daemon 状态。
 - `mesh_get_knowledge` / `mesh_list_knowledge`：按 id 或过滤条件查看已有知识条目，适合编辑、删除、链接前确认目标。
 - `mesh_capture_knowledge`：沉淀架构决策、约定、术语、经验。

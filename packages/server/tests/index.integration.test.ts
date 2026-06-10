@@ -2120,15 +2120,14 @@ describe('hub server HTTP integration', () => {
         name: 'mesh_get_status',
         arguments: {}
       });
-      const status = JSON.parse(readTextToolResult(statusResult));
+      const statusText = readTextToolResult(statusResult);
 
-      expect(status).toMatchObject({
-        service: 'devmesh',
-        version: DEV_MESH_VERSION,
-        mode: 'server',
-        projectRoot: core.projectRoot,
-        knowledgeItems: 0
-      });
+      expect(statusText).toContain('DevMesh status');
+      expect(statusText).toContain('service: devmesh');
+      expect(statusText).toContain(`version: ${DEV_MESH_VERSION}`);
+      expect(statusText).toContain('mode: server');
+      expect(statusText).toContain(`projectRoot: ${core.projectRoot}`);
+      expect(statusText).toContain('knowledgeItems: 0');
 
       const capture = await client.callTool({
         name: 'mesh_capture_knowledge',
@@ -2140,13 +2139,13 @@ describe('hub server HTTP integration', () => {
           tags: ['mcp']
         }
       });
-      const captured = JSON.parse(readTextToolResult(capture));
+      const captureText = readTextToolResult(capture);
+      const capturedId = readRequiredField(captureText, 'id');
 
-      expect(captured).toMatchObject({
-        title: 'MCP streamable HTTP capture',
-        layer: 'canonical',
-        tags: ['mcp']
-      });
+      expect(captureText).toContain('Captured knowledge');
+      expect(captureText).toContain('title: MCP streamable HTTP capture');
+      expect(captureText).toContain('layer: canonical');
+      expect(captureText).toContain('tags: mcp');
       const previousCapture = await client.callTool({
         name: 'mesh_capture_knowledge',
         arguments: {
@@ -2157,17 +2156,18 @@ describe('hub server HTTP integration', () => {
           tags: ['mcp']
         }
       });
-      const previous = JSON.parse(readTextToolResult(previousCapture));
+      const previousText = readTextToolResult(previousCapture);
+      const previousId = readRequiredField(previousText, 'id');
       const edgeResult = await client.callTool({
         name: 'mesh_link_knowledge',
         arguments: {
           kind: 'supersedes',
-          fromId: captured.id,
-          toId: previous.id,
+          fromId: capturedId,
+          toId: previousId,
           reason: 'MCP graph should include Hub semantic edges.'
         }
       });
-      const edge = JSON.parse(readTextToolResult(edgeResult));
+      const edgeText = readTextToolResult(edgeResult);
 
       const search = await client.callTool({
         name: 'mesh_search_context',
@@ -2176,56 +2176,32 @@ describe('hub server HTTP integration', () => {
           layers: ['canonical']
         }
       });
-      const contextPack = JSON.parse(readTextToolResult(search));
+      const contextText = readTextToolResult(search);
 
-      expect(contextPack).toMatchObject({
-        query: 'streamable HTTP',
-        items: [
-          {
-            id: captured.id,
-            title: 'MCP streamable HTTP capture',
-            quality: {
-              qualityScore: expect.any(Number)
-            }
-          }
-        ]
-      });
-
-      expect(edge).toMatchObject({
-        kind: 'supersedes',
-        fromId: captured.id,
-        toId: previous.id
-      });
+      expect(contextText).toContain('query: streamable HTTP');
+      expect(contextText).toContain(`id=${capturedId}`);
+      expect(contextText).toContain('MCP streamable HTTP capture');
+      expect(contextText).toContain('qualityScore=');
+      expect(edgeText).toContain('Linked knowledge');
+      expect(edgeText).toContain('kind: supersedes');
+      expect(edgeText).toContain(`fromId: ${capturedId}`);
+      expect(edgeText).toContain(`toId: ${previousId}`);
 
       const graphResult = await client.callTool({
         name: 'mesh_explore_knowledge_graph',
         arguments: {
-          ids: [captured.id],
+          ids: [capturedId],
           depth: 1,
           edgeKinds: ['supersedes']
         }
       });
-      const graph = JSON.parse(readTextToolResult(graphResult));
+      const graphText = readTextToolResult(graphResult);
 
-      expect(graph.nodes).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: `knowledge:${captured.id}`
-          }),
-          expect.objectContaining({
-            id: `knowledge:${previous.id}`
-          })
-        ])
-      );
-      expect(graph.edges).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            kind: 'supersedes',
-            from: `knowledge:${captured.id}`,
-            to: `knowledge:${previous.id}`
-          })
-        ])
-      );
+      expect(graphText).toContain(`node id=knowledge:${capturedId}`);
+      expect(graphText).toContain(`node id=knowledge:${previousId}`);
+      expect(graphText).toContain('edge kind=supersedes');
+      expect(graphText).toContain(`from=knowledge:${capturedId}`);
+      expect(graphText).toContain(`to=knowledge:${previousId}`);
     } finally {
       await client.close().catch(() => undefined);
       await app.close();
@@ -2401,7 +2377,8 @@ describe('hub server HTTP integration', () => {
           tags: ['mcp', 'local-store']
         }
       });
-      const captured = JSON.parse(readTextToolResult(captureResult));
+      const captureText = readTextToolResult(captureResult);
+      const capturedId = readRequiredField(captureText, 'id');
       const taskResult = await client.callTool({
         name: 'mesh_capture_task',
         arguments: {
@@ -2411,66 +2388,50 @@ describe('hub server HTTP integration', () => {
           tags: ['task']
         }
       });
-      const task = JSON.parse(readTextToolResult(taskResult));
+      const taskText = readTextToolResult(taskResult);
       const rateResult = await client.callTool({
         name: 'mesh_rate_knowledge',
         arguments: {
-          id: captured.id,
+          id: capturedId,
           rating: 0,
           confidenceDelta: -0.1
         }
       });
-      const rated = JSON.parse(readTextToolResult(rateResult));
+      const ratedText = readTextToolResult(rateResult);
+      const ratedEventCreatedAt = readInlineField(ratedText, 'event', 'createdAt');
+      const ratingEventCreatedAt = readInlineField(ratedText, 'ratingEvent', 'createdAt');
       const knowledgeJsonl = await readFile(
         join(projectRoot, '.dev-mesh', 'knowledge', 'extract', 'entries.jsonl'),
         'utf8'
       );
       const eventsJsonl = await readFile(
-        join(projectRoot, '.dev-mesh', 'events', `${rated.event.createdAt.slice(0, 7)}.jsonl`),
+        join(projectRoot, '.dev-mesh', 'events', `${ratedEventCreatedAt.slice(0, 7)}.jsonl`),
         'utf8'
       );
       const ratingsJsonl = await readFile(
-        join(projectRoot, '.dev-mesh', 'knowledge', 'ratings', `${rated.ratingEvent.createdAt.slice(0, 7)}.jsonl`),
+        join(projectRoot, '.dev-mesh', 'knowledge', 'ratings', `${ratingEventCreatedAt.slice(0, 7)}.jsonl`),
         'utf8'
       );
 
-      expect(captured).toMatchObject({
-        title: 'Persist MCP capture locally',
-        event: {
-          kind: 'knowledge.captured',
-          payload: {
-            knowledgeId: captured.id
-          }
-        }
-      });
-      expect(task).toMatchObject({
-        type: 'task',
-        summary: '[done] Task progress should become searchable task knowledge.',
-        taskStatus: 'done',
-        event: {
-          kind: 'task.progress.captured'
-        }
-      });
-      expect(rated).toMatchObject({
-        id: captured.id,
-        quality: {
-          rating: 0
-        },
-        ratingEvent: {
-          knowledgeId: captured.id,
-          rating: 0,
-          confidenceDelta: -0.1
-        },
-        event: {
-          kind: 'knowledge.rated'
-        }
-      });
+      expect(captureText).toContain('Captured knowledge');
+      expect(captureText).toContain('title: Persist MCP capture locally');
+      expect(captureText).toContain('event: kind=knowledge.captured');
+      expect(taskText).toContain('Captured task');
+      expect(taskText).toContain('type: task');
+      expect(taskText).toContain('status: done');
+      expect(taskText).toContain('summary: [done] Task progress should become searchable task knowledge.');
+      expect(taskText).toContain('event: kind=task.progress.captured');
+      expect(ratedText).toContain(`id: ${capturedId}`);
+      expect(ratedText).toContain('quality: qualityScore=');
+      expect(ratedText).toContain('rating=0');
+      expect(ratedText).toContain('ratingEvent: rating=0');
+      expect(ratedText).toContain('event: kind=knowledge.rated');
       expect(knowledgeJsonl).toContain('"title":"Persist MCP capture locally"');
       expect(knowledgeJsonl).toContain('"title":"Persist MCP task progress"');
       expect(eventsJsonl).toContain('"kind":"knowledge.captured"');
       expect(eventsJsonl).toContain('"kind":"task.progress.captured"');
       expect(eventsJsonl).toContain('"kind":"knowledge.rated"');
-      expect(ratingsJsonl).toContain(`"knowledgeId":"${captured.id}"`);
+      expect(ratingsJsonl).toContain(`"knowledgeId":"${capturedId}"`);
     } finally {
       await client.close().catch(() => undefined);
       await app.close();
@@ -2538,6 +2499,32 @@ function readTextToolResult(result: unknown): string {
   }
 
   return text;
+}
+
+function readRequiredField(text: string, field: string): string {
+  const match = text.match(new RegExp(`^${field}: (.+)$`, 'm'));
+
+  if (match?.[1] === undefined) {
+    throw new Error(`Expected field ${field} in tool result:\n${text}`);
+  }
+
+  return match[1];
+}
+
+function readInlineField(text: string, linePrefix: string, field: string): string {
+  const line = text.split(/\r?\n/).find((candidate) => candidate.startsWith(`${linePrefix}: `));
+
+  if (line === undefined) {
+    throw new Error(`Expected line ${linePrefix} in tool result:\n${text}`);
+  }
+
+  const match = line.match(new RegExp(`(?:^|, )${field}=([^,]+)`));
+
+  if (match?.[1] === undefined) {
+    throw new Error(`Expected field ${field} in ${linePrefix} line:\n${text}`);
+  }
+
+  return match[1];
 }
 
 function signSyncEvent(input: {

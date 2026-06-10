@@ -45,14 +45,13 @@ describe('mesh-server e2e smoke', () => {
         name: 'mesh_get_status',
         arguments: {}
       });
-      const statusResult = JSON.parse(status.result.content[0].text);
+      const statusText = readToolText(status);
 
-      expect(statusResult).toMatchObject({
-        service: 'devmesh',
-        version: DEV_MESH_VERSION,
-        mode: 'local-store',
-        projectRoot
-      });
+      expect(statusText).toContain('DevMesh status');
+      expect(statusText).toContain('service: devmesh');
+      expect(statusText).toContain(`version: ${DEV_MESH_VERSION}`);
+      expect(statusText).toContain('mode: local-store');
+      expect(statusText).toContain(`projectRoot: ${projectRoot}`);
 
       const capture = await mcp.request('tools/call', {
         name: 'mesh_capture_knowledge',
@@ -64,43 +63,37 @@ describe('mesh-server e2e smoke', () => {
           tags: ['e2e']
         }
       });
-      const captured = JSON.parse(capture.result.content[0].text);
+      const captureText = readToolText(capture);
+      const capturedId = readRequiredField(captureText, 'id');
 
-      expect(captured).toMatchObject({
-        title: 'E2E smoke captures project knowledge',
-        layer: 'canonical'
-      });
+      expect(captureText).toContain('Captured knowledge');
+      expect(captureText).toContain('title: E2E smoke captures project knowledge');
+      expect(captureText).toContain('layer: canonical');
 
       const get = await mcp.request('tools/call', {
         name: 'mesh_get_knowledge',
         arguments: {
-          id: captured.id
+          id: capturedId
         }
       });
-      const fetched = JSON.parse(get.result.content[0].text);
+      const fetchedText = readToolText(get);
 
-      expect(fetched).toMatchObject({
-        id: captured.id,
-        title: 'E2E smoke captures project knowledge'
-      });
+      expect(fetchedText).toContain(`id: ${capturedId}`);
+      expect(fetchedText).toContain('title: E2E smoke captures project knowledge');
 
       const update = await mcp.request('tools/call', {
         name: 'mesh_update_knowledge',
         arguments: {
-          id: captured.id,
+          id: capturedId,
           summary: 'The app entrypoint can serve and update MCP tool calls over Streamable HTTP.',
           reason: 'Exercise MCP knowledge update over HTTP.'
         }
       });
-      const updated = JSON.parse(update.result.content[0].text);
+      const updatedText = readToolText(update);
 
-      expect(updated).toMatchObject({
-        id: captured.id,
-        summary: 'The app entrypoint can serve and update MCP tool calls over Streamable HTTP.',
-        event: {
-          kind: 'knowledge.updated'
-        }
-      });
+      expect(updatedText).toContain(`id: ${capturedId}`);
+      expect(updatedText).toContain('summary: The app entrypoint can serve and update MCP tool calls over Streamable HTTP.');
+      expect(updatedText).toContain('event: kind=knowledge.updated');
 
       const list = await mcp.request('tools/call', {
         name: 'mesh_list_knowledge',
@@ -109,15 +102,9 @@ describe('mesh-server e2e smoke', () => {
           limit: 5
         }
       });
-      const listed = JSON.parse(list.result.content[0].text);
+      const listedText = readToolText(list);
 
-      expect(listed.items).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: captured.id
-          })
-        ])
-      );
+      expect(listedText).toContain(`id=${capturedId}`);
 
       const search = await mcp.request('tools/call', {
         name: 'mesh_search_context',
@@ -126,34 +113,24 @@ describe('mesh-server e2e smoke', () => {
           layers: ['canonical']
         }
       });
-      const contextPack = JSON.parse(search.result.content[0].text);
+      const contextText = readToolText(search);
 
-      expect(contextPack).toMatchObject({
-        query: 'Streamable HTTP',
-        items: [
-          {
-            id: captured.id,
-            title: 'E2E smoke captures project knowledge'
-          }
-        ]
-      });
+      expect(contextText).toContain('query: Streamable HTTP');
+      expect(contextText).toContain(`id=${capturedId}`);
+      expect(contextText).toContain('E2E smoke captures project knowledge');
 
       const deletion = await mcp.request('tools/call', {
         name: 'mesh_delete_knowledge',
         arguments: {
-          id: captured.id,
+          id: capturedId,
           reason: 'Exercise MCP knowledge tombstones over HTTP.'
         }
       });
-      const deleted = JSON.parse(deletion.result.content[0].text);
+      const deletedText = readToolText(deletion);
 
-      expect(deleted).toMatchObject({
-        id: captured.id,
-        status: 'tombstone',
-        event: {
-          kind: 'knowledge.deleted'
-        }
-      });
+      expect(deletedText).toContain(`id: ${capturedId}`);
+      expect(deletedText).toContain('status: tombstone');
+      expect(deletedText).toContain('event: kind=knowledge.deleted');
     } finally {
       await stopProcess(server);
       await rm(projectRoot, { recursive: true, force: true });
@@ -333,6 +310,26 @@ function readSseJson(text: string): JsonRpcResponse {
   }
 
   return JSON.parse(data) as JsonRpcResponse;
+}
+
+function readToolText(response: JsonRpcResponse): string {
+  const text = response.result?.content?.find((item: { type?: string; text?: string }) => item.type === 'text')?.text;
+
+  if (text === undefined) {
+    throw new Error(`Expected a text tool result: ${JSON.stringify(response)}`);
+  }
+
+  return text;
+}
+
+function readRequiredField(text: string, field: string): string {
+  const match = text.match(new RegExp(`^${field}: (.+)$`, 'm'));
+
+  if (match?.[1] === undefined) {
+    throw new Error(`Expected field ${field} in tool result:\n${text}`);
+  }
+
+  return match[1];
 }
 
 async function startMeshServer(projectRoot: string, port: number): Promise<MeshServerProcess> {

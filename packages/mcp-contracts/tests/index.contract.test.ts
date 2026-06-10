@@ -127,20 +127,32 @@ describe('MCP tool contract schemas', () => {
       }
     };
     const handlers: MeshToolHandlers = {
-      getStatus: vi.fn(async () => ({ ok: 'status' })),
-      searchContext: vi.fn(async () => ({ ok: 'search' })),
-      getKnowledge: vi.fn(async () => ({ ok: 'get' })),
-      listKnowledge: vi.fn(async () => ({ ok: 'list' })),
-      captureKnowledge: vi.fn(async () => ({ ok: 'capture' })),
-      updateKnowledge: vi.fn(async () => ({ ok: 'update' })),
-      deleteKnowledge: vi.fn(async () => ({ ok: 'delete' })),
-      captureTask: vi.fn(async () => ({ ok: 'task' })),
-      rateKnowledge: vi.fn(async () => ({ ok: 'rate' })),
-      linkKnowledge: vi.fn(async () => ({ ok: 'link' })),
-      searchMemberExperience: vi.fn(async () => ({ ok: 'member' })),
-      resolveTerm: vi.fn(async () => ({ ok: 'term' })),
-      scanProjectKnowledge: vi.fn(async () => ({ ok: 'scan' })),
-      exploreKnowledgeGraph: vi.fn(async () => ({ ok: 'graph' }))
+      getStatus: vi.fn(async () => ({ service: 'devmesh', version: '0.1.0', mode: 'test', knowledgeItems: 1 })),
+      searchContext: vi.fn(async () => ({
+        query: 'auth',
+        generatedAt: '2026-06-10T00:00:00.000Z',
+        items: [
+          {
+            id: 'ki_auth',
+            title: 'Auth decision',
+            summary: 'Use the shared auth helper.',
+            type: 'decision',
+            layer: 'canonical'
+          }
+        ]
+      })),
+      getKnowledge: vi.fn(async () => ({ id: 'ki_get', title: 'Get item', summary: 'Fetch one item.' })),
+      listKnowledge: vi.fn(async () => ({ total: 1, limit: 20, items: [{ id: 'ki_list', title: 'List item' }] })),
+      captureKnowledge: vi.fn(async () => ({ id: 'ki_capture', title: 'Captured item' })),
+      updateKnowledge: vi.fn(async () => ({ id: 'ki_update', title: 'Updated item' })),
+      deleteKnowledge: vi.fn(async () => ({ id: 'ki_delete', title: 'Deleted item', status: 'tombstone' })),
+      captureTask: vi.fn(async () => ({ id: 'ki_task', title: 'Captured task', taskStatus: 'done' })),
+      rateKnowledge: vi.fn(async () => ({ id: 'ki_rate', title: 'Rated item', quality: { rating: 1 } })),
+      linkKnowledge: vi.fn(async () => ({ kind: 'supersedes', fromId: 'ki_new', toId: 'ki_old' })),
+      searchMemberExperience: vi.fn(async () => ({ query: 'auth', items: [] })),
+      resolveTerm: vi.fn(async () => [{ id: 'ki_term', title: 'Term item' }]),
+      scanProjectKnowledge: vi.fn(async () => ({ projectRoot: '/tmp/project', findings: [] })),
+      exploreKnowledgeGraph: vi.fn(async () => ({ nodes: [{ id: 'knowledge:ki_1', kind: 'knowledge' }], edges: [] }))
     };
 
     registerMeshTools(fakeServer as never, handlers);
@@ -181,10 +193,11 @@ describe('MCP tool contract schemas', () => {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ ok: 'status' }, null, 2)
+          text: expect.stringContaining('DevMesh status')
         }
       ]
     });
+    expect(readRegisteredToolText(result)).not.toMatch(/^\s*\{/);
     expect(handlers.getStatus).toHaveBeenCalledWith(
       expect.objectContaining({
         project: 'auto'
@@ -196,10 +209,11 @@ describe('MCP tool contract schemas', () => {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ ok: 'search' }, null, 2)
+          text: expect.stringContaining('Auth decision')
         }
       ]
     });
+    expect(readRegisteredToolText(searchResult)).not.toMatch(/^\s*\{/);
     expect(handlers.searchContext).toHaveBeenCalledWith(
       expect.objectContaining({
         query: 'auth',
@@ -230,3 +244,14 @@ describe('MCP tool contract schemas', () => {
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('Do not capture secrets');
   });
 });
+
+function readRegisteredToolText(result: unknown): string {
+  const content = (result as { content?: Array<{ type: string; text?: string }> }).content;
+  const text = content?.find((item) => item.type === 'text')?.text;
+
+  if (text === undefined) {
+    throw new Error('Expected a text tool result.');
+  }
+
+  return text;
+}

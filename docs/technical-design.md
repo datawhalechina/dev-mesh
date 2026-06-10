@@ -475,6 +475,8 @@ GET  /api/v1/admin/audit
 
 当请求经过 Mesh Client 时，写入类 tool 的默认落点是当前项目的 `.dev-mesh/`。服务端同步是后续动作，不阻塞 Agent 的本地工作流。
 
+MCP tool handler 内部可以返回结构化对象，但对 AI 客户端暴露的 `content` 统一由 `packages/mcp-contracts` 格式化为精简纯文本，避免把完整 JSON 对象塞进上下文。CLI 调试命令仍可按各自需要输出 JSON。
+
 #### `mesh_get_status`
 
 检查当前 DevMesh MCP 连接的版本、运行模式和项目知识库状态。通过 stdio launcher 连接时，返回体还会附加前台 proxy 和共享 daemon 的运行状态。AI 客户端可以在怀疑 MCP 配置、项目根、daemon 或版本不一致时先调用这个 tool。
@@ -487,26 +489,19 @@ GET  /api/v1/admin/audit
 
 返回示例：
 
-```json
-{
-  "service": "devmesh",
-  "version": "0.1.1",
-  "mode": "local-only",
-  "projectRoot": "/repo/app",
-  "storeRoot": "/repo/app/.dev-mesh",
-  "knowledgeItems": 12,
-  "autoInit": true,
-  "autoReference": true,
-  "autoSync": true,
-  "mcp": {
-    "entrypoint": "stdio-proxy",
-    "daemon": {
-      "running": true,
-      "version": "0.1.1",
-      "mcpUrl": "http://127.0.0.1:8722/mcp"
-    }
-  }
-}
+```text
+DevMesh status
+service: devmesh
+version: 0.1.1
+mode: local-only
+projectRoot: /repo/app
+storeRoot: /repo/app/.dev-mesh
+knowledgeItems: 12
+autoInit: true
+autoReference: true
+autoSync: true
+mcp: entrypoint=stdio-proxy
+daemon: running=true, version=0.1.1, mcpUrl=http://127.0.0.1:8722/mcp
 ```
 
 #### `mesh_search_context`
@@ -532,42 +527,14 @@ GET  /api/v1/admin/audit
 
 返回：
 
-```json
-{
-  "items": [
-    {
-      "id": "ki_01J...",
-      "layer": "canonical",
-      "para": {
-        "category": "areas",
-        "key": "backend/auth"
-      },
-      "entryKey": "areas/backend/auth/session",
-      "storageRef": "knowledge/canonical/entries.jsonl#can_01J...",
-      "type": "decision",
-      "title": "登录态统一通过 AuthSession 读取",
-      "summary": "后端和前端都避免直接解析 token，统一通过 AuthSession 抽象访问用户态。",
-      "source": {
-        "kind": "pr",
-        "url": "https://git.example.com/org/repo/pull/123",
-        "commit": "abc123"
-      },
-      "createdBy": {
-        "memberId": "member_01J...",
-        "displayName": "小云"
-      },
-      "confidence": 0.86,
-      "weight": 1.2,
-      "rating": {
-        "score": 4.3,
-        "count": 7
-      },
-      "adoptionScore": 0.81,
-      "qualityScore": 0.82,
-      "updatedAt": "2026-06-06T09:30:00Z"
-    }
-  ]
-}
+```text
+DevMesh context results
+query: 用户登录模块的鉴权约定是什么？
+generatedAt: 2026-06-06T09:30:00.000Z
+items: 1
+1. id=ki_01J... | 登录态统一通过 AuthSession 读取
+   type=decision | layer=canonical | para=areas/backend/auth | qualityScore=0.82, confidence=0.86, rating=0.5
+   summary: 后端和前端都避免直接解析 token，统一通过 AuthSession 抽象访问用户态。
 ```
 
 #### `mesh_get_knowledge`

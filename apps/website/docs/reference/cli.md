@@ -51,7 +51,7 @@ pnpm --filter devmesh dev -- serve --mcp --root C:\path\to\project --global-root
 pnpm --filter devmesh dev -- proxy --root C:\path\to\project --name local --port 8722
 ```
 
-本地 stdio launcher 和 HTTP proxy 暴露同一套核心 MCP tools：`mesh_get_status`、`mesh_search_context`、`mesh_get_knowledge`、`mesh_list_knowledge`、`mesh_capture_knowledge`、`mesh_update_knowledge`、`mesh_delete_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_link_knowledge`、`mesh_resolve_term`、`mesh_scan_project_knowledge` 和 `mesh_explore_knowledge_graph`。
+本地 stdio launcher 和 HTTP proxy 暴露同一套核心 MCP tools：`mesh_get_status`、`mesh_search_context`、`mesh_get_knowledge`、`mesh_list_knowledge`、`mesh_capture_knowledge`、`mesh_update_knowledge`、`mesh_delete_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_link_knowledge`、`mesh_resolve_term`、`mesh_scan_project_knowledge` 和 `mesh_explore_knowledge_graph`。这些工具的 MCP `content` 会统一格式化为简短纯文本，方便 AI 客户端直接读取。
 
 ## 写入和检索
 
