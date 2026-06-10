@@ -1,10 +1,10 @@
 # Alpha Release Guide
 
-This guide describes the current alpha release path for the DevMesh application. It covers the Hub Server, Web Admin, Website, and PostgreSQL runtime used by the Docker Compose stack.
+This guide describes the current alpha release path for DevMesh. It covers the Hub Server, Web Admin, Website, PostgreSQL runtime used by the Docker Compose stack, and the public `devmesh` CLI npm package.
 
 ## Release Scope
 
-The alpha release publishes deployable application artifacts, not public npm packages. Workspace packages remain private and are bundled into Docker images from source.
+The alpha release publishes deployable application artifacts and the public `devmesh` CLI package. Internal workspace packages remain private; the CLI bundles them into `dist/index.js`, while Docker images build them from source.
 
 Included artifacts:
 
@@ -12,14 +12,21 @@ Included artifacts:
 - `apps/web-admin`: static Web Admin container with `/api` proxied to the Hub Server.
 - `apps/website`: static documentation website container.
 - `postgres`: PostgreSQL service for durable knowledge and Hub state storage.
+- `apps/dmx`: public `devmesh` npm package that installs the `dmx` CLI.
 
 ## Preflight
 
-Run the full verification suite before creating a tag or building images. The release check synchronizes the publishable CLI package version from the workspace root before validating the git tag:
+Run the full verification suite before creating a tag or building images. The release check synchronizes the publishable CLI package version from the workspace root, validates the git tag, and smoke-tests the packed npm CLI in a temporary install prefix:
 
 ```bash
 pnpm install
 pnpm release:check
+```
+
+To run only the packaged CLI install smoke locally:
+
+```bash
+pnpm npm:smoke
 ```
 
 Known build warnings:
