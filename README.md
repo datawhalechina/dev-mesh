@@ -297,6 +297,8 @@ pnpm --filter devmesh dev -- doctor --root .
 .dev-mesh/
   config.toml
   .gitignore
+  daemon.pid
+  daemon.json
   knowledge/
     raw/
     extract/
@@ -315,9 +317,12 @@ pnpm --filter devmesh dev -- doctor --root .
 约定：
 
 - `knowledge/*.jsonl` 保存本地知识视图。
-- `events/*.jsonl` 是 append-only 事件日志。
-- `knowledge/ratings/*.jsonl` 保存显式反馈事件，不会被当作普通知识检索。
-- `knowledge/usage/*.jsonl` 保存检索命中、inbox 接受等采纳信号，用来轻量调整 adoption/quality，也不会被当作普通知识检索。
+- `knowledge/extract/`、`knowledge/canonical/`、`knowledge/para/` 和 `knowledge/edges.jsonl` 保存可审查的项目级知识，适合进入仓库。
+- `daemon.pid` 和 `daemon.json` 是本机 daemon 运行态，可能包含本机绝对路径、PID、端口等信息，默认忽略。
+- `events/*.jsonl` 是 append-only 事件日志，默认忽略。
+- `knowledge/ratings/*.jsonl` 保存显式反馈事件，不会被当作普通知识检索，默认忽略。
+- `knowledge/usage/*.jsonl` 保存检索命中、inbox 接受等采纳信号，用来轻量调整 adoption/quality，也不会被当作普通知识检索，默认忽略。
+- `knowledge/raw/` 保存原始材料，默认忽略。
 - `index/manifest.json` 和 `index/mesh.sqlite` 是可重建本地索引。
 - `visualizations/graph.html` 是可重建的本地图谱页面。
 - `queue/pending.jsonl` 保存待 review 候选，接受后写入 knowledge 和 events，拒绝后进入 `queue/rejected.jsonl`。

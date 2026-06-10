@@ -78,10 +78,14 @@ describe('local project store', () => {
       await expect(stat(first.paths.secretsDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
 
       const gitignore = await readFile(join(first.storeRoot, '.gitignore'), 'utf8');
+      expect(gitignore).toContain('daemon.json');
+      expect(gitignore).toContain('daemon.pid');
       expect(gitignore).toContain('index/');
       expect(gitignore).toContain('visualizations/');
       expect(gitignore).toContain('secrets/');
       expect(gitignore).toContain('knowledge/raw/');
+      expect(gitignore).toContain('knowledge/ratings/');
+      expect(gitignore).toContain('knowledge/usage/');
 
       await writeFile(join(first.storeRoot, '.gitignore'), 'index/\ncustom-local/\n', 'utf8');
       await ensureProjectStore(projectRoot, { projectKey: 'org/repo' });

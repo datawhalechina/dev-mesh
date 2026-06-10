@@ -3,11 +3,17 @@ dist/
 coverage/
 *.tsbuildinfo
 *.tgz
+.dev-mesh/daemon.json
+.dev-mesh/daemon.pid
+.dev-mesh/events/
 .dev-mesh/index/
 .dev-mesh/visualizations/
 .dev-mesh/queue/
 .dev-mesh/secrets/
 .dev-mesh/sync/
+.dev-mesh/knowledge/raw/
+.dev-mesh/knowledge/ratings/
+.dev-mesh/knowledge/usage/
 apps/website/docs/.vitepress/cache/
 apps/website/docs/.vitepress/dist/
 apps/website/docs/.vitepress/.temp/

@@ -64,7 +64,19 @@ async function checkStoreGitignore(projectRoot: string): Promise<DevMeshDoctorCh
 
   try {
     const content = await readFile(gitignorePath, 'utf8');
-    const requiredPatterns = ['secrets/', 'events/', 'sync/', 'knowledge/raw/'];
+    const requiredPatterns = [
+      'daemon.json',
+      'daemon.pid',
+      'index/',
+      'visualizations/',
+      'queue/',
+      'sync/',
+      'secrets/',
+      'events/',
+      'knowledge/raw/',
+      'knowledge/ratings/',
+      'knowledge/usage/'
+    ];
     const missing = requiredPatterns.filter((pattern) => !content.includes(pattern));
 
     if (missing.length > 0) {
@@ -81,7 +93,7 @@ async function checkStoreGitignore(projectRoot: string): Promise<DevMeshDoctorCh
       id: 'privacy.store-gitignore',
       category: 'privacy',
       status: 'ok',
-      message: '.dev-mesh/.gitignore excludes local secrets, events, sync state, and raw knowledge.'
+      message: '.dev-mesh/.gitignore excludes local runtime state, secrets, events, sync state, raw knowledge, and feedback logs.'
     };
   } catch {
     return {

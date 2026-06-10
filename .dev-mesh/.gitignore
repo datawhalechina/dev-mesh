@@ -1,0 +1,13 @@
+daemon.json
+daemon.pid
+index/
+visualizations/
+queue/
+sync/
+secrets/
+events/
+knowledge/raw/
+knowledge/ratings/
+knowledge/usage/
+*.sqlite
+*.db

@@ -1,0 +1,14 @@
+schema_version = 1
+project_key = "auto"
+display_name = "local"
+local_only = true
+
+[automation]
+auto_init = true
+auto_reference = true
+auto_sync = true
+
+[privacy]
+redaction_enabled = true
+upload_raw_transcripts = false
+upload_large_source_blocks = false

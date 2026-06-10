@@ -291,6 +291,8 @@ async function ensureStoreGitignore(storeRoot: string): Promise<void> {
 
 function defaultStoreGitignoreLines(): string[] {
   return [
+    'daemon.json',
+    'daemon.pid',
     'index/',
     'visualizations/',
     'queue/',
@@ -298,6 +300,8 @@ function defaultStoreGitignoreLines(): string[] {
     'secrets/',
     'events/',
     'knowledge/raw/',
+    'knowledge/ratings/',
+    'knowledge/usage/',
     '*.sqlite',
     '*.db'
   ];

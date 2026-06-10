@@ -1099,7 +1099,7 @@ interval_seconds = 60
       decisions.jsonl       # 可选提交：从 raw 提炼出的决策片段
       conventions.jsonl     # 可选提交：从 raw 提炼出的规范片段
       pitfalls.jsonl        # 可选提交：从 raw 提炼出的踩坑片段
-      tasks.jsonl           # 不提交：任务过程片段
+      tasks.jsonl           # 可选提交：已审查的任务过程片段
       local.jsonl           # 不提交：个人本地提炼
     canonical/
       entries.jsonl         # 可选提交：团队稳定知识条目，协作中心
@@ -1110,7 +1110,7 @@ interval_seconds = 60
         resources/
           glossary.md       # 可选提交：从 entries 导出的术语视图
     ratings/
-      2026-06.jsonl         # 可选提交或仅同步：知识评分和过时/错误反馈事件
+      2026-06.jsonl         # 不提交：知识评分和过时/错误反馈事件
     usage/
       2026-06.jsonl         # 不提交：知识被引用后的采纳、修改、回滚和对话纠正信号
     para/
@@ -1135,6 +1135,8 @@ interval_seconds = 60
 推荐 `.gitignore`：
 
 ```gitignore
+.dev-mesh/daemon.json
+.dev-mesh/daemon.pid
 .dev-mesh/events/
 .dev-mesh/queue/
 .dev-mesh/index/
@@ -1143,7 +1145,6 @@ interval_seconds = 60
 .dev-mesh/knowledge/raw/
 .dev-mesh/knowledge/ratings/
 .dev-mesh/knowledge/usage/
-.dev-mesh/knowledge/extract/tasks.jsonl
 .dev-mesh/knowledge/extract/local.jsonl
 ```
 
