@@ -35,3 +35,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: NPM package smoke
+        run: node scripts/smoke-npm-package.mjs --skip-build
