@@ -7,7 +7,7 @@ import type {
   UpdateKnowledgeInput
 } from '@devmesh/core';
 import { createDevMeshClientRuntime } from '@devmesh/client';
-import { formatMeshToolOutput } from '@devmesh/mcp-contracts';
+import { printJsonOrText } from './output.js';
 import { parseIntOption, parseNumberOption, parsePara } from './shared.js';
 
 export function registerKnowledgeCommand(program: Command): void {
@@ -31,7 +31,7 @@ function registerGetCommand(parent: Command): void {
         projectRoot: options.root
       });
 
-      printKnowledgeResult('mesh_get_knowledge', await runtime.getKnowledge(id), options.json);
+      printJsonOrText('mesh_get_knowledge', await runtime.getKnowledge(id), options.json);
     });
 }
 
@@ -54,7 +54,7 @@ function registerListCommand(parent: Command): void {
         projectRoot: options.root
       });
 
-      printKnowledgeResult('mesh_list_knowledge', await runtime.listKnowledge(createListInput(options)), options.json);
+      printJsonOrText('mesh_list_knowledge', await runtime.listKnowledge(createListInput(options)), options.json);
     });
 }
 
@@ -86,7 +86,7 @@ function registerUpdateCommand(parent: Command): void {
       });
       const input = createUpdateInput(id, options);
 
-      printKnowledgeResult(
+      printJsonOrText(
         'mesh_update_knowledge',
         await runtime.updateKnowledge(input, createMutationOptions(options.reason)),
         options.json
@@ -109,20 +109,12 @@ function registerDeleteCommand(parent: Command): void {
         memberName: options.name
       });
 
-      printKnowledgeResult(
+      printJsonOrText(
         'mesh_delete_knowledge',
         await runtime.deleteKnowledge({ id }, createMutationOptions(options.reason)),
         options.json
       );
     });
-}
-
-function printKnowledgeResult(
-  toolName: 'mesh_get_knowledge' | 'mesh_list_knowledge' | 'mesh_update_knowledge' | 'mesh_delete_knowledge',
-  value: unknown,
-  json?: boolean
-): void {
-  console.log(json === true ? JSON.stringify(value, null, 2) : formatMeshToolOutput(toolName, value));
 }
 
 function createListInput(options: KnowledgeListOptions): Parameters<ReturnType<typeof createDevMeshClientRuntime>['listKnowledge']>[0] {

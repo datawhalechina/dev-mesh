@@ -23,7 +23,8 @@ describe('dmx CLI local flow', () => {
         '--type',
         'command',
         '--para',
-        'resources:test-commands'
+        'resources:test-commands',
+        '--json'
       ]);
       const captureJson = JSON.parse(capture.stdout);
       const previousCapture = await runDmx([
@@ -39,7 +40,8 @@ describe('dmx CLI local flow', () => {
         '--type',
         'command',
         '--para',
-        'resources:test-commands'
+        'resources:test-commands',
+        '--json'
       ]);
       const previousCaptureJson = JSON.parse(previousCapture.stdout);
       const edgeAdd = await runDmx([
@@ -60,7 +62,7 @@ describe('dmx CLI local flow', () => {
         'Focused tests supersede the broad test note.'
       ]);
       const edgeList = await runDmx(['graph', 'edge', 'list', '--root', projectRoot, '--kind', 'supersedes']);
-      const search = await runDmx(['search', 'focused tests', '--root', projectRoot]);
+      const search = await runDmx(['search', 'focused tests', '--root', projectRoot, '--json']);
       const rate = await runDmx([
         'rate',
         captureJson.id,
@@ -71,9 +73,10 @@ describe('dmx CLI local flow', () => {
         '--rating',
         '1',
         '--reason',
-        'Useful local command.'
+        'Useful local command.',
+        '--json'
       ]);
-      const status = await runDmx(['status', '--root', projectRoot]);
+      const status = await runDmx(['status', '--root', projectRoot, '--json']);
       const index = await runDmx(['index', 'rebuild', '--root', projectRoot]);
       const graph = await runDmx([
         'graph',
@@ -162,6 +165,8 @@ describe('dmx CLI local flow', () => {
         '--limit',
         '5'
       ]);
+      const statusText = await runDmx(['status', '--root', projectRoot]);
+      const searchText = await runDmx(['search', 'focused tests', '--root', projectRoot]);
 
       const initJson = JSON.parse(init.stdout);
       const edgeAddJson = JSON.parse(edgeAdd.stdout);
@@ -337,6 +342,12 @@ describe('dmx CLI local flow', () => {
       expect(knowledgeListText.stdout).toContain(`id=${previousCaptureJson.id}`);
       expect(knowledgeListText.stdout).toContain('status=tombstone');
       expect(knowledgeListText.stdout.trim()).not.toMatch(/^\{/);
+      expect(statusText.stdout).toContain('DevMesh status');
+      expect(statusText.stdout).toContain('mode: local-only');
+      expect(statusText.stdout.trim()).not.toMatch(/^\{/);
+      expect(searchText.stdout).toContain('DevMesh context results');
+      expect(searchText.stdout).toContain(`id=${captureJson.id}`);
+      expect(searchText.stdout.trim()).not.toMatch(/^\{/);
       expect(graphIndex.sourceItemCount).toBe(2);
       expect(visualize.stdout).toContain(graphHtmlPath);
       expect(graphHtml).toContain('DevMesh Knowledge Graph');
@@ -349,5 +360,5 @@ describe('dmx CLI local flow', () => {
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
-  }, 30000);
+  }, 45000);
 });

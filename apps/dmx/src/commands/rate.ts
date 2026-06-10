@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import type { RateKnowledgeInput } from '@devmesh/core';
 import { createDevMeshClientRuntime } from '@devmesh/client';
+import { printJsonOrText } from './output.js';
 import { createRateOptions, parseNumberOption } from './shared.js';
 
 export function registerRateCommand(program: Command): void {
@@ -15,6 +16,7 @@ export function registerRateCommand(program: Command): void {
     .option('--reason <reason>', 'feedback reason')
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
+    .option('--json', 'print structured JSON')
     .action(runRateCommand);
 }
 
@@ -41,7 +43,7 @@ async function runRateCommand(id: string, options: RateCommandOptions): Promise<
     input.weightDelta = options.weightDelta;
   }
 
-  console.log(JSON.stringify(await runtime.rateKnowledge(input, createRateOptions(options.reason)), null, 2));
+  printJsonOrText('mesh_rate_knowledge', await runtime.rateKnowledge(input, createRateOptions(options.reason)), options.json);
 }
 
 interface RateCommandOptions {
@@ -52,4 +54,5 @@ interface RateCommandOptions {
   reason?: string;
   root: string;
   name: string;
+  json?: boolean;
 }

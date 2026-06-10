@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import type { CaptureKnowledgeInput, KnowledgeLayer, KnowledgeType, KnowledgeVisibility } from '@devmesh/core';
 import { createDevMeshClientRuntime } from '@devmesh/client';
+import { printJsonOrText } from './output.js';
 import { createReviewOptions, parsePara } from './shared.js';
 
 export function registerCaptureCommand(program: Command): void {
@@ -19,6 +20,7 @@ export function registerCaptureCommand(program: Command): void {
     .option('--reason <reason>', 'review queue reason')
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
+    .option('--json', 'print structured JSON')
     .action(runCaptureCommand);
 }
 
@@ -45,11 +47,34 @@ async function runCaptureCommand(options: CaptureCommandOptions): Promise<void> 
     capture.para = para;
   }
 
-  const item = options.review
-    ? await runtime.enqueueKnowledgeForReview(capture, createReviewOptions(options.reason))
-    : await runtime.captureKnowledge(capture);
+  if (options.review === true) {
+    const item = await runtime.enqueueKnowledgeForReview(capture, createReviewOptions(options.reason));
 
-  console.log(JSON.stringify(item, null, 2));
+    if (options.json === true) {
+      printJsonOrText('mesh_capture_knowledge', item, true);
+      return;
+    }
+
+    printJsonOrText('mesh_capture_knowledge', createReviewQueueTextValue(item), false);
+    return;
+  }
+
+  const item = await runtime.captureKnowledge(capture);
+
+  printJsonOrText('mesh_capture_knowledge', item, options.json);
+}
+
+function createReviewQueueTextValue(item: ReviewQueueTextSource): Record<string, unknown> {
+  return {
+    id: item.id,
+    title: item.input?.title,
+    type: item.input?.type,
+    layer: item.input?.layer,
+    status: 'pending_review',
+    summary: item.input?.summary,
+    para: item.input?.para,
+    tags: item.input?.tags
+  };
 }
 
 interface CaptureCommandOptions {
@@ -65,4 +90,10 @@ interface CaptureCommandOptions {
   reason?: string;
   root: string;
   name: string;
+  json?: boolean;
+}
+
+interface ReviewQueueTextSource {
+  id: string;
+  input?: Partial<CaptureKnowledgeInput>;
 }

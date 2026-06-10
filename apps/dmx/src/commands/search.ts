@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
 import { createDevMeshClientRuntime } from '@devmesh/client';
+import { printJsonOrText } from './output.js';
 import { parseIntOption } from './shared.js';
 
 export function registerSearchCommand(program: Command): void {
@@ -9,7 +10,8 @@ export function registerSearchCommand(program: Command): void {
     .argument('<query>', 'search query')
     .option('--limit <n>', 'maximum number of items', parseIntOption, 8)
     .option('--root <path>', 'project root', process.cwd())
-    .action(async (query: string, options: { limit: number; root: string }) => {
+    .option('--json', 'print structured JSON')
+    .action(async (query: string, options: SearchCommandOptions) => {
       const runtime = createDevMeshClientRuntime({
         projectRoot: options.root
       });
@@ -18,6 +20,12 @@ export function registerSearchCommand(program: Command): void {
         limit: options.limit
       });
 
-      console.log(JSON.stringify(contextPack, null, 2));
+      printJsonOrText('mesh_search_context', contextPack, options.json);
     });
+}
+
+interface SearchCommandOptions {
+  limit: number;
+  root: string;
+  json?: boolean;
 }

@@ -57,7 +57,7 @@ pnpm --filter devmesh dev -- proxy --root C:\path\to\project --name local --port
 
 ```powershell
 pnpm --filter devmesh dev -- capture --root C:\path\to\project --name local --title "Decision" --summary "Persist project knowledge." --type decision --layer canonical --tag smoke
-pnpm --filter devmesh dev -- search --root C:\path\to\project --query "project knowledge"
+pnpm --filter devmesh dev -- search "project knowledge" --root C:\path\to\project
 pnpm --filter devmesh dev -- knowledge get <knowledge-id> --root C:\path\to\project
 pnpm --filter devmesh dev -- knowledge list --root C:\path\to\project --layer canonical --type decision
 pnpm --filter devmesh dev -- knowledge update <knowledge-id> --root C:\path\to\project --summary "Updated summary." --tag smoke --reason "Refresh stale wording"
@@ -68,7 +68,7 @@ pnpm --filter devmesh dev -- graph edge list --root C:\path\to\project --kind su
 pnpm --filter devmesh dev -- visualize --root C:\path\to\project --query "project knowledge"
 ```
 
-`dmx knowledge` 默认输出精简文本；需要给脚本解析时，在对应 get/list/update/delete 子命令追加 `--json`。`dmx graph edge add` 会把本地已确认的语义关系写入 `.dev-mesh/knowledge/edges.jsonl`；`supersedes` 会把被替代条目标记为 superseded。`visualize` 会生成一个基于 Cytoscape.js COSE force layout 的本地交互 HTML 图谱，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`；语义边会用方向、颜色和标签区分 `supersedes`、`duplicates`、`contradicts`。
+`dmx status`、`dmx search`、`dmx capture`、`dmx rate` 和 `dmx knowledge` 默认输出精简文本；需要给脚本解析时追加 `--json`。`dmx graph edge add` 会把本地已确认的语义关系写入 `.dev-mesh/knowledge/edges.jsonl`；`supersedes` 会把被替代条目标记为 superseded。`visualize` 会生成一个基于 Cytoscape.js COSE force layout 的本地交互 HTML 图谱，打开时会以引力/斥力动画收敛，默认输出到 `.dev-mesh/visualizations/graph.html`；语义边会用方向、颜色和标签区分 `supersedes`、`duplicates`、`contradicts`。
 
 ## 诊断
 
