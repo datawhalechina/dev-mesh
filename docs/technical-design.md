@@ -570,6 +570,61 @@ GET  /api/v1/admin/audit
 }
 ```
 
+#### `mesh_get_knowledge`
+
+按 id 读取一条知识，适合在修改、删除、链接或引用前确认当前版本。
+
+```json
+{
+  "id": "can_01J..."
+}
+```
+
+#### `mesh_list_knowledge`
+
+列出已有知识条目，可按 layer、type、PARA、tag、作者和更新时间过滤。默认只返回 active 条目；设置 `includeSuperseded: true` 时会包含 superseded 和 tombstone。
+
+```json
+{
+  "layers": ["canonical"],
+  "types": ["decision", "convention"],
+  "para": {
+    "category": "areas",
+    "key": "backend/auth"
+  },
+  "tags": ["auth"],
+  "authorName": "xiaoyun",
+  "recencyDays": 90,
+  "includeSuperseded": false,
+  "limit": 20
+}
+```
+
+#### `mesh_update_knowledge`
+
+更新一条已有知识。JSONL 本地实现不会原地改写历史行，而是追加同 id 的新版知识，并写入 `knowledge.updated` 事件；读取时按 `updatedAt` 选择最新版。
+
+```json
+{
+  "id": "can_01J...",
+  "summary": "新的知识摘要。",
+  "tags": ["auth", "session"],
+  "confidence": 0.9,
+  "reason": "旧摘要缺少 session 边界说明。"
+}
+```
+
+#### `mesh_delete_knowledge`
+
+删除使用 tombstone 语义：追加同 id、`status: "tombstone"` 的新版知识，并写入 `knowledge.deleted` 事件。默认搜索不返回 tombstone，审计、同步和历史回放仍可追溯。
+
+```json
+{
+  "id": "can_01J...",
+  "reason": "该约定已被后续决策替代。"
+}
+```
+
 #### `mesh_capture_knowledge`
 
 沉淀技术经验、决策、术语或踩坑。
@@ -675,6 +730,8 @@ GET  /api/v1/admin/audit
   "project": "auto"
 }
 ```
+
+> 当前实现中，下面早期规划的读取/改写类能力主要由 `mesh_get_knowledge`、`mesh_list_knowledge`、`mesh_update_knowledge` 和 `mesh_delete_knowledge` 承载；`mesh_get_para_index`、`mesh_get_canonical_entry`、`mesh_upsert_canonical_entry` 等名称保留为设计语义参考，不是现行 public MCP tool 名称。
 
 #### `mesh_list_decisions`
 
@@ -1343,9 +1400,11 @@ Agent 在工作过程中主动调用：
 - `mesh_get_status`
 - `mesh_search_context`
 - `mesh_search_member_experience`
-- `mesh_get_para_index`
-- `mesh_get_canonical_entry`
+- `mesh_get_knowledge`
+- `mesh_list_knowledge`
 - `mesh_capture_knowledge`
+- `mesh_update_knowledge`
+- `mesh_delete_knowledge`
 - `mesh_capture_task`
 - `mesh_rate_knowledge`
 - `mesh_link_knowledge`
@@ -2155,7 +2214,7 @@ pending -> reviewed -> committed-local -> pushed -> acknowledged
 - daemon 负责远端共享同步：当项目 `auto_sync = true` 且本机 `identity.json` 存在 joined server 时，daemon 会把 `.dev-mesh/events/*.jsonl` 事件签名后增量 push 到 Hub，并按 pull cursor 拉取同 group 事件。可回放的 `knowledge` snapshot 会 upsert 到本地 `.dev-mesh/knowledge/`，让同组成员沉淀的知识进入本地搜索；replay 不追加新的本地 event，避免同步回环。
 - 客户端同步游标写入 `.dev-mesh/sync/cursors.json`，最近一次 daemon sync 状态写入 `.dev-mesh/sync/status.json`，`dmx doctor` 会读取该状态报告远端错误和本地待推送事件数量。
 - `dmx proxy --root . --port 8722` 仍可直接启动 `http://127.0.0.1:8722/mcp`，用于调试或嵌入。
-- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_get_status`、`mesh_search_context`、`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_link_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_scan_project_knowledge`、`mesh_explore_knowledge_graph`。
+- 本地 proxy 注册与远端一致的核心 MCP tools：`mesh_get_status`、`mesh_search_context`、`mesh_get_knowledge`、`mesh_list_knowledge`、`mesh_capture_knowledge`、`mesh_update_knowledge`、`mesh_delete_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge`、`mesh_link_knowledge`、`mesh_search_member_experience`、`mesh_resolve_term`、`mesh_scan_project_knowledge`、`mesh_explore_knowledge_graph`。
 - 本地 proxy 不依赖 `packages/server`，只通过 `packages/mcp-contracts` 共享 tool schema，避免 client/server 反向耦合。
 
 ### 12.2 Adapter 接口
@@ -2481,7 +2540,7 @@ MCP 调试建议使用 MCP Inspector 验证：
 | --- | --- |
 | CLI local-only flow | 在临时目录运行 `dmx init`、`dmx capture`、`dmx search`、`dmx status`，验证 `.dev-mesh/` 结构、JSONL 内容和 Context Pack。 |
 | Global init flow | 运行 `dmx init --global --yes`，验证 `~/.dev-mesh/config.toml`、设备身份、MCP Host 选择结果和重复执行幂等。 |
-| Local MCP proxy flow | 启动本地 proxy，使用 MCP Inspector 或 SDK client 调用 `tools/list`、`mesh_get_status`、`mesh_capture_knowledge`、`mesh_search_context`、`mesh_explore_knowledge_graph`，验证写入默认落到当前项目 store。 |
+| Local MCP proxy flow | 启动本地 proxy，使用 MCP Inspector 或 SDK client 调用 `tools/list`、`mesh_get_status`、`mesh_get_knowledge`、`mesh_list_knowledge`、`mesh_capture_knowledge`、`mesh_update_knowledge`、`mesh_delete_knowledge`、`mesh_search_context`、`mesh_explore_knowledge_graph`，验证写入默认落到当前项目 store。 |
 | Hub server HTTP flow | 使用真实端口或 HTTP adapter 注入验证 `/healthz`、`/.well-known/devmesh`、`/api/v1/groups`、`/api/v1/join`、`/api/v1/projects/:id/brief`；Koa 实现需要跑同一组 parity 测试。 |
 | Sync push/pull flow | Client A capture 后 push，Client B pull，同 group 可见；不同 group 或无权限不可见；cursor 可增量推进。 |
 | Review queue flow | 高风险提取进入 `.dev-mesh/queue/pending.jsonl`，用户确认后写入 events，拒绝后进入 rejected，不同步。 |
@@ -2543,7 +2602,11 @@ CI 门禁：
 - Streamable HTTP MCP `/mcp`
 - `mesh_get_status`
 - `mesh_search_context`
+- `mesh_get_knowledge`
+- `mesh_list_knowledge`
 - `mesh_capture_knowledge`
+- `mesh_update_knowledge`
+- `mesh_delete_knowledge`
 - `mesh_capture_task`
 - `mesh_rate_knowledge`
 - `mesh_link_knowledge`

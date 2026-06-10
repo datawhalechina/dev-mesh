@@ -181,7 +181,7 @@ pnpm --filter devmesh dev -- serve --mcp --root . --name local
 pnpm --filter devmesh dev -- proxy --root . --name local --port 8722
 ```
 
-`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。知识沉淀由 Codex、Claude Code 或 opencode 结合当前上下文自主触发：MCP 初始化 instructions 会提醒模型把沉淀作为默认工作习惯，工具 description 会在 search/scan/capture 时继续提示 final response 前的 capture decision；需要全项目巡检时可以按需调用 `mesh_scan_project_knowledge`，确认有长期价值后再调用 capture 工具。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/rate 写入当前项目 `.dev-mesh/`。
+`dmx serve --mcp` 使用 stdio transport 面向 MCP host；后台共享 daemon 使用 Koa2 和官方 MCP TypeScript SDK Streamable HTTP transport。daemon 还负责把本地 `.dev-mesh/events/*.jsonl` 中的事件同步到已加入的 Hub group，定期拉取同组事件到 `.dev-mesh/sync/remotes/`，并把事件里的 knowledge 快照 upsert 到本地 `.dev-mesh/knowledge/` 供搜索使用。知识沉淀由 Codex、Claude Code 或 opencode 结合当前上下文自主触发：MCP 初始化 instructions 会提醒模型把沉淀作为默认工作习惯，工具 description 会在 search/scan/capture 时继续提示 final response 前的 capture decision；需要全项目巡检时可以按需调用 `mesh_scan_project_knowledge`，确认有长期价值后再调用 capture 工具。`dmx proxy` 默认监听 `http://127.0.0.1:8722/mcp`，可用于调试或嵌入。两种入口都暴露与 Hub Server 一致的核心 MCP tools，并把 capture/search/update/delete/rate 写入当前项目 `.dev-mesh/`。
 
 初始化项目本地知识库：
 
@@ -345,7 +345,11 @@ MCP tools 与 Hub Server 核心工具保持一致：
 ```text
 mesh_get_status
 mesh_search_context
+mesh_get_knowledge
+mesh_list_knowledge
 mesh_capture_knowledge
+mesh_update_knowledge
+mesh_delete_knowledge
 mesh_capture_task
 mesh_rate_knowledge
 mesh_link_knowledge
@@ -355,7 +359,7 @@ mesh_scan_project_knowledge
 mesh_explore_knowledge_graph
 ```
 
-集成测试覆盖 stdio launcher 启动 daemon、SDK client 调用 `tools/list` / `mesh_get_status` / `mesh_capture_knowledge`，以及 HTTP proxy 调用 `tools/list`、`mesh_get_status`、`mesh_capture_knowledge`、`mesh_link_knowledge`、`mesh_search_context`、`mesh_explore_knowledge_graph`，并验证默认写入当前项目 store。
+集成测试覆盖 stdio launcher 启动 daemon、SDK client 调用 `tools/list` / `mesh_get_status` / `mesh_capture_knowledge`，以及 HTTP proxy 调用 `tools/list`、`mesh_get_status`、`mesh_get_knowledge`、`mesh_list_knowledge`、`mesh_capture_knowledge`、`mesh_update_knowledge`、`mesh_delete_knowledge`、`mesh_link_knowledge`、`mesh_search_context`、`mesh_explore_knowledge_graph`，并验证默认写入当前项目 store。
 
 ## HTTP API Skeleton
 
@@ -402,7 +406,11 @@ MCP `/mcp` 已使用 SDK Streamable HTTP transport 接入，集成测试覆盖 `
 ```text
 mesh_get_status
 mesh_search_context
+mesh_get_knowledge
+mesh_list_knowledge
 mesh_capture_knowledge
+mesh_update_knowledge
+mesh_delete_knowledge
 mesh_capture_task
 mesh_rate_knowledge
 mesh_link_knowledge
@@ -412,7 +420,7 @@ mesh_scan_project_knowledge
 mesh_explore_knowledge_graph
 ```
 
-其中 `mesh_get_status` 返回当前 DevMesh MCP 运行版本、模式、项目根、store 路径、知识数量；通过 stdio launcher 连接时还会包含前台 proxy 和共享 daemon 的运行状态，方便 Codex 先确认实际连接状态。`mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。`mesh_link_knowledge` 会把明确的 `supersedes`、`duplicates`、`contradicts` 关系写入本地 edge store 或 Hub knowledge edges。`mesh_explore_knowledge_graph` 会围绕条目、PARA、tag、作者、来源、类型和语义边返回关系子图，适合回答“这个决策关联哪些坑点/模块/成员经验”。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_rate_knowledge` 和 `mesh_link_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志、ratings 反馈文件或 semantic edge 文件；检索命中和 inbox 接受会写入 usage 反馈文件，并通过较小的 adoption/confidence 增量影响后续排序。
+其中 `mesh_get_status` 返回当前 DevMesh MCP 运行版本、模式、项目根、store 路径、知识数量；通过 stdio launcher 连接时还会包含前台 proxy 和共享 daemon 的运行状态，方便 Codex 先确认实际连接状态。`mesh_search_context` 返回稳定的 Context Pack：包含 `query`、`generatedAt` 和带来源、PARA、质量信号的 `items`。`mesh_get_knowledge` / `mesh_list_knowledge` 读取单条或按 layer/type/PARA/tag/author/recency 过滤列表；`mesh_update_knowledge` 会追加同 id 的新版 JSONL 条目并写入 `knowledge.updated` 事件；`mesh_delete_knowledge` 会写入 tombstone，让默认搜索隐藏该条目但保留审计和同步历史。`mesh_link_knowledge` 会把明确的 `supersedes`、`duplicates`、`contradicts` 关系写入本地 edge store 或 Hub knowledge edges。`mesh_explore_knowledge_graph` 会围绕条目、PARA、tag、作者、来源、类型和语义边返回关系子图，适合回答“这个决策关联哪些坑点/模块/成员经验”。当 MCP Server 使用 `JsonlKnowledgeRepository` 时，`mesh_capture_knowledge`、`mesh_capture_task`、`mesh_update_knowledge`、`mesh_delete_knowledge`、`mesh_rate_knowledge` 和 `mesh_link_knowledge` 会同时写入本地 `.dev-mesh/` 的知识视图、事件日志、ratings 反馈文件或 semantic edge 文件；检索命中和 inbox 接受会写入 usage 反馈文件，并通过较小的 adoption/confidence 增量影响后续排序。
 
 开发期 Hub Server 目前使用内存状态管理 groups、invite token、members、access token、projects、knowledge edges 和 audit logs：
 
@@ -536,7 +544,7 @@ pnpm typecheck:examples
 - 已完成 Git snapshot provider 和 filesystem snapshot provider，供 `mesh_scan_project_knowledge` 按需读取 branch/commit/diff stat/test 摘要、文件元数据、TODO/FIXME 计数，并按 `.meshignore`、`.env`、`*.pem`、`*.key`、secrets 路径等隐私策略过滤。
 - 已完成内置 redactor 的 secret、PII、URL token、Authorization、cookie、private key 和 sensitive path 脱敏。
 - 已完成内置 quality scorers，覆盖 confidence、rating、adoption、freshness 和 source trust patch。
-- 已完成 assistant-led capture 主链路：MCP server instructions 和工具描述双层强提示模型总结当前上下文，再调用 `mesh_capture_knowledge` / `mesh_capture_task` 写入本地知识库。
+- 已完成 assistant-led capture 主链路：MCP server instructions 和工具描述双层强提示模型总结当前上下文，再调用 `mesh_capture_knowledge` / `mesh_capture_task` 写入本地知识库，并可通过 `mesh_get_knowledge` / `mesh_list_knowledge` / `mesh_update_knowledge` / `mesh_delete_knowledge` 维护已有条目。
 - 已完成 member-specific experience search 和内置 hybrid search backend，支持 keyword、deterministic embedding mock、recency、quality 和 adoption ranking。
 - 已完成知识图谱基础能力：从 Knowledge Item 和本地/Hub 语义边派生 `.dev-mesh/index/graph.json`，并通过 `mesh_explore_knowledge_graph` 探索条目、PARA、tag、作者、来源、类型和 `supersedes` / `duplicates` / `contradicts` 关系。
 - 已完成 web-admin 的 member 禁用、invite 创建/撤销，以及 Hub admin audit log 写入和查询。

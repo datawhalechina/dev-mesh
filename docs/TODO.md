@@ -30,6 +30,7 @@
 - [x] 实现 Streamable HTTP MCP `/mcp` 的会话和工具调用回归测试。
 - [x] 完成 `mesh_search_context` 的 Context Pack 输出格式。
 - [x] 完成 `mesh_capture_knowledge` 的本地/服务端写入路径。
+- [x] 完成知识条目 `get/list/update/delete` MCP tools。
 - [x] 完成 `mesh_capture_task` 的任务进度沉淀。
 - [x] 完成 `mesh_rate_knowledge` 的显式反馈落库。
 - [x] 实现 invite join API 的 token 校验。
