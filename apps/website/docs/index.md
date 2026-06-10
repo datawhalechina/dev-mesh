@@ -14,6 +14,10 @@ aside: false
         安装 <code>devmesh</code> CLI 后，用 <code>dmx init</code> 接入 Codex、Claude Code 或 opencode。
         项目决策、任务进展和命令经验会保存到 <code>.dev-mesh</code>，再通过 CLI 和 MCP 回到开发流程里。
       </p>
+      <div class="mesh-install" aria-label="DevMesh install command">
+        <span>安装</span>
+        <code>npm install -g devmesh@alpha</code>
+      </div>
       <div class="mesh-actions">
         <a class="mesh-button" href="/getting-started">快速开始</a>
         <a class="mesh-button mesh-button--secondary" href="/reference/cli">CLI 参考</a>

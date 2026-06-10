@@ -67,6 +67,39 @@
   line-height: 1.65;
 }
 
+.mesh-install {
+  width: min(520px, 100%);
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 28px auto 0;
+  padding: 0 18px;
+  border: 1px solid #d8e3dc;
+  border-radius: 8px;
+  background: #f7faf8;
+  color: #18221c;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  text-align: left;
+}
+
+.mesh-install span {
+  color: #6b7c70;
+  font-family: var(--vp-font-family-base);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.mesh-install code {
+  padding: 0;
+  background: transparent;
+  color: #18221c;
+  font-size: 1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .mesh-actions {
   display: flex;
   flex-wrap: wrap;
@@ -199,6 +232,10 @@
     font-size: 1.1rem;
   }
 
+  .mesh-install {
+    width: min(480px, 100%);
+  }
+
   .mesh-strip__inner,
   .mesh-feature-grid {
     grid-template-columns: 1fr;
@@ -221,6 +258,16 @@
 
   .mesh-super {
     font-size: 2.25rem;
+  }
+
+  .mesh-install {
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .mesh-install code {
+    font-size: 0.9rem;
   }
 
   .mesh-section {
