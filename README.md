@@ -1,4 +1,27 @@
-# DevMesh
+<div align="center">
+  <img src="apps/website/docs/public/img/logo.svg" width="72" alt="DevMesh logo">
+  <h1>DevMesh</h1>
+  <h3>Local-first project memory for Codex, Claude Code, and opencode</h3>
+  <p><strong>MCP-native</strong> · <strong>knowledge follows the repo</strong> · <strong>team sync optional</strong></p>
+  <p><a href="https://devmesh.xyun.dev/"><strong>Documentation & Website -></strong></a></p>
+  <p>
+    <a href="https://www.npmjs.com/package/devmesh"><img alt="npm alpha version" src="https://img.shields.io/npm/v/devmesh/alpha?label=npm&color=2f7f68"></a>
+    <a href="https://www.npmjs.com/package/devmesh"><img alt="npm monthly downloads" src="https://img.shields.io/npm/dm/devmesh?label=downloads&color=4b5563"></a>
+    <img alt="Node.js" src="https://img.shields.io/badge/Node.js-%3E%3D22-5fa04e">
+  </p>
+  <p>
+    <img alt="Windows supported" src="https://img.shields.io/badge/Windows-supported-3b72b9">
+    <img alt="macOS supported" src="https://img.shields.io/badge/macOS-supported-3b72b9">
+    <img alt="Linux supported" src="https://img.shields.io/badge/Linux-supported-3b72b9">
+  </p>
+  <p>
+    <img alt="Codex supported" src="https://img.shields.io/badge/Codex-supported-6d3fc8">
+    <img alt="Claude Code supported" src="https://img.shields.io/badge/Claude%20Code-supported-6d3fc8">
+    <img alt="opencode supported" src="https://img.shields.io/badge/opencode-supported-6d3fc8">
+    <img alt="MCP tools" src="https://img.shields.io/badge/MCP-tools-2b6f73">
+  </p>
+  <p><code>npm install -g devmesh@alpha</code></p>
+</div>
 
 `DevMesh` 是一个面向多人协作开发的 local-first 知识共享层。它通过 MCP 为 Codex、Claude Code、opencode 等 AI 编程工具提供项目知识检索、经验沉淀、本地缓存和可选团队同步能力。
 
