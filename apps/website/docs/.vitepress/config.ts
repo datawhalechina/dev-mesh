@@ -4,6 +4,7 @@ export default defineConfig({
   lang: 'zh-CN',
   title: 'DevMesh',
   description: '面向 AI 协作开发的本地优先上下文网络',
+  base: '/',
   cleanUrls: true,
   head: [
     ['link', { rel: 'icon', href: '/img/logo.svg', type: 'image/svg+xml' }],
@@ -14,7 +15,7 @@ export default defineConfig({
     nav: [
       { text: '文档', link: '/intro' },
       { text: '快速开始', link: '/getting-started' },
-      { text: 'GitHub', link: 'https://github.com/devmesh/mcp-context-mesh' },
+      { text: 'GitHub', link: 'https://github.com/xy200303/DevMesh' },
     ],
     sidebar: [
       {
@@ -37,7 +38,7 @@ export default defineConfig({
       },
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/devmesh/mcp-context-mesh' },
+      { icon: 'github', link: 'https://github.com/xy200303/DevMesh' },
     ],
     footer: {
       message: 'Local-first context memory for AI-assisted engineering teams.',
