@@ -9,15 +9,19 @@ import { DEV_MESH_VERSION } from '@devmesh/shared';
 import type {
   MeshCaptureKnowledgeInput,
   MeshCaptureTaskInput,
+  MeshDeleteKnowledgeInput,
   MeshExploreKnowledgeGraphInput,
+  MeshGetKnowledgeInput,
   MeshGetStatusInput,
   MeshLinkKnowledgeInput,
+  MeshListKnowledgeInput,
   MeshScanProjectKnowledgeInput,
   MeshRateKnowledgeInput,
   MeshResolveTermInput,
   MeshSearchContextInput,
   MeshSearchMemberExperienceInput,
-  MeshToolHandlers
+  MeshToolHandlers,
+  MeshUpdateKnowledgeInput
 } from '@devmesh/mcp-contracts';
 import {
   createLocalMeshMcpServerWithHandlers,
@@ -74,7 +78,11 @@ export interface LocalMcpDaemonStatus {
 type DaemonToolName =
   | 'mesh_search_context'
   | 'mesh_get_status'
+  | 'mesh_get_knowledge'
+  | 'mesh_list_knowledge'
   | 'mesh_capture_knowledge'
+  | 'mesh_update_knowledge'
+  | 'mesh_delete_knowledge'
   | 'mesh_capture_task'
   | 'mesh_rate_knowledge'
   | 'mesh_link_knowledge'
@@ -253,10 +261,34 @@ function createDaemonAwareHandlers(localHandlers: MeshToolHandlers, options: Loc
         await callDaemonOrLocal('mesh_search_context', input, () => localHandlers.searchContext(input), options)
       );
     },
+    async getKnowledge(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_get_knowledge',
+        await callDaemonOrLocal('mesh_get_knowledge', input, () => localHandlers.getKnowledge(input), options)
+      );
+    },
+    async listKnowledge(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_list_knowledge',
+        await callDaemonOrLocal('mesh_list_knowledge', input, () => localHandlers.listKnowledge(input), options)
+      );
+    },
     async captureKnowledge(input) {
       return formatStdioProxyToolOutput(
         'mesh_capture_knowledge',
         await callDaemonOrLocal('mesh_capture_knowledge', input, () => localHandlers.captureKnowledge(input), options)
+      );
+    },
+    async updateKnowledge(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_update_knowledge',
+        await callDaemonOrLocal('mesh_update_knowledge', input, () => localHandlers.updateKnowledge(input), options)
+      );
+    },
+    async deleteKnowledge(input) {
+      return formatStdioProxyToolOutput(
+        'mesh_delete_knowledge',
+        await callDaemonOrLocal('mesh_delete_knowledge', input, () => localHandlers.deleteKnowledge(input), options)
       );
     },
     async captureTask(input) {
@@ -324,7 +356,11 @@ async function callDaemonOrLocal(
   input:
     | MeshSearchContextInput
     | MeshGetStatusInput
+    | MeshGetKnowledgeInput
+    | MeshListKnowledgeInput
     | MeshCaptureKnowledgeInput
+    | MeshUpdateKnowledgeInput
+    | MeshDeleteKnowledgeInput
     | MeshCaptureTaskInput
     | MeshExploreKnowledgeGraphInput
     | MeshLinkKnowledgeInput
@@ -399,8 +435,16 @@ function formatStdioProxyToolOutput(toolName: DaemonToolName, value: unknown): s
     case 'mesh_search_context':
     case 'mesh_search_member_experience':
       return formatContextPack(value);
+    case 'mesh_get_knowledge':
+      return formatKnowledgeLookup(value);
+    case 'mesh_list_knowledge':
+      return formatKnowledgeList('Knowledge items', value);
     case 'mesh_capture_knowledge':
       return formatKnowledgeMutation('Captured knowledge', value);
+    case 'mesh_update_knowledge':
+      return formatKnowledgeMutation('Updated knowledge', value);
+    case 'mesh_delete_knowledge':
+      return formatKnowledgeMutation('Deleted knowledge', value);
     case 'mesh_capture_task':
       return formatKnowledgeMutation('Captured task', value);
     case 'mesh_rate_knowledge':
@@ -472,6 +516,21 @@ function formatContextPack(value: unknown): string {
   }
 
   return lines.join('\n');
+}
+
+function formatKnowledgeLookup(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  if (value.found === false) {
+    const lines = ['Knowledge item not found'];
+    pushField(lines, 'id', value.id);
+    pushField(lines, 'message', value.message);
+    return lines.join('\n');
+  }
+
+  return formatKnowledgeMutation('Knowledge item', value);
 }
 
 function formatKnowledgeMutation(title: string, value: unknown): string {

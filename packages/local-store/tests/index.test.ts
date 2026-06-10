@@ -8,6 +8,7 @@ import {
   captureProjectKnowledge,
   captureProjectTask,
   createProjectKnowledgeEdge,
+  deleteProjectKnowledge,
   enqueuePendingKnowledge,
   ensureProjectStore,
   JsonlKnowledgeRepository,
@@ -21,7 +22,8 @@ import {
   rebuildProjectIndex,
   rebuildProjectGraph,
   rejectPendingKnowledge,
-  searchProjectIndex
+  searchProjectIndex,
+  updateProjectKnowledge
 } from '../src/index.js';
 
 describe('local project store', () => {
@@ -113,6 +115,76 @@ describe('local project store', () => {
       const loaded = await repository.get(original.id);
       expect(loaded?.summary).toBe('Replacement summary.');
       expect(await repository.list({ includeSuperseded: true })).toHaveLength(1);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('updates and tombstones project knowledge with events', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const core = createDevMeshCore({
+        projectRoot,
+        repository
+      });
+      const captured = await captureProjectKnowledge(projectRoot, {
+        type: 'decision',
+        title: 'Use local CRUD tools',
+        summary: 'Codex should edit knowledge through MCP tools.',
+        layer: 'canonical'
+      });
+      const updated = await updateProjectKnowledge(
+        projectRoot,
+        core,
+        {
+          id: captured.item.id,
+          summary: 'Codex should edit knowledge through MCP CRUD tools.',
+          tags: ['mcp', 'crud']
+        },
+        {
+          reason: 'Clarify tool scope.'
+        }
+      );
+
+      expect(updated.item).toMatchObject({
+        id: captured.item.id,
+        summary: 'Codex should edit knowledge through MCP CRUD tools.',
+        tags: ['mcp', 'crud']
+      });
+      expect(updated.event).toMatchObject({
+        kind: 'knowledge.updated',
+        payload: {
+          knowledgeId: captured.item.id,
+          changedFields: ['summary', 'tags'],
+          reason: 'Clarify tool scope.'
+        }
+      });
+
+      const deleted = await deleteProjectKnowledge(
+        projectRoot,
+        core,
+        {
+          id: captured.item.id
+        },
+        {
+          reason: 'Remove obsolete knowledge.'
+        }
+      );
+
+      expect(deleted.item.status).toBe('tombstone');
+      await expect(repository.search({ query: 'CRUD tools' })).resolves.toHaveLength(0);
+      await expect(repository.search({ query: 'CRUD tools', includeSuperseded: true })).resolves.toHaveLength(1);
+
+      const eventsJsonl = await readFile(
+        join(projectRoot, '.dev-mesh', 'events', `${deleted.event.createdAt.slice(0, 7)}.jsonl`),
+        'utf8'
+      );
+
+      expect(eventsJsonl).toContain('"kind":"knowledge.updated"');
+      expect(eventsJsonl).toContain('"kind":"knowledge.deleted"');
+      expect(eventsJsonl).toContain('"tombstone":true');
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }

@@ -1,11 +1,13 @@
 import type {
   CaptureKnowledgeInput,
+  DeleteKnowledgeInput,
   KnowledgeItem,
   KnowledgeLayer,
   KnowledgeVisibility,
   MemberIdentity,
   ParaRef,
-  RateKnowledgeInput
+  RateKnowledgeInput,
+  UpdateKnowledgeInput
 } from '@devmesh/core';
 import type {
   ExploreKnowledgeGraphInput,
@@ -224,6 +226,30 @@ export interface KnowledgeRatingRecord {
 export interface RateProjectKnowledgeResult {
   item: KnowledgeItem;
   rating: KnowledgeRatingRecord;
+  event: DevMeshEvent;
+}
+
+export interface UpdateProjectKnowledgeOptions extends ProjectCaptureOptions {
+  reason?: string;
+  createdBy?: MemberIdentity;
+}
+
+export type UpdateProjectKnowledgeInput = UpdateKnowledgeInput;
+
+export interface UpdateProjectKnowledgeResult {
+  item: KnowledgeItem;
+  event: DevMeshEvent;
+}
+
+export interface DeleteProjectKnowledgeOptions extends ProjectCaptureOptions {
+  reason?: string;
+  createdBy?: MemberIdentity;
+}
+
+export type DeleteProjectKnowledgeInput = DeleteKnowledgeInput;
+
+export interface DeleteProjectKnowledgeResult {
+  item: KnowledgeItem;
   event: DevMeshEvent;
 }
 

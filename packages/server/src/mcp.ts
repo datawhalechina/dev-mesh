@@ -2,12 +2,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createAgentContextService, type BuildContextPackInput } from '@devmesh/agent';
 import type {
   CaptureKnowledgeInput,
+  DeleteKnowledgeInput,
   DevMeshCore,
+  KnowledgeFilter,
   KnowledgeLayer,
   KnowledgeType,
   KnowledgeVisibility,
   ParaRef,
-  RateKnowledgeInput
+  RateKnowledgeInput,
+  UpdateKnowledgeInput
 } from '@devmesh/core';
 import { buildKnowledgeGraph, exploreKnowledgeGraph, type KnowledgeGraphSemanticEdge } from '@devmesh/graph';
 import { DEV_MESH_VERSION } from '@devmesh/shared';
@@ -16,23 +19,34 @@ import {
   registerMeshTools,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
+  type MeshDeleteKnowledgeInput,
   type MeshExploreKnowledgeGraphInput,
   type MeshLinkKnowledgeInput,
+  type MeshListKnowledgeInput,
   type MeshRateKnowledgeInput,
   type MeshScanProjectKnowledgeInput,
-  type MeshSearchContextInput
+  type MeshSearchContextInput,
+  type MeshUpdateKnowledgeInput
 } from '@devmesh/mcp-contracts';
 import {
   captureProjectKnowledge,
   captureProjectTask,
   createProjectKnowledgeEdge,
+  deleteProjectKnowledge,
   JsonlKnowledgeRepository,
   rateProjectKnowledge,
+  updateProjectKnowledge,
   type CaptureProjectKnowledgeResult,
   type CaptureProjectTaskInput,
   type CaptureProjectTaskResult,
-  type RateProjectKnowledgeResult
+  type DeleteProjectKnowledgeResult,
+  type RateProjectKnowledgeResult,
+  type UpdateProjectKnowledgeResult
 } from '@devmesh/local-store';
+
+interface ListKnowledgeRequest extends KnowledgeFilter {
+  limit?: number;
+}
 
 export interface MeshMcpServerOptions {
   knowledgeEdges?: () => KnowledgeGraphSemanticEdge[] | Promise<KnowledgeGraphSemanticEdge[]>;
@@ -69,6 +83,29 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
     async searchContext(input) {
       return agent.buildContextPack(toContextPackInput(input));
     },
+    async getKnowledge(input) {
+      const item = await core.getKnowledge(input.id);
+
+      if (item === undefined) {
+        return {
+          found: false,
+          id: input.id,
+          message: `Knowledge item ${input.id} was not found.`
+        };
+      }
+
+      return item;
+    },
+    async listKnowledge(input) {
+      const { limit = 20, ...filter } = toListKnowledgeInput(input);
+      const items = await core.listKnowledge(filter);
+
+      return {
+        total: items.length,
+        limit,
+        items: items.slice(0, limit)
+      };
+    },
     async captureKnowledge(input) {
       const capture = toCaptureInput(input);
 
@@ -77,6 +114,24 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
       }
 
       return core.captureKnowledge(capture);
+    },
+    async updateKnowledge(input) {
+      const update = toUpdateKnowledgeInput(input);
+
+      if (isLocalStoreBacked(core)) {
+        return flattenUpdateResult(await updateProjectKnowledge(core.projectRoot, core, update, toUpdateOptions(input)));
+      }
+
+      return core.updateKnowledge(update);
+    },
+    async deleteKnowledge(input) {
+      const deletion = toDeleteKnowledgeInput(input);
+
+      if (isLocalStoreBacked(core)) {
+        return flattenDeleteResult(await deleteProjectKnowledge(core.projectRoot, core, deletion, toDeleteOptions(input)));
+      }
+
+      return core.deleteKnowledge(deletion);
     },
     async captureTask(input) {
       if (isLocalStoreBacked(core)) {
@@ -197,6 +252,39 @@ function toContextPackInput(input: MeshSearchContextInput): BuildContextPackInpu
   return search;
 }
 
+function toListKnowledgeInput(input: MeshListKnowledgeInput): ListKnowledgeRequest {
+  const filter: ListKnowledgeRequest = {
+    includeSuperseded: input.includeSuperseded,
+    limit: input.limit
+  };
+
+  if (input.layers !== undefined) {
+    filter.layers = input.layers as KnowledgeLayer[];
+  }
+
+  if (input.types !== undefined) {
+    filter.types = input.types as KnowledgeType[];
+  }
+
+  if (input.para) {
+    filter.para = input.para as Partial<ParaRef>;
+  }
+
+  if (input.authorName !== undefined) {
+    filter.authorName = input.authorName;
+  }
+
+  if (input.tags !== undefined) {
+    filter.tags = input.tags;
+  }
+
+  if (input.recencyDays !== undefined) {
+    filter.recencyDays = input.recencyDays;
+  }
+
+  return filter;
+}
+
 function toRateInput(input: MeshRateKnowledgeInput): RateKnowledgeInput {
   const rate: RateKnowledgeInput = {
     id: input.id
@@ -244,6 +332,20 @@ function flattenRateResult(result: RateProjectKnowledgeResult): unknown {
   return {
     ...result.item,
     ratingEvent: result.rating,
+    event: result.event
+  };
+}
+
+function flattenUpdateResult(result: UpdateProjectKnowledgeResult): unknown {
+  return {
+    ...result.item,
+    event: result.event
+  };
+}
+
+function flattenDeleteResult(result: DeleteProjectKnowledgeResult): unknown {
+  return {
+    ...result.item,
     event: result.event
   };
 }
@@ -316,6 +418,114 @@ function toCaptureInput(input: MeshCaptureKnowledgeInput): CaptureKnowledgeInput
   }
 
   return capture;
+}
+
+function toUpdateKnowledgeInput(input: MeshUpdateKnowledgeInput): UpdateKnowledgeInput {
+  const update: UpdateKnowledgeInput = {
+    id: input.id
+  };
+
+  if (input.layer !== undefined) {
+    update.layer = input.layer as KnowledgeLayer;
+  }
+
+  if (input.entryKey !== undefined) {
+    update.entryKey = input.entryKey;
+  }
+
+  if (input.type !== undefined) {
+    update.type = input.type;
+  }
+
+  if (input.title !== undefined) {
+    update.title = input.title;
+  }
+
+  if (input.summary !== undefined) {
+    update.summary = input.summary;
+  }
+
+  if (input.content !== undefined) {
+    update.content = input.content;
+  }
+
+  if (input.para !== undefined) {
+    update.para = input.para as ParaRef;
+  }
+
+  if (input.tags !== undefined) {
+    update.tags = input.tags;
+  }
+
+  if (input.source !== undefined) {
+    update.source = {
+      kind: input.source.kind
+    };
+
+    if (input.source.ref !== undefined) {
+      update.source.ref = input.source.ref;
+    }
+
+    if (input.source.url !== undefined) {
+      update.source.url = input.source.url;
+    }
+
+    if (input.source.commit !== undefined) {
+      update.source.commit = input.source.commit;
+    }
+
+    if (input.source.storageRef !== undefined) {
+      update.source.storageRef = input.source.storageRef;
+    }
+
+    if (input.source.metadata !== undefined) {
+      update.source.metadata = input.source.metadata;
+    }
+  }
+
+  if (input.visibility !== undefined) {
+    update.visibility = input.visibility;
+  }
+
+  if (input.status !== undefined) {
+    update.status = input.status;
+  }
+
+  if (input.confidence !== undefined) {
+    update.confidence = input.confidence;
+  }
+
+  if (input.weight !== undefined) {
+    update.weight = input.weight;
+  }
+
+  return update;
+}
+
+function toUpdateOptions(input: MeshUpdateKnowledgeInput): Parameters<typeof updateProjectKnowledge>[3] {
+  const options: NonNullable<Parameters<typeof updateProjectKnowledge>[3]> = {};
+
+  if (input.reason !== undefined) {
+    options.reason = input.reason;
+  }
+
+  return options;
+}
+
+function toDeleteKnowledgeInput(input: MeshDeleteKnowledgeInput): DeleteKnowledgeInput {
+  return {
+    id: input.id
+  };
+}
+
+function toDeleteOptions(input: MeshDeleteKnowledgeInput): Parameters<typeof deleteProjectKnowledge>[3] {
+  const options: NonNullable<Parameters<typeof deleteProjectKnowledge>[3]> = {};
+
+  if (input.reason !== undefined) {
+    options.reason = input.reason;
+  }
+
+  return options;
 }
 
 function toProjectTaskCaptureInput(input: MeshCaptureTaskInput): CaptureProjectTaskInput {

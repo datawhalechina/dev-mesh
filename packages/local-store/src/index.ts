@@ -9,6 +9,9 @@ export type {
   CaptureProjectTaskResult,
   CreateProjectKnowledgeEdgeInput,
   CreateProjectKnowledgeEdgeResult,
+  DeleteProjectKnowledgeInput,
+  DeleteProjectKnowledgeOptions,
+  DeleteProjectKnowledgeResult,
   DevMeshEvent,
   EnqueuePendingKnowledgeOptions,
   EnsureProjectStoreOptions,
@@ -37,7 +40,10 @@ export type {
   RebuildProjectIndexResult,
   RejectedKnowledgeReviewItem,
   RejectPendingKnowledgeResult,
-  ReviewQueueRisk
+  ReviewQueueRisk,
+  UpdateProjectKnowledgeInput,
+  UpdateProjectKnowledgeOptions,
+  UpdateProjectKnowledgeResult
 } from './types.js';
 export {
   createProjectStorePaths,
@@ -60,7 +66,9 @@ export {
   appendKnowledgeRating,
   captureProjectKnowledge,
   captureProjectTask,
-  rateProjectKnowledge
+  deleteProjectKnowledge,
+  rateProjectKnowledge,
+  updateProjectKnowledge
 } from './capture.js';
 export {
   appendKnowledgeUsage,

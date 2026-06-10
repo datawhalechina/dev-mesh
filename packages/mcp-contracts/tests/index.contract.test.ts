@@ -2,11 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEV_MESH_MCP_INSTRUCTIONS,
   meshCaptureKnowledgeInputSchema,
+  meshDeleteKnowledgeInputSchema,
   meshExploreKnowledgeGraphInputSchema,
+  meshGetKnowledgeInputSchema,
   meshGetStatusInputSchema,
   meshLinkKnowledgeInputSchema,
+  meshListKnowledgeInputSchema,
   meshRateKnowledgeInputSchema,
   meshSearchContextInputSchema,
+  meshUpdateKnowledgeInputSchema,
   registerMeshTools,
   type MeshToolHandlers
 } from '../src/index.js';
@@ -86,6 +90,31 @@ describe('MCP tool contract schemas', () => {
     });
   });
 
+  it('validates knowledge CRUD tool inputs', () => {
+    expect(meshGetKnowledgeInputSchema.parse({ id: 'ki_1' })).toEqual({
+      id: 'ki_1'
+    });
+    expect(meshListKnowledgeInputSchema.parse({})).toEqual({
+      includeSuperseded: false,
+      limit: 20
+    });
+    expect(
+      meshUpdateKnowledgeInputSchema.parse({
+        id: 'ki_1',
+        summary: 'Updated summary.',
+        reason: 'Refresh stale wording.'
+      })
+    ).toMatchObject({
+      id: 'ki_1',
+      summary: 'Updated summary.',
+      reason: 'Refresh stale wording.'
+    });
+    expect(() => meshUpdateKnowledgeInputSchema.parse({ id: 'ki_1', reason: 'No actual patch.' })).toThrow();
+    expect(meshDeleteKnowledgeInputSchema.parse({ id: 'ki_1' })).toEqual({
+      id: 'ki_1'
+    });
+  });
+
   it('registers the expected public tools', async () => {
     const registered: Array<{
       name: string;
@@ -100,7 +129,11 @@ describe('MCP tool contract schemas', () => {
     const handlers: MeshToolHandlers = {
       getStatus: vi.fn(async () => ({ ok: 'status' })),
       searchContext: vi.fn(async () => ({ ok: 'search' })),
+      getKnowledge: vi.fn(async () => ({ ok: 'get' })),
+      listKnowledge: vi.fn(async () => ({ ok: 'list' })),
       captureKnowledge: vi.fn(async () => ({ ok: 'capture' })),
+      updateKnowledge: vi.fn(async () => ({ ok: 'update' })),
+      deleteKnowledge: vi.fn(async () => ({ ok: 'delete' })),
       captureTask: vi.fn(async () => ({ ok: 'task' })),
       rateKnowledge: vi.fn(async () => ({ ok: 'rate' })),
       linkKnowledge: vi.fn(async () => ({ ok: 'link' })),
@@ -115,7 +148,11 @@ describe('MCP tool contract schemas', () => {
     expect(registered.map((tool) => tool.name)).toEqual([
       'mesh_get_status',
       'mesh_search_context',
+      'mesh_get_knowledge',
+      'mesh_list_knowledge',
       'mesh_capture_knowledge',
+      'mesh_update_knowledge',
+      'mesh_delete_knowledge',
       'mesh_capture_task',
       'mesh_rate_knowledge',
       'mesh_link_knowledge',
@@ -128,6 +165,8 @@ describe('MCP tool contract schemas', () => {
     const toolDescriptions = Object.fromEntries(registered.map((tool) => [tool.name, tool.config.description ?? '']));
 
     expect(toolDescriptions.mesh_get_status).toContain('running DevMesh version');
+    expect(toolDescriptions.mesh_get_knowledge).toContain('full current record');
+    expect(toolDescriptions.mesh_delete_knowledge).toContain('Tombstone one DevMesh knowledge item');
     expect(toolDescriptions.mesh_capture_knowledge).toContain('Do not wait for the user');
     expect(toolDescriptions.mesh_capture_knowledge).toContain('Before the final response');
     expect(toolDescriptions.mesh_capture_knowledge).toContain('Prefer one high-signal item');

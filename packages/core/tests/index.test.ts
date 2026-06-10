@@ -44,6 +44,40 @@ describe('createDevMeshCore', () => {
     expect(updated.quality.adoptionScore).toBe(0.25);
   });
 
+  it('updates and tombstones knowledge without replacing the item identity', async () => {
+    const core = createDevMeshCore();
+    const item = await core.captureKnowledge({
+      type: 'note',
+      title: 'Draft deployment note',
+      summary: 'Initial deployment wording.',
+      content: 'Remove this content later.',
+      tags: ['draft']
+    });
+
+    const updated = await core.updateKnowledge({
+      id: item.id,
+      title: 'Deployment note',
+      summary: 'Updated deployment wording.',
+      content: null,
+      tags: ['release'],
+      confidence: 0.9
+    });
+
+    expect(updated.id).toBe(item.id);
+    expect(updated.title).toBe('Deployment note');
+    expect(updated.summary).toBe('Updated deployment wording.');
+    expect(updated.content).toBeUndefined();
+    expect(updated.tags).toEqual(['release']);
+    expect(updated.quality.confidence).toBe(0.9);
+
+    const deleted = await core.deleteKnowledge({ id: item.id });
+
+    expect(deleted.id).toBe(item.id);
+    expect(deleted.status).toBe('tombstone');
+    expect(await core.searchKnowledge({ query: 'deployment' })).toHaveLength(0);
+    expect(await core.searchKnowledge({ query: 'deployment', includeSuperseded: true })).toHaveLength(1);
+  });
+
   it('applies layer defaults and PARA inference when capturing knowledge', async () => {
     const core = createDevMeshCore();
 

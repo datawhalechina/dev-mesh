@@ -17,7 +17,11 @@ export async function loadProjectKnowledgeItems(projectRoot: string): Promise<Kn
     const lines = await readJsonl<KnowledgeItem>(file);
 
     for (const item of lines) {
-      byId.set(item.id, item);
+      const existing = byId.get(item.id);
+
+      if (existing === undefined || item.updatedAt >= existing.updatedAt) {
+        byId.set(item.id, item);
+      }
     }
   }
 

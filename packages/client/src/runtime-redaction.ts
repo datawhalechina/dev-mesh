@@ -1,9 +1,11 @@
-import type { CaptureKnowledgeInput } from '@devmesh/core';
+import type { CaptureKnowledgeInput, UpdateKnowledgeInput } from '@devmesh/core';
 import type {
   CaptureProjectTaskInput,
   CreateProjectKnowledgeEdgeInput,
+  DeleteProjectKnowledgeOptions,
   EnqueuePendingKnowledgeOptions,
-  RateProjectKnowledgeOptions
+  RateProjectKnowledgeOptions,
+  UpdateProjectKnowledgeOptions
 } from '@devmesh/local-store';
 import type { Redactor } from '@devmesh/extension-api';
 
@@ -39,6 +41,81 @@ export async function redactCaptureKnowledgeInput(
     if (input.source.storageRef !== undefined) {
       output.source.storageRef = (await redactor.redact({ text: input.source.storageRef })).text;
     }
+  }
+
+  return output;
+}
+
+export async function redactUpdateKnowledgeInput(
+  input: UpdateKnowledgeInput,
+  redactor: Redactor
+): Promise<UpdateKnowledgeInput> {
+  const output: UpdateKnowledgeInput = {
+    id: input.id
+  };
+
+  if (input.layer !== undefined) {
+    output.layer = input.layer;
+  }
+
+  if (input.entryKey !== undefined) {
+    output.entryKey = (await redactor.redact({ text: input.entryKey })).text;
+  }
+
+  if (input.type !== undefined) {
+    output.type = input.type;
+  }
+
+  if (input.title !== undefined) {
+    output.title = (await redactor.redact({ text: input.title })).text;
+  }
+
+  if (input.summary !== undefined) {
+    output.summary = (await redactor.redact({ text: input.summary })).text;
+  }
+
+  if (input.content !== undefined) {
+    output.content = input.content === null ? null : (await redactor.redact({ text: input.content })).text;
+  }
+
+  if (input.para !== undefined) {
+    output.para = input.para;
+  }
+
+  if (input.tags !== undefined) {
+    output.tags = await Promise.all(input.tags.map(async (tag) => (await redactor.redact({ text: tag })).text));
+  }
+
+  if (input.source !== undefined) {
+    output.source = { ...input.source };
+
+    if (input.source.ref !== undefined) {
+      output.source.ref = (await redactor.redact({ text: input.source.ref })).text;
+    }
+
+    if (input.source.url !== undefined) {
+      output.source.url = (await redactor.redact({ text: input.source.url })).text;
+    }
+
+    if (input.source.storageRef !== undefined) {
+      output.source.storageRef = (await redactor.redact({ text: input.source.storageRef })).text;
+    }
+  }
+
+  if (input.visibility !== undefined) {
+    output.visibility = input.visibility;
+  }
+
+  if (input.status !== undefined) {
+    output.status = input.status;
+  }
+
+  if (input.confidence !== undefined) {
+    output.confidence = input.confidence;
+  }
+
+  if (input.weight !== undefined) {
+    output.weight = input.weight;
   }
 
   return output;
@@ -107,6 +184,48 @@ export async function redactRateOptions(
   return output;
 }
 
+export async function redactUpdateOptions(
+  options: UpdateProjectKnowledgeOptions,
+  redactor: Redactor
+): Promise<UpdateProjectKnowledgeOptions> {
+  const output: UpdateProjectKnowledgeOptions = {};
+
+  if (options.projectKey !== undefined) {
+    output.projectKey = options.projectKey;
+  }
+
+  if (options.createdBy !== undefined) {
+    output.createdBy = options.createdBy;
+  }
+
+  if (options.reason !== undefined) {
+    output.reason = (await redactor.redact({ text: options.reason })).text;
+  }
+
+  return output;
+}
+
+export async function redactDeleteOptions(
+  options: DeleteProjectKnowledgeOptions,
+  redactor: Redactor
+): Promise<DeleteProjectKnowledgeOptions> {
+  const output: DeleteProjectKnowledgeOptions = {};
+
+  if (options.projectKey !== undefined) {
+    output.projectKey = options.projectKey;
+  }
+
+  if (options.createdBy !== undefined) {
+    output.createdBy = options.createdBy;
+  }
+
+  if (options.reason !== undefined) {
+    output.reason = (await redactor.redact({ text: options.reason })).text;
+  }
+
+  return output;
+}
+
 export async function redactKnowledgeEdgeInput(
   input: CreateProjectKnowledgeEdgeInput,
   redactor: Redactor
@@ -158,6 +277,38 @@ export function withDefaultRatingMember(
   options: RateProjectKnowledgeOptions,
   memberName?: string
 ): RateProjectKnowledgeOptions {
+  if (options.createdBy || !memberName) {
+    return options;
+  }
+
+  return {
+    ...options,
+    createdBy: {
+      displayName: memberName
+    }
+  };
+}
+
+export function withDefaultUpdateMember(
+  options: UpdateProjectKnowledgeOptions,
+  memberName?: string
+): UpdateProjectKnowledgeOptions {
+  if (options.createdBy || !memberName) {
+    return options;
+  }
+
+  return {
+    ...options,
+    createdBy: {
+      displayName: memberName
+    }
+  };
+}
+
+export function withDefaultDeleteMember(
+  options: DeleteProjectKnowledgeOptions,
+  memberName?: string
+): DeleteProjectKnowledgeOptions {
   if (options.createdBy || !memberName) {
     return options;
   }

@@ -2,10 +2,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { BuildContextPackInput } from '@devmesh/agent';
 import type {
   CaptureKnowledgeInput,
+  DeleteKnowledgeInput,
   KnowledgeLayer,
   KnowledgeType,
   ParaRef,
-  RateKnowledgeInput
+  RateKnowledgeInput,
+  UpdateKnowledgeInput
 } from '@devmesh/core';
 import type { CaptureProjectTaskInput } from '@devmesh/local-store';
 import { DEV_MESH_VERSION } from '@devmesh/shared';
@@ -15,11 +17,14 @@ import {
   type MeshToolHandlers,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
+  type MeshDeleteKnowledgeInput,
   type MeshExploreKnowledgeGraphInput,
   type MeshLinkKnowledgeInput,
+  type MeshListKnowledgeInput,
   type MeshScanProjectKnowledgeInput,
   type MeshRateKnowledgeInput,
-  type MeshSearchContextInput
+  type MeshSearchContextInput,
+  type MeshUpdateKnowledgeInput
 } from '@devmesh/mcp-contracts';
 import type { DevMeshClientRuntime } from './runtime.js';
 
@@ -46,7 +51,11 @@ export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers)
 export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): MeshToolHandlers {
   return {
     searchContext: (input) => runtime.searchContext(toContextPackInput(input)),
+    getKnowledge: (input) => runtime.getKnowledge(input.id),
+    listKnowledge: (input) => runtime.listKnowledge(toListKnowledgeInput(input)),
     captureKnowledge: (input) => runtime.captureKnowledge(toCaptureInput(input)),
+    updateKnowledge: (input) => runtime.updateKnowledge(toUpdateKnowledgeInput(input), toUpdateKnowledgeOptions(input)),
+    deleteKnowledge: (input) => runtime.deleteKnowledge(toDeleteKnowledgeInput(input), toDeleteKnowledgeOptions(input)),
     captureTask: (input) => runtime.captureTask(toTaskCaptureInput(input)),
     rateKnowledge: (input) => runtime.rateKnowledge(toRateInput(input)),
     linkKnowledge: (input) => runtime.linkKnowledge(toLinkKnowledgeInput(input)),
@@ -67,6 +76,39 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
       });
     }
   };
+}
+
+function toListKnowledgeInput(input: MeshListKnowledgeInput): Parameters<DevMeshClientRuntime['listKnowledge']>[0] {
+  const filter: NonNullable<Parameters<DevMeshClientRuntime['listKnowledge']>[0]> = {
+    includeSuperseded: input.includeSuperseded,
+    limit: input.limit
+  };
+
+  if (input.layers !== undefined) {
+    filter.layers = input.layers as KnowledgeLayer[];
+  }
+
+  if (input.types !== undefined) {
+    filter.types = input.types as KnowledgeType[];
+  }
+
+  if (input.para) {
+    filter.para = input.para as Partial<ParaRef>;
+  }
+
+  if (input.authorName !== undefined) {
+    filter.authorName = input.authorName;
+  }
+
+  if (input.tags !== undefined) {
+    filter.tags = input.tags;
+  }
+
+  if (input.recencyDays !== undefined) {
+    filter.recencyDays = input.recencyDays;
+  }
+
+  return filter;
 }
 
 function toContextPackInput(input: MeshSearchContextInput): BuildContextPackInput {
@@ -164,6 +206,118 @@ function toCaptureInput(input: MeshCaptureKnowledgeInput): CaptureKnowledgeInput
   }
 
   return capture;
+}
+
+function toUpdateKnowledgeInput(input: MeshUpdateKnowledgeInput): UpdateKnowledgeInput {
+  const update: UpdateKnowledgeInput = {
+    id: input.id
+  };
+
+  if (input.layer !== undefined) {
+    update.layer = input.layer as KnowledgeLayer;
+  }
+
+  if (input.entryKey !== undefined) {
+    update.entryKey = input.entryKey;
+  }
+
+  if (input.type !== undefined) {
+    update.type = input.type;
+  }
+
+  if (input.title !== undefined) {
+    update.title = input.title;
+  }
+
+  if (input.summary !== undefined) {
+    update.summary = input.summary;
+  }
+
+  if (input.content !== undefined) {
+    update.content = input.content;
+  }
+
+  if (input.para !== undefined) {
+    update.para = input.para as ParaRef;
+  }
+
+  if (input.tags !== undefined) {
+    update.tags = input.tags;
+  }
+
+  if (input.source !== undefined) {
+    update.source = {
+      kind: input.source.kind
+    };
+
+    if (input.source.ref !== undefined) {
+      update.source.ref = input.source.ref;
+    }
+
+    if (input.source.url !== undefined) {
+      update.source.url = input.source.url;
+    }
+
+    if (input.source.commit !== undefined) {
+      update.source.commit = input.source.commit;
+    }
+
+    if (input.source.storageRef !== undefined) {
+      update.source.storageRef = input.source.storageRef;
+    }
+
+    if (input.source.metadata !== undefined) {
+      update.source.metadata = input.source.metadata;
+    }
+  }
+
+  if (input.visibility !== undefined) {
+    update.visibility = input.visibility;
+  }
+
+  if (input.status !== undefined) {
+    update.status = input.status;
+  }
+
+  if (input.confidence !== undefined) {
+    update.confidence = input.confidence;
+  }
+
+  if (input.weight !== undefined) {
+    update.weight = input.weight;
+  }
+
+  return update;
+}
+
+function toUpdateKnowledgeOptions(
+  input: MeshUpdateKnowledgeInput
+): Parameters<DevMeshClientRuntime['updateKnowledge']>[1] {
+  const options: NonNullable<Parameters<DevMeshClientRuntime['updateKnowledge']>[1]> = {};
+
+  if (input.reason !== undefined) {
+    options.reason = input.reason;
+  }
+
+  return options;
+}
+
+function toDeleteKnowledgeInput(input: MeshDeleteKnowledgeInput): DeleteKnowledgeInput {
+  return {
+    id: input.id
+  };
+}
+
+function toDeleteKnowledgeOptions(
+  input: MeshDeleteKnowledgeInput
+): Parameters<DevMeshClientRuntime['deleteKnowledge']>[1] {
+  const options: NonNullable<Parameters<DevMeshClientRuntime['deleteKnowledge']>[1]> = {};
+
+  if (input.reason !== undefined) {
+    options.reason = input.reason;
+  }
+
+  return options;
 }
 
 function toTaskCaptureInput(input: MeshCaptureTaskInput): CaptureProjectTaskInput {

@@ -5,7 +5,15 @@ import {
   type ContextPack,
   type ContextPackItem
 } from '@devmesh/agent';
-import { createDevMeshCore, type CaptureKnowledgeInput, type DevMeshCore, type RateKnowledgeInput } from '@devmesh/core';
+import {
+  createDevMeshCore,
+  type CaptureKnowledgeInput,
+  type DeleteKnowledgeInput,
+  type DevMeshCore,
+  type KnowledgeFilter,
+  type RateKnowledgeInput,
+  type UpdateKnowledgeInput
+} from '@devmesh/core';
 import type { ProjectScanRecord, Redactor } from '@devmesh/extension-api';
 import { createSecretRedactor } from '@devmesh/redaction';
 import { createFileSystemProjectScanProvider, createGitProjectScanProvider } from '@devmesh/providers';
@@ -17,6 +25,7 @@ import {
   captureProjectKnowledge,
   captureProjectTask,
   createProjectKnowledgeEdge,
+  deleteProjectKnowledge,
   enqueuePendingKnowledge,
   readProjectConfig,
   listProjectKnowledgeEdges,
@@ -30,6 +39,7 @@ import {
   type CreateProjectKnowledgeEdgeInput,
   type CreateProjectKnowledgeEdgeResult,
   type CaptureProjectTaskInput,
+  type DeleteProjectKnowledgeOptions,
   type EnqueuePendingKnowledgeOptions,
   type KnowledgeUsageOptions,
   type PendingKnowledgeReviewItem,
@@ -40,19 +50,26 @@ import {
   type ProjectKnowledgeGraphExploreResult,
   type RateProjectKnowledgeOptions,
   type RejectPendingKnowledgeResult,
-  type RebuildProjectIndexResult
+  type RebuildProjectIndexResult,
+  type UpdateProjectKnowledgeOptions,
+  updateProjectKnowledge
 } from '@devmesh/local-store';
 import {
   redactCaptureKnowledgeInput,
   redactCaptureProjectTaskInput,
+  redactDeleteOptions,
   redactKnowledgeEdgeInput,
   redactRateOptions,
   redactReviewOptions,
+  redactUpdateKnowledgeInput,
+  redactUpdateOptions,
   storeOptions,
+  withDefaultDeleteMember,
   withDefaultEdgeMember,
   withDefaultMember,
   withDefaultRatingMember,
-  withDefaultTaskMember
+  withDefaultTaskMember,
+  withDefaultUpdateMember
 } from './runtime-redaction.js';
 
 export interface DevMeshClientOptions {
@@ -83,6 +100,10 @@ export interface ProjectKnowledgeScanResult {
   };
 }
 
+export interface ListProjectKnowledgeInput extends KnowledgeFilter {
+  limit?: number;
+}
+
 export interface DevMeshClientRuntime {
   projectRoot: string;
   core: DevMeshCore;
@@ -90,6 +111,10 @@ export interface DevMeshClientRuntime {
   ensureProjectStore(): Promise<ProjectStore>;
   captureKnowledge(input: CaptureKnowledgeInput): Promise<unknown>;
   captureTask(input: CaptureProjectTaskInput): Promise<unknown>;
+  getKnowledge(id: string): Promise<unknown>;
+  listKnowledge(input?: ListProjectKnowledgeInput): Promise<unknown>;
+  updateKnowledge(input: UpdateKnowledgeInput, options?: UpdateProjectKnowledgeOptions): Promise<unknown>;
+  deleteKnowledge(input: DeleteKnowledgeInput, options?: DeleteProjectKnowledgeOptions): Promise<unknown>;
   rateKnowledge(input: RateKnowledgeInput, options?: RateProjectKnowledgeOptions): Promise<unknown>;
   linkKnowledge(input: CreateProjectKnowledgeEdgeInput): Promise<CreateProjectKnowledgeEdgeResult>;
   listKnowledgeEdges(input?: ProjectKnowledgeEdgeQuery): Promise<ProjectKnowledgeEdge[]>;
@@ -138,6 +163,54 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
       return {
         ...result.item,
         taskStatus: result.status,
+        event: result.event
+      };
+    },
+    async getKnowledge(id) {
+      const item = await core.getKnowledge(id);
+
+      if (item === undefined) {
+        return {
+          found: false,
+          id,
+          message: `Knowledge item ${id} was not found.`
+        };
+      }
+
+      return item;
+    },
+    async listKnowledge(input = {}) {
+      const { limit = 20, ...filter } = input;
+      const items = await core.listKnowledge(filter);
+
+      return {
+        total: items.length,
+        limit,
+        items: items.slice(0, limit)
+      };
+    },
+    async updateKnowledge(input, updateOptions = {}) {
+      const redacted = await redactUpdateKnowledgeInput(input, redactor);
+      const safeOptions = await redactUpdateOptions(
+        withDefaultUpdateMember(updateOptions, options.memberName),
+        redactor
+      );
+      const result = await updateProjectKnowledge(projectRoot, core, redacted, safeOptions);
+
+      return {
+        ...result.item,
+        event: result.event
+      };
+    },
+    async deleteKnowledge(input, deleteOptions = {}) {
+      const safeOptions = await redactDeleteOptions(
+        withDefaultDeleteMember(deleteOptions, options.memberName),
+        redactor
+      );
+      const result = await deleteProjectKnowledge(projectRoot, core, input, safeOptions);
+
+      return {
+        ...result.item,
         event: result.event
       };
     },

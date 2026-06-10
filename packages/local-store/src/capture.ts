@@ -2,9 +2,11 @@ import {
   createKnowledgeId,
   createKnowledgeItem,
   type CaptureKnowledgeInput,
+  type DeleteKnowledgeInput,
   type DevMeshCore,
   type KnowledgeItem,
-  type RateKnowledgeInput
+  type RateKnowledgeInput,
+  type UpdateKnowledgeInput
 } from '@devmesh/core';
 import { nowIso } from '@devmesh/shared';
 import { appendProjectEvent } from './events.js';
@@ -18,8 +20,12 @@ import type {
   KnowledgeRatingRecord,
   ProjectCaptureOptions,
   ProjectTaskStatus,
+  DeleteProjectKnowledgeOptions,
+  DeleteProjectKnowledgeResult,
   RateProjectKnowledgeOptions,
-  RateProjectKnowledgeResult
+  RateProjectKnowledgeResult,
+  UpdateProjectKnowledgeOptions,
+  UpdateProjectKnowledgeResult
 } from './types.js';
 
 export async function captureProjectKnowledge(
@@ -122,6 +128,72 @@ export async function rateProjectKnowledge(
   };
 }
 
+export async function updateProjectKnowledge(
+  projectRoot: string,
+  core: DevMeshCore,
+  input: UpdateKnowledgeInput,
+  options: UpdateProjectKnowledgeOptions = {}
+): Promise<UpdateProjectKnowledgeResult> {
+  const item = await core.updateKnowledge(input);
+  const payload: Record<string, unknown> = {
+    knowledgeId: item.id,
+    changedFields: changedKnowledgeFields(input),
+    layer: item.layer,
+    type: item.type,
+    title: item.title,
+    entryKey: item.entryKey,
+    status: item.status
+  };
+
+  if (options.reason !== undefined) {
+    payload.reason = options.reason;
+  }
+
+  if (options.createdBy !== undefined) {
+    payload.createdBy = options.createdBy;
+  }
+
+  const event = await appendProjectEvent(projectRoot, 'knowledge.updated', payload, options.projectKey);
+
+  return {
+    item,
+    event
+  };
+}
+
+export async function deleteProjectKnowledge(
+  projectRoot: string,
+  core: DevMeshCore,
+  input: DeleteKnowledgeInput,
+  options: DeleteProjectKnowledgeOptions = {}
+): Promise<DeleteProjectKnowledgeResult> {
+  const item = await core.deleteKnowledge(input);
+  const payload: Record<string, unknown> = {
+    knowledgeId: item.id,
+    tombstone: true,
+    deletedAt: item.updatedAt,
+    layer: item.layer,
+    type: item.type,
+    title: item.title,
+    entryKey: item.entryKey
+  };
+
+  if (options.reason !== undefined) {
+    payload.reason = options.reason;
+  }
+
+  if (options.createdBy !== undefined) {
+    payload.createdBy = options.createdBy;
+  }
+
+  const event = await appendProjectEvent(projectRoot, 'knowledge.deleted', payload, options.projectKey);
+
+  return {
+    item,
+    event
+  };
+}
+
 export async function appendKnowledgeRating(
   projectRoot: string,
   input: RateKnowledgeInput,
@@ -166,6 +238,12 @@ export async function appendKnowledgeRating(
   await appendJsonLine(getKnowledgeRatingFile(store.paths.knowledgeDir, createdAt), rating);
 
   return rating;
+}
+
+function changedKnowledgeFields(input: UpdateKnowledgeInput): string[] {
+  return (Object.keys(input) as Array<keyof UpdateKnowledgeInput>)
+    .filter((key) => key !== 'id' && input[key] !== undefined)
+    .map((key) => String(key));
 }
 
 function createTaskCaptureInput(input: CaptureProjectTaskInput, status: ProjectTaskStatus): CaptureKnowledgeInput {

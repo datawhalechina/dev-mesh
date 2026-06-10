@@ -6,6 +6,31 @@ export const paraSchema = z.object({
   key: z.string().min(1).optional()
 });
 
+const paraRefSchema = z.object({
+  category: z.enum(['projects', 'areas', 'resources', 'archives']),
+  key: z.string().min(1)
+});
+
+const knowledgeLayerSchema = z.enum(['raw', 'extract', 'canonical']);
+const knowledgeVisibilitySchema = z.enum(['private', 'project', 'team', 'org']);
+const knowledgeStatusSchema = z.enum(['active', 'superseded', 'tombstone']);
+
+const knowledgeSourceSchema = z.object({
+  kind: z.string().min(1),
+  ref: z.string().optional(),
+  url: z.string().optional(),
+  commit: z.string().optional(),
+  storageRef: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional()
+});
+
+const memberIdentitySchema = z.object({
+  memberId: z.string().optional(),
+  displayName: z.string().min(1),
+  handle: z.string().optional(),
+  clientId: z.string().optional()
+});
+
 export const meshSearchContextInputSchema = z.object({
   query: z.string().min(1),
   project: z.string().default('auto'),
@@ -22,40 +47,65 @@ export const meshGetStatusInputSchema = z.object({
   project: z.string().default('auto')
 });
 
+export const meshGetKnowledgeInputSchema = z.object({
+  id: z.string().min(1)
+});
+
+export const meshListKnowledgeInputSchema = z.object({
+  layers: z.array(knowledgeLayerSchema).optional(),
+  types: z.array(z.string().min(1)).optional(),
+  para: paraSchema.nullable().optional(),
+  authorName: z.string().nullable().optional(),
+  tags: z.array(z.string().min(1)).optional(),
+  includeSuperseded: z.boolean().default(false),
+  recencyDays: z.number().int().positive().optional(),
+  limit: z.number().int().min(1).max(50).default(20)
+});
+
 export const meshCaptureKnowledgeInputSchema = z.object({
   type: z.string().min(1),
   title: z.string().min(1),
   summary: z.string().min(1),
   content: z.string().optional(),
-  layer: z.enum(['raw', 'extract', 'canonical']).default('extract'),
-  para: z
-    .object({
-      category: z.enum(['projects', 'areas', 'resources', 'archives']),
-      key: z.string().min(1)
-    })
-    .optional(),
+  layer: knowledgeLayerSchema.default('extract'),
+  para: paraRefSchema.optional(),
   tags: z.array(z.string()).default([]),
-  visibility: z.enum(['private', 'project', 'team', 'org']).default('project'),
+  visibility: knowledgeVisibilitySchema.default('project'),
   confidence: z.number().min(0).max(1).optional(),
   weight: z.number().min(0).default(1),
-  source: z
-    .object({
-      kind: z.string().min(1),
-      ref: z.string().optional(),
-      url: z.string().optional(),
-      commit: z.string().optional(),
-      storageRef: z.string().optional(),
-      metadata: z.record(z.string(), z.unknown()).optional()
-    })
-    .optional(),
-  createdBy: z
-    .object({
-      memberId: z.string().optional(),
-      displayName: z.string().min(1),
-      handle: z.string().optional(),
-      clientId: z.string().optional()
-    })
-    .optional()
+  source: knowledgeSourceSchema.optional(),
+  createdBy: memberIdentitySchema.optional()
+});
+
+export const meshUpdateKnowledgeInputSchema = z
+  .object({
+    id: z.string().min(1),
+    layer: knowledgeLayerSchema.optional(),
+    entryKey: z.string().min(1).optional(),
+    type: z.string().min(1).optional(),
+    title: z.string().min(1).optional(),
+    summary: z.string().min(1).optional(),
+    content: z.string().nullable().optional(),
+    para: paraRefSchema.optional(),
+    tags: z.array(z.string()).optional(),
+    source: knowledgeSourceSchema.optional(),
+    visibility: knowledgeVisibilitySchema.optional(),
+    status: knowledgeStatusSchema.optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    weight: z.number().min(0).optional(),
+    reason: z.string().optional()
+  })
+  .refine(
+    (input) =>
+      Object.entries(input).some(([key, value]) => !['id', 'reason'].includes(key) && value !== undefined),
+    {
+      message: 'At least one knowledge field must be provided to update.'
+    }
+  );
+
+export const meshDeleteKnowledgeInputSchema = z.object({
+  id: z.string().min(1),
+  reason: z.string().optional()
 });
 
 export const meshCaptureTaskInputSchema = z.object({
@@ -126,7 +176,11 @@ export const meshExploreKnowledgeGraphInputSchema = z.object({
 
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
 export type MeshGetStatusInput = z.infer<typeof meshGetStatusInputSchema>;
+export type MeshGetKnowledgeInput = z.infer<typeof meshGetKnowledgeInputSchema>;
+export type MeshListKnowledgeInput = z.infer<typeof meshListKnowledgeInputSchema>;
 export type MeshCaptureKnowledgeInput = z.infer<typeof meshCaptureKnowledgeInputSchema>;
+export type MeshUpdateKnowledgeInput = z.infer<typeof meshUpdateKnowledgeInputSchema>;
+export type MeshDeleteKnowledgeInput = z.infer<typeof meshDeleteKnowledgeInputSchema>;
 export type MeshCaptureTaskInput = z.infer<typeof meshCaptureTaskInputSchema>;
 export type MeshRateKnowledgeInput = z.infer<typeof meshRateKnowledgeInputSchema>;
 export type MeshLinkKnowledgeInput = z.infer<typeof meshLinkKnowledgeInputSchema>;
@@ -141,6 +195,7 @@ export const DEV_MESH_MCP_INSTRUCTIONS = [
   'Before final responses after meaningful coding, debugging, review, design, setup, release, deployment, or documentation work, decide whether you learned durable project knowledge.',
   'Capture durable decisions, conventions, commands, architecture notes, debugging lessons, pitfalls, setup/deployment steps, release notes, and handoffs with mesh_capture_knowledge.',
   'Capture task state, blockers, verification status, and next actions with mesh_capture_task when work starts, changes state, finishes, or needs handoff.',
+  'Use mesh_get_knowledge, mesh_list_knowledge, mesh_update_knowledge, and mesh_delete_knowledge to inspect, correct, merge, or tombstone existing entries instead of creating duplicates.',
   'When new or existing knowledge clearly supersedes, duplicates, or contradicts another item, link the items with mesh_link_knowledge so the graph stays navigable.',
   'Do not capture secrets, credentials, raw private transcripts, large source blocks, noisy step-by-step logs, or facts that are already obvious from the code.',
   'Prefer one concise high-signal item over many small items. Search or explore existing knowledge first when duplication is likely.'
@@ -152,7 +207,11 @@ const assistantLedCaptureReminder =
 export interface MeshToolHandlers {
   getStatus(input: MeshGetStatusInput): Promise<unknown>;
   searchContext(input: MeshSearchContextInput): Promise<unknown>;
+  getKnowledge(input: MeshGetKnowledgeInput): Promise<unknown>;
+  listKnowledge(input: MeshListKnowledgeInput): Promise<unknown>;
   captureKnowledge(input: MeshCaptureKnowledgeInput): Promise<unknown>;
+  updateKnowledge(input: MeshUpdateKnowledgeInput): Promise<unknown>;
+  deleteKnowledge(input: MeshDeleteKnowledgeInput): Promise<unknown>;
   captureTask(input: MeshCaptureTaskInput): Promise<unknown>;
   rateKnowledge(input: MeshRateKnowledgeInput): Promise<unknown>;
   linkKnowledge(input: MeshLinkKnowledgeInput): Promise<unknown>;
@@ -187,6 +246,30 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
   );
 
   server.registerTool(
+    'mesh_get_knowledge',
+    {
+      title: 'Get knowledge item',
+      description:
+        'Fetch one DevMesh knowledge item by id when you need the full current record before editing, deleting, linking, or citing it.',
+      inputSchema: meshGetKnowledgeInputSchema.shape
+    },
+    async (args) =>
+      textToolResult('mesh_get_knowledge', await handlers.getKnowledge(meshGetKnowledgeInputSchema.parse(args)))
+  );
+
+  server.registerTool(
+    'mesh_list_knowledge',
+    {
+      title: 'List knowledge items',
+      description:
+        'List DevMesh knowledge items with filters such as layer, type, PARA, tags, author, recency, and superseded/tombstone inclusion.',
+      inputSchema: meshListKnowledgeInputSchema.shape
+    },
+    async (args) =>
+      textToolResult('mesh_list_knowledge', await handlers.listKnowledge(meshListKnowledgeInputSchema.parse(args)))
+  );
+
+  server.registerTool(
     'mesh_capture_knowledge',
     {
       title: 'Capture knowledge',
@@ -198,6 +281,36 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
       textToolResult(
         'mesh_capture_knowledge',
         await handlers.captureKnowledge(meshCaptureKnowledgeInputSchema.parse(args))
+      )
+  );
+
+  server.registerTool(
+    'mesh_update_knowledge',
+    {
+      title: 'Update knowledge item',
+      description:
+        `${assistantLedCaptureReminder} Update one existing DevMesh knowledge item by id. Fetch or search first when you are unsure which item should change, and include a concise reason when the edit is meaningful.`,
+      inputSchema: meshUpdateKnowledgeInputSchema.shape
+    },
+    async (args) =>
+      textToolResult(
+        'mesh_update_knowledge',
+        await handlers.updateKnowledge(meshUpdateKnowledgeInputSchema.parse(args))
+      )
+  );
+
+  server.registerTool(
+    'mesh_delete_knowledge',
+    {
+      title: 'Delete knowledge item',
+      description:
+        'Tombstone one DevMesh knowledge item by id so normal searches stop returning it while audit and sync history remain intact. Search or get the item first when the id is uncertain, and include a short reason.',
+      inputSchema: meshDeleteKnowledgeInputSchema.shape
+    },
+    async (args) =>
+      textToolResult(
+        'mesh_delete_knowledge',
+        await handlers.deleteKnowledge(meshDeleteKnowledgeInputSchema.parse(args))
       )
   );
 

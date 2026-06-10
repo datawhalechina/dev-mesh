@@ -111,6 +111,27 @@ export interface RateKnowledgeInput {
   weightDelta?: number;
 }
 
+export interface UpdateKnowledgeInput {
+  id: string;
+  layer?: KnowledgeLayer;
+  entryKey?: string;
+  type?: KnowledgeType;
+  title?: string;
+  summary?: string;
+  content?: string | null;
+  para?: ParaRef;
+  tags?: string[];
+  source?: KnowledgeSource;
+  visibility?: KnowledgeVisibility;
+  status?: KnowledgeStatus;
+  confidence?: number;
+  weight?: number;
+}
+
+export interface DeleteKnowledgeInput {
+  id: string;
+}
+
 export interface KnowledgeRepository {
   upsert(item: KnowledgeItem): Promise<void>;
   get(id: string): Promise<KnowledgeItem | undefined>;
@@ -133,6 +154,8 @@ export interface DevMeshCore {
   listKnowledge(filter?: KnowledgeFilter): Promise<KnowledgeItem[]>;
   searchKnowledge(input: SearchKnowledgeInput): Promise<KnowledgeItem[]>;
   rateKnowledge(input: RateKnowledgeInput): Promise<KnowledgeItem>;
+  updateKnowledge(input: UpdateKnowledgeInput): Promise<KnowledgeItem>;
+  deleteKnowledge(input: DeleteKnowledgeInput): Promise<KnowledgeItem>;
 }
 
 export class InMemoryKnowledgeRepository implements KnowledgeRepository {
@@ -201,6 +224,89 @@ export function createDevMeshCore(options: DevMeshCoreOptions = {}): DevMeshCore
       };
       await repository.upsert(updated);
       return updated;
+    },
+    async updateKnowledge(input) {
+      const existing = await repository.get(input.id);
+      invariant(existing, 'knowledge.not_found', `Knowledge item ${input.id} was not found`);
+
+      const updated: KnowledgeItem = {
+        ...existing,
+        updatedAt: nowIso()
+      };
+
+      if (input.layer !== undefined) {
+        updated.layer = input.layer;
+      }
+
+      if (input.entryKey !== undefined) {
+        updated.entryKey = input.entryKey;
+      }
+
+      if (input.type !== undefined) {
+        updated.type = input.type;
+      }
+
+      if (input.title !== undefined) {
+        updated.title = input.title;
+      }
+
+      if (input.summary !== undefined) {
+        updated.summary = input.summary;
+      }
+
+      if (input.content !== undefined) {
+        if (input.content === null) {
+          delete updated.content;
+        } else {
+          updated.content = input.content;
+        }
+      }
+
+      if (input.para !== undefined) {
+        updated.para = input.para;
+      }
+
+      if (input.tags !== undefined) {
+        updated.tags = [...new Set(input.tags)];
+      }
+
+      if (input.source !== undefined) {
+        updated.source = input.source;
+      }
+
+      if (input.visibility !== undefined) {
+        updated.visibility = input.visibility;
+      }
+
+      if (input.status !== undefined) {
+        updated.status = input.status;
+      }
+
+      if (input.confidence !== undefined || input.weight !== undefined) {
+        const quality: QualitySignals = {
+          ...updated.quality,
+          confidence: input.confidence === undefined ? updated.quality.confidence : clamp01(input.confidence),
+          weight: input.weight === undefined ? updated.quality.weight : Math.max(0, input.weight)
+        };
+        quality.qualityScore = computeQualityScore(quality);
+        updated.quality = quality;
+      }
+
+      await repository.upsert(updated);
+      return updated;
+    },
+    async deleteKnowledge(input) {
+      const existing = await repository.get(input.id);
+      invariant(existing, 'knowledge.not_found', `Knowledge item ${input.id} was not found`);
+
+      const deleted: KnowledgeItem = {
+        ...existing,
+        status: 'tombstone',
+        updatedAt: nowIso()
+      };
+
+      await repository.upsert(deleted);
+      return deleted;
     }
   };
 
