@@ -11,8 +11,8 @@ aside: false
       <p class="mesh-super">本地优先</p>
       <h1>DevMesh</h1>
       <p class="mesh-hero__lead">
-        给项目放一个可检索、可审查的上下文层。决策、任务进展和命令经验保存到
-        <code>.dev-mesh</code>，再通过 CLI 和 MCP proxy 回到开发流程里。
+        安装 <code>devmesh</code> CLI 后，用 <code>dmx init</code> 接入 Codex、Claude Code 或 opencode。
+        项目决策、任务进展和命令经验会保存到 <code>.dev-mesh</code>，再通过 CLI 和 MCP 回到开发流程里。
       </p>
       <div class="mesh-actions">
         <a class="mesh-button" href="/getting-started">快速开始</a>
@@ -43,7 +43,7 @@ aside: false
     <div class="mesh-section__inner mesh-feature-grid">
       <article class="mesh-feature">
         <h2>易于落地</h2>
-        <p>用 <code>dmx init</code> 建项目知识库，用 <code>dmx capture</code> 写入关键记录，不需要先部署中心服务。</p>
+        <p>通过 <code>npm install -g devmesh@alpha</code> 安装，用 <code>dmx init</code> 配置 AI 客户端，不需要先部署中心服务。</p>
       </article>
       <article class="mesh-feature">
         <h2>可审查</h2>

@@ -5,6 +5,12 @@ title: 部署
 
 # 部署
 
+普通用户只需要安装 `devmesh` CLI；只有团队需要共享 Hub、管理成员和跨项目同步时，才需要部署服务端。
+
+```powershell
+npm install -g devmesh@alpha
+```
+
 服务端可以通过 CLI 参数、系统环境变量或 env 文件配置。当前优先级为：
 
 ```text
