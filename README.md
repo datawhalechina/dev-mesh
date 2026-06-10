@@ -90,6 +90,7 @@ pnpm test:contract
 pnpm test:security
 pnpm test:e2e
 pnpm build
+pnpm npm:smoke
 pnpm release:check
 pnpm docker:config
 pnpm docker:up
