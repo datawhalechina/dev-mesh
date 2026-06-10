@@ -9,6 +9,7 @@ import { registerInboxCommand } from './commands/inbox.js';
 import { registerIndexCommand } from './commands/index-command.js';
 import { registerInitCommand } from './commands/init.js';
 import { registerJoinCommand } from './commands/join.js';
+import { registerKnowledgeCommand } from './commands/knowledge.js';
 import { registerProxyCommand } from './commands/proxy.js';
 import { registerRateCommand } from './commands/rate.js';
 import { registerSearchCommand } from './commands/search.js';
@@ -25,6 +26,7 @@ export function createDmxProgram(): Command {
   registerStatusCommand(program);
   registerCaptureCommand(program);
   registerSearchCommand(program);
+  registerKnowledgeCommand(program);
   registerRateCommand(program);
   registerInboxCommand(program);
   registerIndexCommand(program);

@@ -228,6 +228,15 @@ pnpm --filter devmesh dev -- inbox reject <queue-id> --root . --reason "Not dura
 pnpm --filter devmesh dev -- search "focused tests" --root .
 ```
 
+维护已有知识条目：
+
+```bash
+pnpm --filter devmesh dev -- knowledge get <knowledge-id> --root .
+pnpm --filter devmesh dev -- knowledge list --root . --layer canonical --type decision
+pnpm --filter devmesh dev -- knowledge update <knowledge-id> --root . --summary "Updated summary." --tag tests --reason "Refresh stale wording"
+pnpm --filter devmesh dev -- knowledge delete <knowledge-id> --root . --reason "Superseded by a newer decision"
+```
+
 探索本地知识图谱：
 
 ```bash

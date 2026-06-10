@@ -98,6 +98,56 @@ describe('dmx CLI local flow', () => {
         '1',
         '--no-open'
       ]);
+      const knowledgeGet = await runDmx(['knowledge', 'get', captureJson.id, '--root', projectRoot]);
+      const knowledgeList = await runDmx([
+        'knowledge',
+        'list',
+        '--root',
+        projectRoot,
+        '--layer',
+        'extract',
+        '--type',
+        'command',
+        '--limit',
+        '5'
+      ]);
+      const knowledgeUpdate = await runDmx([
+        'knowledge',
+        'update',
+        captureJson.id,
+        '--root',
+        projectRoot,
+        '--name',
+        'Xiaoyun',
+        '--summary',
+        'Use pnpm test:unit for fast focused checks.',
+        '--tag',
+        'tests',
+        '--tag',
+        'focused',
+        '--reason',
+        'Clarify the local test command.'
+      ]);
+      const knowledgeDelete = await runDmx([
+        'knowledge',
+        'delete',
+        previousCaptureJson.id,
+        '--root',
+        projectRoot,
+        '--name',
+        'Xiaoyun',
+        '--reason',
+        'Focused test guidance supersedes the broad note.'
+      ]);
+      const knowledgeListAll = await runDmx([
+        'knowledge',
+        'list',
+        '--root',
+        projectRoot,
+        '--include-superseded',
+        '--limit',
+        '5'
+      ]);
 
       const initJson = JSON.parse(init.stdout);
       const edgeAddJson = JSON.parse(edgeAdd.stdout);
@@ -107,6 +157,11 @@ describe('dmx CLI local flow', () => {
       const statusJson = JSON.parse(status.stdout);
       const indexJson = JSON.parse(index.stdout);
       const graphJson = JSON.parse(graph.stdout);
+      const knowledgeGetJson = JSON.parse(knowledgeGet.stdout);
+      const knowledgeListJson = JSON.parse(knowledgeList.stdout);
+      const knowledgeUpdateJson = JSON.parse(knowledgeUpdate.stdout);
+      const knowledgeDeleteJson = JSON.parse(knowledgeDelete.stdout);
+      const knowledgeListAllJson = JSON.parse(knowledgeListAll.stdout);
       const indexManifest = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'index', 'manifest.json'), 'utf8'));
       const graphIndex = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'index', 'graph.json'), 'utf8'));
       const graphHtml = await readFile(graphHtmlPath, 'utf8');
@@ -209,6 +264,54 @@ describe('dmx CLI local flow', () => {
             kind: 'supersedes',
             fromId: captureJson.id,
             toId: previousCaptureJson.id
+          })
+        ])
+      );
+      expect(knowledgeGetJson).toMatchObject({
+        id: captureJson.id,
+        title: 'Run focused tests'
+      });
+      expect(knowledgeListJson.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: captureJson.id
+          })
+        ])
+      );
+      expect(knowledgeUpdateJson).toMatchObject({
+        id: captureJson.id,
+        summary: 'Use pnpm test:unit for fast focused checks.',
+        tags: ['tests', 'focused'],
+        event: {
+          kind: 'knowledge.updated',
+          payload: {
+            knowledgeId: captureJson.id,
+            reason: 'Clarify the local test command.',
+            createdBy: {
+              displayName: 'Xiaoyun'
+            }
+          }
+        }
+      });
+      expect(knowledgeDeleteJson).toMatchObject({
+        id: previousCaptureJson.id,
+        status: 'tombstone',
+        event: {
+          kind: 'knowledge.deleted',
+          payload: {
+            knowledgeId: previousCaptureJson.id,
+            reason: 'Focused test guidance supersedes the broad note.',
+            createdBy: {
+              displayName: 'Xiaoyun'
+            }
+          }
+        }
+      });
+      expect(knowledgeListAllJson.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: previousCaptureJson.id,
+            status: 'tombstone'
           })
         ])
       );

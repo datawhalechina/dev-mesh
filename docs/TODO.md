@@ -49,6 +49,7 @@
 - [x] 完成 `dmx join <server> --group <groupKey> --name <displayName>`：支持 well-known discovery、invite join、全局 `[[servers]]` / `[[groups]]` 写入和 join 后 `auto_sync` 开启。
 - [x] 增加 `dmx join` client 单元测试和 CLI 集成测试，覆盖 token 不写入 TOML、identity 记录、真实 Hub Server join flow。
 - [x] 实现本地 MCP Proxy：`http://127.0.0.1:8722/mcp`。
+- [x] 增加 `dmx knowledge get/list/update/delete` 本地知识条目维护命令。
 - [x] Codex 打开项目时自动 `ensureProjectStore`。
 - [x] 实现 `dmx doctor` 的 adapter、store、sync、privacy 检查。
 - [x] Codex Adapter：detect、configure、remove、doctor。
