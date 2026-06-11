@@ -149,6 +149,22 @@ describe('dmx CLI global init', () => {
       await rm(projectRoot, { recursive: true, force: true });
     }
   }, 30000);
+
+  it('rejects conflicting init modes', async () => {
+    const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-conflicting-init-global-'));
+
+    try {
+      await expect(
+        runDmx(['init', '--global', '--project', '--yes'], {
+          DEV_MESH_HOME: globalRoot
+        })
+      ).rejects.toThrow(/cannot be used with option/);
+
+      await expect(readFile(join(globalRoot, 'config.toml'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await rm(globalRoot, { recursive: true, force: true });
+    }
+  }, 30000);
 });
 
 interface GlobalToolOutput {

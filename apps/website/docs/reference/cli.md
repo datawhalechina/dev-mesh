@@ -54,7 +54,7 @@ dmx init --global --tool codex --tool claude --scope user
 | --- | --- |
 | `--global` | 初始化全局 DevMesh 配置。 |
 | `--project` | 初始化当前项目的 `.dev-mesh`。 |
-| `--root <path>` | 指定项目根目录。显式传入时按项目初始化。 |
+| `--root <path>` | 指定项目根目录。未搭配 `--global` 时，显式传入会按项目初始化；搭配 `--global` 时，会把 MCP launcher 固定到该项目根。 |
 | `--name <displayName>` | 成员显示名，默认 `local`。 |
 | `--mcp-url <url>` | 本地 MCP proxy URL，默认 `http://127.0.0.1:8722/mcp`。 |
 | `--yes` | 使用默认值，不进入交互选择。 |
@@ -63,7 +63,7 @@ dmx init --global --tool codex --tool claude --scope user
 | `--tools <tools>` | 逗号分隔 MCP host。 |
 | `--scope <scope>` | MCP host 配置范围：`user` 或 `project`。 |
 
-`dmx init` 默认是全局初始化：扫描本机安装的 MCP host，配置它们运行 `dmx serve --mcp`。`dmx serve --mcp` 是前台 stdio launcher，会按项目拉起或复用后台共享 daemon。
+`dmx init` 默认是全局初始化：扫描本机安装的 MCP host，配置它们运行 `dmx serve --mcp`。`dmx serve --mcp` 是前台 stdio launcher，会按项目拉起或复用后台共享 daemon。`--global` 和 `--project` 表示互斥的初始化模式，不能同时使用。
 
 ### `dmx join <server>`
 

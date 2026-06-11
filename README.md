@@ -143,7 +143,6 @@ DevMesh 暴露两类接口：
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
 | 筹划 | 已完成 | 完成产品方向、技术路线和本地优先设计。 |
-| 立项准备 | 进行中 | 正在整理 README、协议、行为准则和提交材料。 |
 | Alpha 内测 | 进行中 | CLI 已发布到 npm，官网和核心文档已上线。 |
 | Beta 公测 | 未开始 | 计划在安装体验、Hub 部署和文档稳定后推进。 |
 
@@ -209,7 +208,7 @@ packages/
 
 本项目代码采用 [MIT License](./LICENSE)。
 
-文档、网站和社区协作规范会继续按 Datawhale 开源社区要求完善。
+文档、网站和社区协作规范会继续随项目演进完善。
 
 ## 安全和隐私
 
@@ -221,7 +220,3 @@ packages/
 ## 当前状态
 
 DevMesh 当前处于 alpha 阶段，CLI 已发布到 npm，网站和核心文档位于 [devmesh.xyun.dev](https://devmesh.xyun.dev/)。接口和存储格式会继续演进，生产部署前请结合自己的认证、密钥管理、备份和监控策略进行评估。
-
-## Datawhale 计划
-
-DevMesh 正在准备提交到 Datawhale DOPMC。当前仓库已经补齐双语 README、贡献指南、PR 模板、MIT 协议和行为准则适配文件，GitHub 仓库也已调整为符合 Datawhale 要求的小写形式 `dev-mesh`；接下来主要是按 DOPMC 的立项流程正式提交申请。

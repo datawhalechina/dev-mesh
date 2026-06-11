@@ -1,10 +1,6 @@
 # Code Of Conduct
 
-DevMesh adopts the spirit of the Datawhale open-source community code of conduct while preparing for DOPMC submission.
-
-Primary reference:
-
-- Datawhale DOPMC code of conduct: https://github.com/datawhalechina/DOPMC/blob/main/CODE_OF_CONDUCT.md
+DevMesh is committed to a welcoming, respectful, and practical collaboration environment for contributors and users.
 
 ## Our Commitment
 
@@ -33,4 +29,4 @@ For repository-related concerns, contact the current project lead through:
 - GitHub: https://github.com/xy200303
 - Repository issues: https://github.com/xy200303/dev-mesh/issues
 
-When DevMesh enters the formal Datawhale DOPMC process, this file can be updated to align with the final community governance path.
+This file can evolve as the contributor community grows and governance needs become clearer.
