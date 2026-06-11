@@ -33,6 +33,19 @@ DevMesh 是一个面向 Codex、Claude Code、opencode 等 AI 编程工具的项
 
 默认模式完全本地优先：不需要先部署服务端，也不会上传原始对话。需要团队共享时，再通过 Hub Server 做可选同步。
 
+## 项目受众
+
+- 使用 Codex、Claude Code、opencode 等 AI 编程工具的个人开发者
+- 希望让项目知识随仓库流动的小团队
+- 想基于 MCP、项目记忆、知识图谱继续二次开发的工程师
+
+## 在线阅读
+
+- 官网与文档：https://devmesh.xyun.dev/
+- CLI 参考：https://devmesh.xyun.dev/reference/cli
+- MCP 工具：https://devmesh.xyun.dev/reference/mcp
+- HTTP API：https://devmesh.xyun.dev/reference/http
+
 ## 快速开始
 
 ```bash
@@ -125,6 +138,24 @@ DevMesh 暴露两类接口：
 - [环境变量](https://devmesh.xyun.dev/reference/env)
 - [部署指南](https://devmesh.xyun.dev/deployment)
 
+## 项目进度
+
+| 阶段 | 状态 | 说明 |
+| --- | --- | --- |
+| 筹划 | 已完成 | 完成产品方向、技术路线和本地优先设计。 |
+| 立项准备 | 进行中 | 正在整理 README、协议、行为准则和提交材料。 |
+| Alpha 内测 | 进行中 | CLI 已发布到 npm，官网和核心文档已上线。 |
+| Beta 公测 | 未开始 | 计划在安装体验、Hub 部署和文档稳定后推进。 |
+
+## 项目团队
+
+| 角色 | 成员 | 联系方式 |
+| --- | --- | --- |
+| 项目负责人 | `@xy200303` | GitHub: https://github.com/xy200303 |
+| 项目主页 | DevMesh | Website: https://devmesh.xyun.dev/ |
+
+如果后续有固定维护者或共创成员，建议继续在这里补充。
+
 ## 本地开发
 
 ```bash
@@ -167,6 +198,19 @@ packages/
 
 贡献前请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。发布流程见 [docs/release.md](./docs/release.md)。
 
+## 如何贡献
+
+- 阅读 [CONTRIBUTING.md](./CONTRIBUTING.md) 了解开发环境、提交规范和 `.dev-mesh` 知识提交边界
+- 提交 PR 前至少运行 `pnpm typecheck`、`pnpm test:unit` 和 `pnpm build`
+- 涉及命令、接口、环境变量或知识目录行为的改动，请同步更新文档
+- 如果本轮工作产生了稳定项目知识，建议用 DevMesh 沉淀并单独提交
+
+## 开源协议
+
+本项目代码采用 [MIT License](./LICENSE)。
+
+文档、网站和社区协作规范会继续按 Datawhale 开源社区要求完善。
+
 ## 安全和隐私
 
 - 默认不上传原始对话全文。
@@ -177,3 +221,7 @@ packages/
 ## 当前状态
 
 DevMesh 当前处于 alpha 阶段，CLI 已发布到 npm，网站和核心文档位于 [devmesh.xyun.dev](https://devmesh.xyun.dev/)。接口和存储格式会继续演进，生产部署前请结合自己的认证、密钥管理、备份和监控策略进行评估。
+
+## Datawhale 计划
+
+DevMesh 正在准备提交到 Datawhale DOPMC。当前仓库已经补齐双语 README、贡献指南、PR 模板、MIT 协议和行为准则适配文件；后续还需要把 GitHub 仓库名调整为符合 Datawhale 要求的小写形式，并按 DOPMC 的立项流程提交申请。

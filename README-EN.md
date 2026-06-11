@@ -33,6 +33,19 @@ DevMesh is a project knowledge layer for AI coding tools such as Codex, Claude C
 
 The default mode is local-first. You do not need to deploy a server, and raw conversations are not uploaded. When a team wants shared memory, DevMesh can optionally sync through a Hub Server.
 
+## Who It Is For
+
+- Individual developers using Codex, Claude Code, opencode, or similar AI coding tools
+- Small teams that want project knowledge to travel with the repository
+- Engineers building on top of MCP, project memory, or knowledge graph workflows
+
+## Online Reading
+
+- Website and docs: https://devmesh.xyun.dev/
+- CLI reference: https://devmesh.xyun.dev/reference/cli
+- MCP tools: https://devmesh.xyun.dev/reference/mcp
+- HTTP API: https://devmesh.xyun.dev/reference/http
+
 ## Quick Start
 
 ```bash
@@ -125,6 +138,24 @@ Documentation:
 - [Environment variables](https://devmesh.xyun.dev/reference/env)
 - [Deployment guide](https://devmesh.xyun.dev/deployment)
 
+## Project Status
+
+| Stage | Status | Notes |
+| --- | --- | --- |
+| Planning | Complete | Product direction and local-first architecture are in place. |
+| Proposal prep | In progress | Repository materials are being aligned for Datawhale submission. |
+| Alpha | In progress | The CLI is published on npm and the website is online. |
+| Beta | Not started | Planned after install flow, Hub deployment, and docs stabilize. |
+
+## Project Team
+
+| Role | Member | Contact |
+| --- | --- | --- |
+| Project lead | `@xy200303` | GitHub: https://github.com/xy200303 |
+| Project home | DevMesh | Website: https://devmesh.xyun.dev/ |
+
+Add maintainers and collaborators here as the contributor group grows.
+
 ## Local Development
 
 ```bash
@@ -167,6 +198,19 @@ packages/
 
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) before sending a pull request. Release details are in [docs/release.md](./docs/release.md).
 
+## Contributing
+
+- Read [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, commit rules, and `.dev-mesh` knowledge-store boundaries
+- Run at least `pnpm typecheck`, `pnpm test:unit`, and `pnpm build` before opening a PR
+- Update docs when commands, APIs, environment variables, or knowledge-store behavior changes
+- If your work produces durable project knowledge, capture it with DevMesh and commit it separately when practical
+
+## License
+
+The code in this repository is released under the [MIT License](./LICENSE).
+
+Documentation, website content, and community collaboration rules will continue to be aligned with Datawhale submission expectations.
+
 ## Security And Privacy
 
 - Raw conversations are not uploaded by default.
@@ -177,3 +221,7 @@ Read [CONTRIBUTING.md](./CONTRIBUTING.md) before sending a pull request. Release
 ## Status
 
 DevMesh is currently in alpha. The CLI is published on npm, and the website and core docs live at [devmesh.xyun.dev](https://devmesh.xyun.dev/). APIs and storage formats may still evolve, so production deployments should be evaluated with your own authentication, secret management, backup, and monitoring requirements.
+
+## Datawhale Plan
+
+DevMesh is being prepared for submission to Datawhale DOPMC. The repository now includes bilingual READMEs, a contribution guide, a PR template, an MIT license, and a local code-of-conduct adoption file. The remaining repository-level task is to rename the GitHub repository to a lowercase form that matches Datawhale naming rules before submitting the proposal issue.
