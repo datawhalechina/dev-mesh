@@ -95,10 +95,6 @@ export default defineConfig({
     socialLinks: [
       { icon: 'github', link: 'https://github.com/xy200303/dev-mesh' },
     ],
-    footer: {
-      message: 'Local-first context memory for AI-assisted engineering teams.',
-      copyright: `Copyright © ${new Date().getFullYear()} DevMesh`,
-    },
     search: {
       provider: 'local',
     },
