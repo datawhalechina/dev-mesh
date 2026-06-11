@@ -143,7 +143,6 @@ Documentation:
 | Stage | Status | Notes |
 | --- | --- | --- |
 | Planning | Complete | Product direction and local-first architecture are in place. |
-| Proposal prep | In progress | Repository materials are being aligned for Datawhale submission. |
 | Alpha | In progress | The CLI is published on npm and the website is online. |
 | Beta | Not started | Planned after install flow, Hub deployment, and docs stabilize. |
 
@@ -209,7 +208,7 @@ Read [CONTRIBUTING.md](./CONTRIBUTING.md) before sending a pull request. Release
 
 The code in this repository is released under the [MIT License](./LICENSE).
 
-Documentation, website content, and community collaboration rules will continue to be aligned with Datawhale submission expectations.
+Documentation, website content, and community collaboration rules will continue to evolve with the project.
 
 ## Security And Privacy
 
@@ -221,7 +220,3 @@ Documentation, website content, and community collaboration rules will continue 
 ## Status
 
 DevMesh is currently in alpha. The CLI is published on npm, and the website and core docs live at [devmesh.xyun.dev](https://devmesh.xyun.dev/). APIs and storage formats may still evolve, so production deployments should be evaluated with your own authentication, secret management, backup, and monitoring requirements.
-
-## Datawhale Plan
-
-DevMesh is being prepared for submission to Datawhale DOPMC. The repository now includes bilingual READMEs, a contribution guide, a PR template, an MIT license, and a local code-of-conduct adoption file. The remaining repository-level task is to rename the GitHub repository to a lowercase form that matches Datawhale naming rules before submitting the proposal issue.
