@@ -224,4 +224,4 @@ DevMesh 当前处于 alpha 阶段，CLI 已发布到 npm，网站和核心文档
 
 ## Datawhale 计划
 
-DevMesh 正在准备提交到 Datawhale DOPMC。当前仓库已经补齐双语 README、贡献指南、PR 模板、MIT 协议和行为准则适配文件；后续还需要把 GitHub 仓库名调整为符合 Datawhale 要求的小写形式，并按 DOPMC 的立项流程提交申请。
+DevMesh 正在准备提交到 Datawhale DOPMC。当前仓库已经补齐双语 README、贡献指南、PR 模板、MIT 协议和行为准则适配文件，GitHub 仓库也已调整为符合 Datawhale 要求的小写形式 `dev-mesh`；接下来主要是按 DOPMC 的立项流程正式提交申请。

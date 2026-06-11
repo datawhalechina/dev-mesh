@@ -5,7 +5,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xy200303/DevMesh.git"
+    "url": "git+https://github.com/xy200303/dev-mesh.git"
   },
   "main": "./dist/index.js",
   "bin": {

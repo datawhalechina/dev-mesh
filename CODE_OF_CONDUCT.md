@@ -31,6 +31,6 @@ Primary reference:
 For repository-related concerns, contact the current project lead through:
 
 - GitHub: https://github.com/xy200303
-- Repository issues: https://github.com/xy200303/DevMesh/issues
+- Repository issues: https://github.com/xy200303/dev-mesh/issues
 
 When DevMesh enters the formal Datawhale DOPMC process, this file can be updated to align with the final community governance path.

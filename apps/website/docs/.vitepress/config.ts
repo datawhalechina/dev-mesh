@@ -68,7 +68,7 @@ export default defineConfig({
     nav: [
       { text: '文档', link: '/intro' },
       { text: '快速开始', link: '/getting-started' },
-      { text: 'GitHub', link: 'https://github.com/xy200303/DevMesh' },
+      { text: 'GitHub', link: 'https://github.com/xy200303/dev-mesh' },
     ],
     sidebar: [
       {
@@ -93,7 +93,7 @@ export default defineConfig({
       },
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/xy200303/DevMesh' },
+      { icon: 'github', link: 'https://github.com/xy200303/dev-mesh' },
     ],
     footer: {
       message: 'Local-first context memory for AI-assisted engineering teams.',

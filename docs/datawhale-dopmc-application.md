@@ -1,6 +1,6 @@
 # DevMesh Datawhale DOPMC 立项 Issue 草稿
 
-以下内容按当前 Datawhale DOPMC 常见立项 Issue 结构整理，提交前建议补齐仓库重命名结果、真实团队名单，以及你是否已经完成 Datawhale 联系方式登记。
+以下内容按当前 Datawhale DOPMC 常见立项 Issue 结构整理，提交前建议补齐真实团队名单，以及确认你是否已经完成 Datawhale 联系方式登记。
 
 ---
 
@@ -22,8 +22,8 @@ DevMesh 是一个面向 Codex、Claude Code、opencode 等 AI 编程工具的本
 
 项目仓库：
 
-- 当前仓库：<https://github.com/xy200303/DevMesh>
-- 提交前计划调整为符合 Datawhale 规范的小写仓库名：`devmesh` 或 `dev-mesh`
+- 当前仓库：<https://github.com/xy200303/dev-mesh>
+- 当前仓库名已调整为符合 Datawhale 规范的小写形式：`dev-mesh`
 
 项目文档：
 
@@ -87,7 +87,7 @@ DevMesh 是一个面向 Codex、Claude Code、opencode 等 AI 编程工具的本
 
 ### 补充说明
 
-- 本项目当前 GitHub 仓库名仍为 `DevMesh`，正式提交前会调整为符合 Datawhale 规范的小写形式
+- 本项目 GitHub 仓库已调整为符合 Datawhale 规范的小写形式：`dev-mesh`
 - 当前代码采用 MIT License；如 Datawhale 对软件仓库协议形式有额外建议，可按官方建议调整
 
 ### 注意事项

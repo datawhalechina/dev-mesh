@@ -224,4 +224,4 @@ DevMesh is currently in alpha. The CLI is published on npm, and the website and 
 
 ## Datawhale Plan
 
-DevMesh is being prepared for submission to Datawhale DOPMC. The repository now includes bilingual READMEs, a contribution guide, a PR template, an MIT license, and a local code-of-conduct adoption file. The remaining repository-level task is to rename the GitHub repository to a lowercase form that matches Datawhale naming rules before submitting the proposal issue.
+DevMesh is being prepared for submission to Datawhale DOPMC. The repository now includes bilingual READMEs, a contribution guide, a PR template, an MIT license, and a local code-of-conduct adoption file. The GitHub repository has also been renamed to the lowercase `dev-mesh` form that matches Datawhale naming rules, so the next step is the formal proposal submission.
