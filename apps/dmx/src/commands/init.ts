@@ -1,5 +1,5 @@
 import { cancel, intro, isCancel, log, multiselect, note, outro, select, spinner } from '@clack/prompts';
-import type { Command } from 'commander';
+import { Option, type Command } from 'commander';
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import {
@@ -18,8 +18,8 @@ export function registerInitCommand(program: Command): void {
   program
     .command('init')
     .description('Initialize global or project DevMesh state')
-    .option('--global', 'initialize ~/.dev-mesh instead of the current project')
-    .option('--project', 'initialize .dev-mesh in the selected project')
+    .addOption(new Option('--global', 'initialize ~/.dev-mesh instead of the current project').conflicts('project'))
+    .addOption(new Option('--project', 'initialize .dev-mesh in the selected project').conflicts('global'))
     .option('--root <path>', 'project root', process.cwd())
     .option('--name <displayName>', 'member display name', 'local')
     .option('--mcp-url <url>', 'local MCP proxy URL', 'http://127.0.0.1:8722/mcp')
