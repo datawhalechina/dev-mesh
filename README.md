@@ -10,7 +10,7 @@
   </p>
   <p>
     <a href="https://www.npmjs.com/package/devmesh"><img alt="npm alpha version" src="https://img.shields.io/npm/v/devmesh/alpha?label=npm&color=2f7f68"></a>
-    <a href="https://www.npmjs.com/package/devmesh"><img alt="npm monthly downloads" src="https://img.shields.io/npm/dm/devmesh?label=downloads&color=4b5563"></a>
+    <a href="https://devmesh.xyun.dev/"><img alt="DevMesh docs" src="https://img.shields.io/badge/docs-devmesh.xyun.dev-4b5563"></a>
     <img alt="Node.js" src="https://img.shields.io/badge/Node.js-%3E%3D22-5fa04e">
   </p>
   <p>
