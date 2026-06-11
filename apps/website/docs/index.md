@@ -166,7 +166,7 @@ const commandGroups = [
 </script>
 
 <div class="mesh-home-doc">
-  <section class="mesh-page-section">
+  <section class="mesh-page-section mesh-page-section--install">
     <p class="mesh-section-label">Install</p>
     <h2>安装已发布的 CLI</h2>
     <p class="mesh-section-copy">
@@ -178,27 +178,31 @@ const commandGroups = [
     <p class="mesh-inline-note">建议使用 Node.js 22 或更高版本，然后继续运行 <code>dmx init</code>。</p>
   </section>
 
-  <section class="mesh-page-section">
+  <section class="mesh-page-section mesh-page-section--flow">
     <p class="mesh-section-label">Flow</p>
     <h2>从安装到沉淀</h2>
+    <p class="mesh-section-copy">安装、接入、开发，三步看清 DevMesh 的起步路径。</p>
     <Card :items="workflowCards" :grid="3" />
   </section>
 
-  <section class="mesh-page-section">
+  <section class="mesh-page-section mesh-page-section--reference">
     <p class="mesh-section-label">Reference</p>
     <h2>文档入口</h2>
+    <p class="mesh-section-copy">把命令、接口、环境变量和部署资料拆成清晰入口，减少来回翻找。</p>
     <Links :items="docLinks" :grid="3" />
   </section>
 
-  <section class="mesh-page-section">
+  <section class="mesh-page-section mesh-page-section--surfaces">
     <p class="mesh-section-label">Surfaces</p>
     <h2>工具和接口</h2>
+    <p class="mesh-section-copy">CLI、MCP、Hub API 和本地知识目录，构成 DevMesh 的主要使用面。</p>
     <Card :items="interfaceCards" :grid="4" />
   </section>
 
-  <section class="mesh-page-section">
+  <section class="mesh-page-section mesh-page-section--commands">
     <p class="mesh-section-label">Commands</p>
     <h2>命令索引</h2>
+    <p class="mesh-section-copy">按工作阶段浏览命令，比先记住所有子命令更容易上手。</p>
     <div class="mesh-command-grid">
       <article v-for="group in commandGroups" :key="group.title" class="mesh-command-group">
         <div class="mesh-command-group__header">
