@@ -109,6 +109,62 @@
 - [x] PostgreSQL-backed Hub state store。
 - [x] 更完整 ACL 和 token rotation 管理界面。
 
+## 阶段 7：CRDT v2 重写基础
+
+- [x] 新增 `@devmesh/crdt-store`，定义 CRDT backend 接口和 Automerge 默认实现。
+- [x] 定义 v2 `ProjectDoc`、`ServerGlobalDoc`、`KnowledgeNode`、`EntityNode`、`RelationEdge`、`ClaimNode`、`QualitySignal` 和 `ConflictNode` schema。
+- [x] 定义知识类型画像和捕获策略：区分 `project_fact`、`macro_experience`、`design_principle`、`pitfall_record` 等类型，默认不自动沉淀易过期项目事实。
+- [x] 定义 Git for knowledge 产品心智：用户层使用 knowledge branch / checkout / capture / merge，底层 group 负责同步和 ACL。
+- [x] 设计 knowledge branch / group 知识空间模型：默认 checkout 到 `main` 知识分支，主题化共享或项目隔离通过显式切换 branch 完成。
+- [x] 实现 1.0 JSONL 到 v2 CRDT 的一次性 import，覆盖知识、edges、ratings、usage、tombstone 和 audit/task signals。（已覆盖知识、edges、ratings、usage、tombstone、review/quality audit hints 和 task progress hints。）
+- [ ] 重写 repository，使写入路径直接写 CRDT，读取路径只读 projections。
+- [x] 新增按需 JSONL export，用于备份、调试和人工审阅。（从 CRDT 源状态导出 `.dev-mesh/exports/knowledge.jsonl`，默认保留 tombstone，可按需过滤。）
+- [x] 增加 CRDT load/save、重复 change 幂等、乱序 apply 收敛和 import round-trip 测试。（已覆盖 load/save、重复 change 幂等、并发不同字段 merge、乱序 Automerge change apply 收敛和 import round-trip。）
+
+## 阶段 8：Projections 和 Daemon v2
+
+- [x] 定义 projection backend 接口，支持 `schemaVersion`、`sourceHeads()`、`rebuild()`、`applyIncrementalChange()`、`healthCheck()` 和 `dropAndRebuild()`；已提供 `LocalProjectionBackend` 过渡实现。
+- [x] 实现本地默认 projections：`knowledge.sqlite`、`graph.sqlite`、`search.sqlite`。（保留 `manifest.json` 作为调试清单，并额外生成 `quality.json` 动态评分 projection。）
+- [x] 实现动态评分 projection：从 `QualitySignal` 聚合 `reliability`、`usefulness`、`freshness`、`priority` 和 `score`。
+- [x] 实现基于类型画像和 TTL 的 projection 召回策略，默认排除过期或易变 `project_fact`，支持显式 `includeVolatile`。
+- [x] 实现 local-store 过渡版 branch-aware 查询：capture 标注 `source.metadata.branch`，list/search/context/graph 默认只读 active/base branch，支持显式 `branch` 单次查询，旧知识回退到 `main`。
+- [x] 实现 Hub 过渡版 group-aware 查询策略：同步快照重放写入 `source.metadata.groupKey`，Admin/MCP 查询可按 group/branch 过滤，CRDT v2 正式版再替换为 namespace projection。
+- [x] 重写 daemon：监听 CRDT changes、自动 sync、自动 materialize projections、写入 v2 status。（本地 daemon 进程状态已写入 `.dev-mesh/state/daemon.json` / `.dev-mesh/state/daemon.pid`，sync status 写入 `.dev-mesh/state/sync.json`，并暴露 CRDT heads、projection materialized 状态和 projection 文件健康摘要；daemon 已通过 `/api/v2/sync/exchange` 交换 Automerge changes，peer heads 状态写入 `.dev-mesh/crdt/sync/peers.json`，诊断 heads 写入 `.dev-mesh/crdt/sync/heads.json`，并在拉取后自动重建 projections；worker 已监听 `.dev-mesh/crdt/project.automerge` 并 debounce 触发同步和 projection rebuild。）
+- [x] 实现 projection dirty 标记、版本不匹配/损坏/缺失文件诊断和 daemon 自动 rebuild。（增量更新当前仍由 backend 降级为全量 rebuild。）
+- [x] 增加 projection 删除后从 CRDT 全量重建一致性的测试。
+
+## 阶段 9：CRDT Sync 和全局 Hub
+
+- [x] 设计 v2 client-to-Hub CRDT sync protocol，替代 cursor-only knowledge sync。（已新增 `/api/v2/sync/exchange`，daemon 使用 document heads 和 base64 Automerge changes 交换 CRDT 变更，并记录 remote heads peer state；本地 bootstrap 不再生成 `.dev-mesh/sync/cursors.json`，daemon 运行路径已移除 v1 cursor event sync。）
+- [ ] 服务端保存逻辑全局 CRDT，并支持物理分片：server、groups、projects、members、knowledge、entities、relations、claims、conflicts、signals。（Hub 已持久化 group/project 维度 CRDT document snapshot、heads 和 change log；Admin branch/project/publish 管理操作已追加到 `server-global/admin-operations` Automerge 过渡日志，并随 `crdtDocuments` 保存 snapshot、heads 和 change log；Admin 已提供 CRDT document status 只读 API/页面查看 document ref、heads、change count 和 latest change 摘要且不暴露 bytes/snapshot；完整全局 schema 分片待补。）
+- [x] 实现服务端全局 projections：`global-knowledge`、`global-graph`、`global-search`、`global-quality`、`global-conflicts`。（已实现 Hub 内存/JSON 持久化的 v2 global projection 摘要，跟踪 CRDT document heads、group/project scope、knowledge、relations、quality signals 和 conflicts；knowledge 仍兼容投影到现有 repository，专用生产 backend 待后续替换。）
+- [ ] 实现全局服务器连接地址和项目 active knowledge branch 配置，active/base branch 映射到底层 `group_key`。（daemon 已按项目 active knowledge branch 选择 joined server/group 执行 v2 CRDT exchange，并兼容 `main` -> `default`；base branch 已作为 read-only remote 拉入独立 `.dev-mesh/crdt/branches/<group>.automerge` cache 且不会上传本地 changes，本地 repository/search/projection/graph explore 已叠加 base cache；daemon status/heads、runtime/MCP status 已暴露 base cache path、heads 和 change count，doctor 已汇总 base cache，Admin 已展示 Hub 侧 CRDT document heads/change log 摘要；更细健康检查待补。）
+- [ ] 统一 project/branch/group 入口模型：默认 `main` 共享知识分支，主题化共享或项目隔离由显式 checkout 决定。（本地 branch 配置、CLI/MCP branch 控制和 daemon active-branch group 映射已落地；Hub/Admin 已新增 branch/group summary API，将 group 作为 knowledge branch 展示并聚合 members/projects/CRDT projection counts；Admin 前端已新增 Branches 视图展示共享边界和 CRDT counts，并支持创建 knowledge branch；Admin 已支持将项目 checkout 到目标 branch/group，改变项目后续默认读写空间并写入 audit；Admin 已支持将单条知识 publish/cherry-pick 到目标 branch，生成新 knowledge 并保留来源 metadata/audit；Admin 已支持只读 branch merge preview，将候选知识区分为 publishable、already_published 和 possible_conflict；Admin 已支持从 preview 中批量 publish 选中的 publishable 项，冲突/已发布/缺失项会被 rejected；branch create/update、project checkout、单条和批量 publish 成功项已写入 server-global CRDT 管理操作日志；完整 branch merge、project split 和历史 CRDT 文档迁移待补。）
+- [x] 实现 group ACL 过滤和 projection 输出裁剪。（Admin global projection 支持 group/project 过滤；成员级 `/api/v2/projections/global` 使用 Bearer token 按认证 group 强制裁剪。）
+- [x] 移除 daemon knowledge snapshot replay 运行路径。
+- [ ] 增加 Hub apply CRDT changes 后 Admin 可见、跨 group 隔离、同 group 共享、重复同步幂等和离线恢复测试。（已覆盖 v2 exchange 后 Admin 可见、global projection 更新、projection ACL 裁剪、daemon 本地/远端 Automerge change 交换、同 group 拉取、跨 group 隔离、重复提交幂等和 CRDT apply 收敛；离线恢复待补。）
+
+## 阶段 10：知识图谱、冲突和 Admin v2
+
+- [ ] 实现 EntityResolver、RelationExtractor、QualityScorer、ConflictPolicy 和 Materializer 扩展点。
+- [ ] 实现全局知识图谱可视化 API，支持按 server、group、project、member、entity、tag、type 过滤。
+- [ ] 实现 Admin 图谱视图：实体关系、项目知识结构、质量热区和冲突层。
+- [ ] 实现 Admin group 管理流程：创建 group、项目加入/移出 group、合并/拆分 group，并支持 project 作为 group 入口别名展示。
+- [ ] 实现语义冲突 review：same-field edit、delete/update、duplicate entity、contradictory claim。
+- [ ] 实现图谱编辑写回 CRDT：entity merge、conflict resolve、priority change、group membership change。
+- [ ] 增加 group membership 审计、冲突处理、图谱编辑写回 CRDT 和 projection 刷新的测试。
+
+## 阶段 11：MCP Tools v2 和扩展生态
+
+- [ ] 重写 MCP tools 为 Core / Power / Admin 三层 capability。
+- [ ] 实现 Core tools：`devmesh.status`、`branch.*`、`context.build`、`knowledge.*`、`task.*`、`graph.explore`、`graph.link`、`entity.*`、`quality.signal`、`sync.*`。
+- [x] 实现 `dmx branch list/switch/create/policy`，让开发者用 Git-like 命令切换知识分支和配置沉淀策略。
+- [ ] 实现 Power tools：`project.brief`、`project.scan`、`graph.path`、`claim.*`、`conflict.*`、`memory.summarize`、`projection.*`。
+- [ ] 实现 Admin tools：`admin.graph_overview`、`admin.member_activity`、`admin.quality_review`、`admin.conflict_queue`、`admin.entity_merge`、`admin.policy_update`。
+- [ ] 实现 `graph.path`，返回知识相关性路径而不是仅返回文本命中。
+- [ ] 实现 extension registry 的 v2 capabilities：CRDT backend、projection backend、materializer、entity resolver、relation extractor、quality scorer、conflict policy、sync transport、knowledge type plugin。
+- [ ] 增加 MCP tool contract tests，覆盖 capability gating、ACL、group-aware context 和 Admin-only 权限。
+
 ## 阶段验收标准
 
 ### 阶段 0 验收标准
@@ -164,6 +220,36 @@
 - invite 默认策略支持短期有效期，显式使用次数限制保留在 audit payload 中。
 - Hub groups、invites、members、tokens、projects、sync cursor 和 audit log 能通过开发期 JSON file adapter 或 PostgreSQL-backed Hub state store 跨重启恢复。
 - 管理后台能查看关键安全生命周期事件，支持 project ACL 和 member token rotation 管理，并保持所有写操作通过 server API。
+
+### 阶段 7 验收标准
+
+- CRDT schema 能表达知识、实体、关系、claim、评分信号、冲突和 group 归属。
+- 所有写入路径只写 CRDT，不再直接写 JSONL 事实源。
+- 1.0 JSONL import 能保留核心历史数据，并能生成等价 projections。
+
+### 阶段 8 验收标准
+
+- 本地 projections 可删除并从 CRDT 全量重建。
+- daemon 能自动同步、自动 materialize projections，并通过 status 暴露健康状态。
+- 项目模式默认只读取 active branch，可选叠加 base branch；默认 active branch 是 `main`，主题化共享或项目隔离通过显式 checkout 完成。
+
+### 阶段 9 验收标准
+
+- Hub 接受 CRDT changes 后能更新全局 CRDT 和全局 projections。
+- 全局服务器连接地址和项目 active/base knowledge branch 能共同解析目标知识空间，并映射到底层 `group_key`。
+- group ACL 能阻止未授权 group 知识出现在查询结果中。
+
+### 阶段 10 验收标准
+
+- Admin 能可视化全局知识图谱，并按 group、project、entity 和 member 过滤。
+- 项目加入、移出、合并或拆分 group 必须写入可审计 CRDT change。
+- 语义冲突能进入 review queue，并通过 Admin 写回处理结果。
+
+### 阶段 11 验收标准
+
+- Core tools 默认可用，Power/Admin tools 受 capability 和权限控制。
+- `context.build` 能结合 group、quality、graph path 和 token budget 生成稳定上下文包。
+- `graph.path` 能解释知识和当前任务的关系路径。
 
 ## 发布前检查
 

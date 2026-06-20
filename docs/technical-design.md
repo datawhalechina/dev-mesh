@@ -58,7 +58,7 @@
 | Knowledge Quality Signals | 知识质量信号，包括 `confidence`、`weight`、`rating`、`adoptionScore` 和派生的 `qualityScore`，用于表达可靠性、先进性、团队认可度、真实采纳情况和检索优先级。 |
 | Context Pack | 检索返回给 Agent 的上下文包，包含摘要、来源、质量信号和引用链接。 |
 | Adapter | 针对 Codex、Claude Code、opencode 等工具的配置写入和事件接入模块。 |
-| Sync Cursor | 客户端和服务端之间的增量同步游标。 |
+| Sync Cursor | 客户端和服务端之间的增量传输游标。游标不能证明知识状态一致；v2 可靠同步设计见 [CRDT 知识同步设计](./crdt-knowledge-sync-design.md)。 |
 
 ## 3. 总体架构
 
@@ -1121,9 +1121,9 @@ interval_seconds = 60
   queue/
     pending.jsonl           # 不提交：待 review / 待同步项目
   index/
-    mesh.sqlite             # 不提交：本地检索、去重、embedding metadata
-    graph.json              # 不提交：从知识条目派生的本地关系图谱索引
-    fts/                    # 不提交：可重建关键词索引
+    knowledge.sqlite        # 不提交：知识列表、过滤、分页和去重读模型
+    search.sqlite           # 不提交：关键词/FTS 和可选 embedding metadata
+    graph.sqlite            # 不提交：从知识条目派生的本地关系图谱索引
     vector/                 # 不提交：可重建向量索引
   sync/
     cursors.json            # 不提交：服务端同步游标
@@ -1668,7 +1668,9 @@ Agent MCP tool call
   -> .dev-mesh/knowledge/extract/*.jsonl
   -> .dev-mesh/knowledge/canonical/entries.jsonl
   -> .dev-mesh/knowledge/para/*.json
-  -> .dev-mesh/index/mesh.sqlite
+  -> .dev-mesh/index/knowledge.sqlite
+  -> .dev-mesh/index/search.sqlite
+  -> .dev-mesh/index/graph.sqlite
   -> sync push to joined Server Group when available
 ```
 

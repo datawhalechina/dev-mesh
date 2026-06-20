@@ -5,6 +5,7 @@
 ## 主要文档
 
 - [技术设计文档](./technical-design.md)：项目背景、架构、包分层、MCP tools、同步、安全、测试策略和路线图。
+- [CRDT 知识同步设计](./crdt-knowledge-sync-design.md)：DevMesh v2 的 CRDT 事实源、`.dev-mesh/` 简化、projections、daemon 自动同步和知识图谱实体关系模型。
 - [开发指南](./development-guide.md)：代码组织、依赖方向、抽象边界、注释规范、测试和文档同步约定。
 - [Alpha Release Guide](./release.md)：Docker Compose、本地发布验证、容器镜像和官网发布边界。
 - [TODO 清单](./TODO.md)：从当前骨架到可用产品的阶段任务、阶段验收标准和发布前检查项。
