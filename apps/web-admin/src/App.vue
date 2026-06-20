@@ -3,6 +3,9 @@ import * as ElementPlusIcons from '@element-plus/icons-vue';
 import type { Component } from 'vue';
 import { computed, onMounted, reactive, ref } from 'vue';
 import {
+  bulkPublishKnowledgeToBranch,
+  checkoutProjectBranch,
+  createBranch,
   createGlossaryItem,
   createInvite,
   createGroup,
@@ -11,6 +14,9 @@ import {
   disableMember,
   fetchAdminOverview,
   fetchAuditLogs,
+  fetchBranchMergePreview,
+  fetchBranches,
+  fetchCrdtDocuments,
   fetchGlossary,
   fetchGroups,
   fetchInvites,
@@ -21,6 +27,7 @@ import {
   fetchQualityReview,
   fetchReviewQueue,
   fetchTaskDigest,
+  publishKnowledgeToBranch,
   rotateMemberToken,
   revokeInvite,
   updateGlossaryItem,
@@ -29,17 +36,26 @@ import {
 import type {
   AdminOverview,
   AuditLog,
+  BranchInput,
+  BranchMergePreview,
+  BranchMergePreviewItem,
+  BranchSummary,
+  CrdtDocumentFilters,
+  CrdtDocumentSummary,
   GlossaryInput,
   GroupInput,
   GroupSummary,
   InviteInput,
   InviteSummary,
+  KnowledgeBranchPublishInput,
+  KnowledgeBranchBulkPublishResult,
   KnowledgeEdge,
   KnowledgeEdgeInput,
   KnowledgeEdgeKind,
   KnowledgeItem,
   MemberSummary,
   ProjectAclRole,
+  ProjectBranchInput,
   ProjectInput,
   ProjectSummary,
   QualityReviewFilters,
@@ -58,6 +74,7 @@ const Collection = icons.Collection;
 const Connection = icons.Connection;
 const DataAnalysis = icons.DataAnalysis;
 const Document = icons.Document;
+const Files = icons.Files;
 const Folder = icons.Folder;
 const Lock = icons.Lock;
 const Memo = icons.Memo;
@@ -70,6 +87,8 @@ const activeView = ref('overview');
 const loading = ref(false);
 const errorMessage = ref('');
 const overview = ref<AdminOverview | null>(null);
+const branches = ref<BranchSummary[]>([]);
+const crdtDocuments = ref<CrdtDocumentSummary[]>([]);
 const groups = ref<GroupSummary[]>([]);
 const members = ref<MemberSummary[]>([]);
 const invites = ref<InviteSummary[]>([]);
@@ -93,24 +112,47 @@ const taskDigestProjectKey = ref('');
 const taskDigestStatus = ref<TaskStatus | ''>('');
 const taskDigestIncludeDone = ref(false);
 const taskDigestIncludeSuperseded = ref(true);
+const crdtDocumentKind = ref('');
+const crdtDocumentGroupKey = ref('');
+const crdtDocumentProjectKey = ref('');
 const glossaryQuery = ref('');
 const glossaryGroupKey = ref('');
 const glossaryProjectKey = ref('');
 const groupDialogOpen = ref(false);
+const branchDialogOpen = ref(false);
+const branchMergePreviewDialogOpen = ref(false);
 const inviteDialogOpen = ref(false);
 const projectDialogOpen = ref(false);
 const projectAclDialogOpen = ref(false);
+const projectBranchDialogOpen = ref(false);
 const rotatedTokenDialogOpen = ref(false);
 const glossaryDialogOpen = ref(false);
+const knowledgePublishDialogOpen = ref(false);
 const edgeDialogOpen = ref(false);
 const rotatedToken = ref<RotatedAccessToken | null>(null);
 const selectedAclProject = ref<ProjectSummary | null>(null);
+const selectedBranchProject = ref<ProjectSummary | null>(null);
+const branchMergePreview = ref<BranchMergePreview | null>(null);
+const branchMergeSelectedSourceIds = ref<string[]>([]);
+const branchMergeBulkPublishResult = ref<KnowledgeBranchBulkPublishResult | null>(null);
+const selectedPublishKnowledge = ref<KnowledgeItem | null>(null);
 const editingGlossaryId = ref<string | null>(null);
 const groupForm = reactive<GroupInput>({
   key: '',
   displayName: '',
   description: '',
   joinMode: 'invite'
+});
+const branchForm = reactive<BranchInput>({
+  branchKey: '',
+  displayName: '',
+  description: '',
+  joinMode: 'invite'
+});
+const branchMergePreviewForm = reactive<BranchMergePreviewFormInput>({
+  sourceBranchKey: '',
+  targetBranchKey: '',
+  reason: ''
 });
 const projectForm = reactive<ProjectInput>({
   groupKey: '',
@@ -129,6 +171,9 @@ const projectAclForm = reactive<ProjectAclFormInput>({
   memberIds: [],
   role: 'member'
 });
+const projectBranchForm = reactive<ProjectBranchInput>({
+  branchKey: ''
+});
 const glossaryForm = reactive<GlossaryFormInput>({
   groupKey: '',
   projectKey: '',
@@ -137,6 +182,10 @@ const glossaryForm = reactive<GlossaryFormInput>({
   content: '',
   aliases: '',
   tags: ''
+});
+const knowledgePublishForm = reactive<KnowledgePublishFormInput>({
+  targetBranchKey: '',
+  reason: ''
 });
 const edgeForm = reactive<KnowledgeEdgeFormInput>({
   kind: 'supersedes',
@@ -149,6 +198,8 @@ const edgeForm = reactive<KnowledgeEdgeFormInput>({
 const navItems = [
   { key: 'overview', label: 'Overview', icon: DataAnalysis },
   { key: 'groups', label: 'Groups', icon: Collection },
+  { key: 'branches', label: 'Branches', icon: Connection },
+  { key: 'crdt', label: 'CRDT Docs', icon: Files },
   { key: 'members', label: 'Members', icon: User },
   { key: 'invites', label: 'Invites', icon: Lock },
   { key: 'projects', label: 'Projects', icon: Folder },
@@ -204,6 +255,10 @@ const taskDigestStats = computed(() => {
 
 const taskDigestEntries = computed(() => taskDigest.value?.entries ?? []);
 
+const branchMergePublishableItems = computed(() =>
+  branchMergePreview.value?.items.filter((item) => item.status === 'publishable') ?? []
+);
+
 const projectAclMembers = computed(() => {
   if (selectedAclProject.value === null) {
     return [];
@@ -232,6 +287,8 @@ async function refreshAll(): Promise<void> {
   try {
     const [
       overviewData,
+      branchData,
+      crdtDocumentData,
       groupData,
       memberData,
       inviteData,
@@ -246,6 +303,8 @@ async function refreshAll(): Promise<void> {
       auditData
     ] = await Promise.all([
       fetchAdminOverview(),
+      fetchBranches(),
+      fetchCrdtDocuments(createCrdtDocumentFilters()),
       fetchGroups(),
       fetchMembers(),
       fetchInvites(),
@@ -261,6 +320,8 @@ async function refreshAll(): Promise<void> {
     ]);
 
     overview.value = overviewData;
+    branches.value = branchData;
+    crdtDocuments.value = crdtDocumentData;
     groups.value = groupData;
     members.value = memberData;
     invites.value = inviteData;
@@ -319,6 +380,19 @@ async function reloadTaskDigest(): Promise<void> {
   }
 }
 
+async function reloadCrdtDocuments(): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    crdtDocuments.value = await fetchCrdtDocuments(createCrdtDocumentFilters());
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
 async function reloadGlossary(): Promise<void> {
   loading.value = true;
   errorMessage.value = '';
@@ -346,6 +420,93 @@ async function submitGroup(): Promise<void> {
       joinMode: 'invite'
     });
     await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function submitBranch(): Promise<void> {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    await createBranch(branchForm);
+    branchDialogOpen.value = false;
+    Object.assign(branchForm, {
+      branchKey: '',
+      displayName: '',
+      description: '',
+      joinMode: 'invite'
+    });
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function openBranchMergePreview(row: BranchSummary): Promise<void> {
+  const targetBranch = branches.value.find((branch) => branch.branchKey !== row.branchKey);
+
+  Object.assign(branchMergePreviewForm, {
+    sourceBranchKey: row.branchKey,
+    targetBranchKey: targetBranch?.branchKey ?? '',
+    reason: ''
+  });
+  branchMergePreview.value = null;
+  branchMergeSelectedSourceIds.value = [];
+  branchMergeBulkPublishResult.value = null;
+  branchMergePreviewDialogOpen.value = true;
+
+  if (branchMergePreviewForm.targetBranchKey) {
+    await reloadBranchMergePreview();
+  }
+}
+
+async function reloadBranchMergePreview(): Promise<void> {
+  if (!branchMergePreviewForm.sourceBranchKey || !branchMergePreviewForm.targetBranchKey) {
+    branchMergePreview.value = null;
+    return;
+  }
+
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    branchMergePreview.value = await fetchBranchMergePreview(
+      branchMergePreviewForm.sourceBranchKey,
+      branchMergePreviewForm.targetBranchKey
+    );
+    branchMergeSelectedSourceIds.value = branchMergePublishableItems.value.map((item) => item.source.id);
+    branchMergeBulkPublishResult.value = null;
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function submitBranchMergeBulkPublish(): Promise<void> {
+  if (!branchMergePreviewForm.sourceBranchKey || !branchMergePreviewForm.targetBranchKey) {
+    return;
+  }
+
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    const reason = branchMergePreviewForm.reason.trim();
+    branchMergeBulkPublishResult.value = await bulkPublishKnowledgeToBranch({
+      sourceBranchKey: branchMergePreviewForm.sourceBranchKey,
+      targetBranchKey: branchMergePreviewForm.targetBranchKey,
+      sourceIds: branchMergeSelectedSourceIds.value,
+      ...(reason ? { reason } : {})
+    });
+    await refreshAll();
+    await reloadBranchMergePreview();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -470,6 +631,35 @@ function openProjectAcl(row: ProjectSummary): void {
   projectAclDialogOpen.value = true;
 }
 
+function openProjectBranch(row: ProjectSummary): void {
+  selectedBranchProject.value = row;
+  projectBranchForm.branchKey = row.groupKey;
+  projectBranchDialogOpen.value = true;
+}
+
+async function submitProjectBranch(): Promise<void> {
+  if (selectedBranchProject.value === null) {
+    return;
+  }
+
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    await checkoutProjectBranch(selectedBranchProject.value.groupKey, selectedBranchProject.value.id, {
+      branchKey: projectBranchForm.branchKey
+    });
+    projectBranchDialogOpen.value = false;
+    selectedBranchProject.value = null;
+    projectBranchForm.branchKey = '';
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
 async function submitProjectAcl(): Promise<void> {
   if (selectedAclProject.value === null) {
     return;
@@ -578,6 +768,52 @@ async function submitGlossary(): Promise<void> {
   }
 }
 
+function openKnowledgePublishDialog(row: KnowledgeItem): void {
+  const sourceBranch = knowledgeGroupKey(row);
+  const targetBranch = branches.value.find((branch) => branch.branchKey !== sourceBranch);
+
+  selectedPublishKnowledge.value = row;
+  Object.assign(knowledgePublishForm, {
+    targetBranchKey: targetBranch?.branchKey ?? '',
+    reason: ''
+  });
+  knowledgePublishDialogOpen.value = true;
+}
+
+async function submitKnowledgePublish(): Promise<void> {
+  if (selectedPublishKnowledge.value === null) {
+    return;
+  }
+
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    const payload: KnowledgeBranchPublishInput = {
+      sourceId: selectedPublishKnowledge.value.id,
+      targetBranchKey: knowledgePublishForm.targetBranchKey
+    };
+    const reason = knowledgePublishForm.reason.trim();
+
+    if (reason) {
+      payload.reason = reason;
+    }
+
+    await publishKnowledgeToBranch(payload);
+    knowledgePublishDialogOpen.value = false;
+    selectedPublishKnowledge.value = null;
+    Object.assign(knowledgePublishForm, {
+      targetBranchKey: '',
+      reason: ''
+    });
+    await refreshAll();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
 function openEdgeDialog(): void {
   Object.assign(edgeForm, {
     kind: 'supersedes',
@@ -664,6 +900,24 @@ function createTaskDigestFilters(): TaskDigestFilters {
   return filters;
 }
 
+function createCrdtDocumentFilters(): CrdtDocumentFilters {
+  const filters: CrdtDocumentFilters = {};
+
+  if (crdtDocumentKind.value.trim()) {
+    filters.kind = crdtDocumentKind.value.trim();
+  }
+
+  if (crdtDocumentGroupKey.value.trim()) {
+    filters.groupKey = crdtDocumentGroupKey.value.trim();
+  }
+
+  if (crdtDocumentProjectKey.value.trim()) {
+    filters.projectKey = crdtDocumentProjectKey.value.trim();
+  }
+
+  return filters;
+}
+
 function memberStatusType(status: MemberSummary['status']): 'success' | 'danger' {
   return status === 'active' ? 'success' : 'danger';
 }
@@ -694,6 +948,62 @@ function edgeKindType(kind: KnowledgeEdgeKind): 'success' | 'warning' | 'danger'
   }
 
   return kind === 'contradicts' ? 'danger' : 'success';
+}
+
+function branchMergePreviewStatusType(status: BranchMergePreviewItem['status']): 'success' | 'warning' | 'info' {
+  if (status === 'publishable') {
+    return 'success';
+  }
+
+  return status === 'possible_conflict' ? 'warning' : 'info';
+}
+
+function crdtDocumentScope(row: CrdtDocumentSummary): string {
+  const parts = [row.kind];
+
+  if (row.groupKey !== undefined) {
+    parts.push(`group:${row.groupKey}`);
+  }
+
+  if (row.projectKey !== undefined) {
+    parts.push(`project:${row.projectKey}`);
+  }
+
+  if (row.namespace !== undefined) {
+    parts.push(`ns:${row.namespace}`);
+  }
+
+  if (row.documentId !== undefined) {
+    parts.push(`doc:${row.documentId}`);
+  }
+
+  return parts.join(' / ');
+}
+
+function crdtLatestChange(row: CrdtDocumentSummary): string {
+  if (row.latestChange === undefined) {
+    return '-';
+  }
+
+  return [row.latestChange.summary, row.latestChange.id].filter(Boolean).join(' / ');
+}
+
+function isBranchMergePreviewRowSelectable(row: BranchMergePreviewItem): boolean {
+  return row.status === 'publishable';
+}
+
+function isBranchMergePreviewRowSelected(row: BranchMergePreviewItem): boolean {
+  return branchMergeSelectedSourceIds.value.includes(row.source.id);
+}
+
+function toggleBranchMergePreviewRow(row: BranchMergePreviewItem, selected: unknown): void {
+  if (!isBranchMergePreviewRowSelectable(row)) {
+    return;
+  }
+
+  branchMergeSelectedSourceIds.value = Boolean(selected)
+    ? [...new Set([...branchMergeSelectedSourceIds.value, row.source.id])]
+    : branchMergeSelectedSourceIds.value.filter((sourceId) => sourceId !== row.source.id);
 }
 
 function taskStatusType(status: TaskStatus): 'success' | 'info' | 'warning' | 'danger' {
@@ -748,6 +1058,10 @@ function glossaryScope(row: KnowledgeItem): string {
   return readMetadataString(row, 'projectKey') ?? row.para.key;
 }
 
+function knowledgeGroupKey(row: KnowledgeItem): string {
+  return readMetadataString(row, 'groupKey') ?? 'default';
+}
+
 function glossaryAliases(row: KnowledgeItem | undefined): string[] {
   const aliases = row?.source.metadata?.aliases;
 
@@ -788,6 +1102,12 @@ interface ProjectAclFormInput {
   role: ProjectAclRole;
 }
 
+interface BranchMergePreviewFormInput {
+  sourceBranchKey: string;
+  targetBranchKey: string;
+  reason: string;
+}
+
 interface GlossaryFormInput {
   groupKey: string;
   projectKey: string;
@@ -796,6 +1116,11 @@ interface GlossaryFormInput {
   content: string;
   aliases: string;
   tags: string;
+}
+
+interface KnowledgePublishFormInput {
+  targetBranchKey: string;
+  reason: string;
 }
 
 interface KnowledgeEdgeFormInput {
@@ -887,6 +1212,106 @@ interface KnowledgeEdgeFormInput {
             </el-table>
           </section>
 
+          <section v-else-if="activeView === 'branches'" class="view">
+            <div class="toolbar">
+              <el-button :icon="Plus" type="primary" @click="branchDialogOpen = true">New Branch</el-button>
+            </div>
+            <el-table :data="branches" empty-text="No knowledge branches">
+              <el-table-column prop="branchKey" label="Branch" min-width="170" />
+              <el-table-column prop="displayName" label="Name" min-width="180" />
+              <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column prop="joinMode" label="Join" width="110" />
+              <el-table-column label="Members" width="100">
+                <template #default="{ row }">{{ row.counts.members }}</template>
+              </el-table-column>
+              <el-table-column label="Projects" min-width="220">
+                <template #default="{ row }">
+                  <el-tag v-for="project in row.projects" :key="project.id" class="reason-tag">
+                    {{ project.projectKey }}
+                  </el-tag>
+                  <span v-if="row.projects.length === 0">-</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="CRDT Docs" width="110">
+                <template #default="{ row }">{{ row.counts.crdtDocuments }}</template>
+              </el-table-column>
+              <el-table-column label="Knowledge" width="110">
+                <template #default="{ row }">{{ row.counts.knowledge }}</template>
+              </el-table-column>
+              <el-table-column label="Relations" width="100">
+                <template #default="{ row }">{{ row.counts.relations }}</template>
+              </el-table-column>
+              <el-table-column label="Signals" width="90">
+                <template #default="{ row }">{{ row.counts.qualitySignals }}</template>
+              </el-table-column>
+              <el-table-column label="Conflicts" width="100">
+                <template #default="{ row }">{{ row.counts.conflicts }}</template>
+              </el-table-column>
+              <el-table-column prop="updatedAt" label="Materialized" min-width="190" />
+              <el-table-column label="Actions" width="120" fixed="right">
+                <template #default="{ row }">
+                  <el-button :disabled="branches.length < 2" :icon="Search" size="small" @click="openBranchMergePreview(row)">
+                    Preview
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </section>
+
+          <section v-else-if="activeView === 'crdt'" class="view">
+            <div class="toolbar">
+              <el-select v-model="crdtDocumentKind" class="layer-select" placeholder="Kind" clearable @change="reloadCrdtDocuments">
+                <el-option label="project" value="project" />
+                <el-option label="group" value="group" />
+                <el-option label="server-global" value="server-global" />
+              </el-select>
+              <el-select
+                v-model="crdtDocumentGroupKey"
+                class="layer-select"
+                placeholder="Group"
+                clearable
+                filterable
+                @change="reloadCrdtDocuments"
+              >
+                <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+              </el-select>
+              <el-input
+                v-model="crdtDocumentProjectKey"
+                class="query-input"
+                clearable
+                placeholder="Project key"
+                @keyup.enter="reloadCrdtDocuments"
+              />
+              <el-button @click="reloadCrdtDocuments">Apply</el-button>
+            </div>
+            <el-table :data="crdtDocuments" empty-text="No CRDT documents">
+              <el-table-column prop="key" label="Key" min-width="260" />
+              <el-table-column label="Scope" min-width="300">
+                <template #default="{ row }">{{ crdtDocumentScope(row) }}</template>
+              </el-table-column>
+              <el-table-column prop="schemaVersion" label="Schema" width="90" />
+              <el-table-column label="Heads" width="90">
+                <template #default="{ row }">{{ row.heads.length }}</template>
+              </el-table-column>
+              <el-table-column prop="changeCount" label="Changes" width="100" />
+              <el-table-column label="Snapshot" width="100">
+                <template #default="{ row }">
+                  <el-tag :type="row.snapshotPresent ? 'success' : 'info'">{{ row.snapshotPresent ? 'yes' : 'no' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="Latest Change" min-width="280">
+                <template #default="{ row }">{{ crdtLatestChange(row) }}</template>
+              </el-table-column>
+              <el-table-column label="Latest Actor" min-width="180">
+                <template #default="{ row }">{{ row.latestChange?.actorId ?? row.latestChange?.clientId ?? '-' }}</template>
+              </el-table-column>
+              <el-table-column label="Latest Received" min-width="190">
+                <template #default="{ row }">{{ row.latestChange?.receivedAt ?? '-' }}</template>
+              </el-table-column>
+              <el-table-column prop="updatedAt" label="Updated" min-width="190" />
+            </el-table>
+          </section>
+
           <section v-else-if="activeView === 'members'" class="view">
             <el-table :data="members" empty-text="No members">
               <el-table-column prop="displayName" label="Name" min-width="160" />
@@ -964,7 +1389,7 @@ interface KnowledgeEdgeFormInput {
             <el-table :data="projects" empty-text="No projects">
               <el-table-column prop="id" label="ID" min-width="170" />
               <el-table-column prop="name" label="Name" min-width="190" />
-              <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column prop="groupKey" label="Branch" width="150" />
               <el-table-column label="Access" width="140">
                 <template #default="{ row }">
                   <el-tag :type="projectAccessType(row)">{{ projectAccessVisibility(row) }}</el-tag>
@@ -975,9 +1400,12 @@ interface KnowledgeEdgeFormInput {
               </el-table-column>
               <el-table-column prop="createdByMemberId" label="Created By" min-width="180" />
               <el-table-column prop="description" label="Description" min-width="220" />
-              <el-table-column label="Actions" width="110" fixed="right">
+              <el-table-column label="Actions" width="190" fixed="right">
                 <template #default="{ row }">
-                  <el-button :icon="Lock" size="small" @click="openProjectAcl(row)">ACL</el-button>
+                  <el-button-group>
+                    <el-button :icon="Collection" size="small" @click="openProjectBranch(row)">Branch</el-button>
+                    <el-button :icon="Lock" size="small" @click="openProjectAcl(row)">ACL</el-button>
+                  </el-button-group>
                 </template>
               </el-table-column>
             </el-table>
@@ -1050,6 +1478,9 @@ interface KnowledgeEdgeFormInput {
             </div>
             <el-table :data="knowledge" empty-text="No knowledge">
               <el-table-column prop="title" label="Title" min-width="260" />
+              <el-table-column label="Branch" width="140">
+                <template #default="{ row }">{{ knowledgeGroupKey(row) }}</template>
+              </el-table-column>
               <el-table-column prop="layer" label="Layer" width="120" />
               <el-table-column label="Status" width="130">
                 <template #default="{ row }">
@@ -1067,6 +1498,11 @@ interface KnowledgeEdgeFormInput {
               </el-table-column>
               <el-table-column label="Owner" width="150">
                 <template #default="{ row }">{{ row.createdBy.displayName }}</template>
+              </el-table-column>
+              <el-table-column label="Actions" width="120" fixed="right">
+                <template #default="{ row }">
+                  <el-button :icon="Connection" size="small" @click="openKnowledgePublishDialog(row)">Publish</el-button>
+                </template>
               </el-table-column>
             </el-table>
           </section>
@@ -1302,11 +1738,124 @@ interface KnowledgeEdgeFormInput {
       </template>
     </el-dialog>
 
+    <el-dialog v-model="branchDialogOpen" title="New Knowledge Branch" width="520px">
+      <el-form label-position="top">
+        <el-form-item label="Branch">
+          <el-input v-model="branchForm.branchKey" />
+        </el-form-item>
+        <el-form-item label="Name">
+          <el-input v-model="branchForm.displayName" />
+        </el-form-item>
+        <el-form-item label="Join Mode">
+          <el-select v-model="branchForm.joinMode">
+            <el-option label="invite" value="invite" />
+            <el-option label="open" value="open" />
+            <el-option label="admin" value="admin" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Description">
+          <el-input v-model="branchForm.description" type="textarea" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="branchDialogOpen = false">Cancel</el-button>
+        <el-button type="primary" @click="submitBranch">Create</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="branchMergePreviewDialogOpen" title="Branch Merge Preview" width="900px">
+      <el-form label-position="top">
+        <el-form-item label="Source Branch">
+          <el-select v-model="branchMergePreviewForm.sourceBranchKey" filterable @change="reloadBranchMergePreview">
+            <el-option
+              v-for="branch in branches"
+              :key="branch.branchKey"
+              :disabled="branch.branchKey === branchMergePreviewForm.targetBranchKey"
+              :label="branch.displayName"
+              :value="branch.branchKey"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Target Branch">
+          <el-select v-model="branchMergePreviewForm.targetBranchKey" filterable @change="reloadBranchMergePreview">
+            <el-option
+              v-for="branch in branches"
+              :key="branch.branchKey"
+              :disabled="branch.branchKey === branchMergePreviewForm.sourceBranchKey"
+              :label="branch.displayName"
+              :value="branch.branchKey"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Reason">
+          <el-input v-model="branchMergePreviewForm.reason" type="textarea" />
+        </el-form-item>
+      </el-form>
+      <el-alert
+        v-if="branchMergeBulkPublishResult"
+        :title="`Published ${branchMergeBulkPublishResult.published.length}, rejected ${branchMergeBulkPublishResult.rejected.length}`"
+        class="alert"
+        type="success"
+        show-icon
+      />
+      <el-descriptions v-if="branchMergePreview" :column="5" border>
+        <el-descriptions-item label="Source">{{ branchMergePreview.summary.sourceKnowledge }}</el-descriptions-item>
+        <el-descriptions-item label="Target">{{ branchMergePreview.summary.targetKnowledge }}</el-descriptions-item>
+        <el-descriptions-item label="Publishable">{{ branchMergePreview.summary.publishable }}</el-descriptions-item>
+        <el-descriptions-item label="Published">{{ branchMergePreview.summary.alreadyPublished }}</el-descriptions-item>
+        <el-descriptions-item label="Conflicts">{{ branchMergePreview.summary.possibleConflicts }}</el-descriptions-item>
+      </el-descriptions>
+      <el-table
+        v-if="branchMergePreview"
+        :data="branchMergePreview.items"
+        class="dialog-table"
+        empty-text="No merge candidates"
+      >
+        <el-table-column width="54">
+          <template #default="{ row }">
+            <el-checkbox
+              :model-value="isBranchMergePreviewRowSelected(row)"
+              :disabled="!isBranchMergePreviewRowSelectable(row)"
+              @change="(value: unknown) => toggleBranchMergePreviewRow(row, value)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="Status" width="150">
+          <template #default="{ row }">
+            <el-tag :type="branchMergePreviewStatusType(row.status)">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="Source" min-width="240">
+          <template #default="{ row }">{{ row.source.title }}</template>
+        </el-table-column>
+        <el-table-column label="Target" min-width="240">
+          <template #default="{ row }">{{ row.target?.title ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="reason" label="Reason" min-width="260" />
+      </el-table>
+      <template #footer>
+        <el-button @click="branchMergePreviewDialogOpen = false">Close</el-button>
+        <el-button
+          :disabled="branchMergeSelectedSourceIds.length === 0"
+          type="success"
+          @click="submitBranchMergeBulkPublish"
+        >
+          Publish Selected
+        </el-button>
+        <el-button type="primary" @click="reloadBranchMergePreview">Refresh</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="projectDialogOpen" title="New Project" width="520px">
       <el-form label-position="top">
-        <el-form-item label="Group">
+        <el-form-item label="Branch">
           <el-select v-model="projectForm.groupKey" filterable>
-            <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+            <el-option
+              v-for="branch in branches"
+              :key="branch.branchKey"
+              :label="branch.displayName"
+              :value="branch.branchKey"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="ID">
@@ -1322,6 +1871,28 @@ interface KnowledgeEdgeFormInput {
       <template #footer>
         <el-button @click="projectDialogOpen = false">Cancel</el-button>
         <el-button type="primary" @click="submitProject">Create</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="projectBranchDialogOpen" title="Project Branch" width="520px">
+      <el-form label-position="top">
+        <el-form-item label="Project">
+          <el-input :model-value="selectedBranchProject?.name ?? ''" disabled />
+        </el-form-item>
+        <el-form-item label="Branch">
+          <el-select v-model="projectBranchForm.branchKey" filterable>
+            <el-option
+              v-for="branch in branches"
+              :key="branch.branchKey"
+              :label="branch.displayName"
+              :value="branch.branchKey"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="projectBranchDialogOpen = false">Cancel</el-button>
+        <el-button type="primary" @click="submitProjectBranch">Save</el-button>
       </template>
     </el-dialog>
 
@@ -1354,6 +1925,37 @@ interface KnowledgeEdgeFormInput {
       <template #footer>
         <el-button @click="glossaryDialogOpen = false">Cancel</el-button>
         <el-button type="primary" @click="submitGlossary">Save</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="knowledgePublishDialogOpen" title="Publish Knowledge" width="560px">
+      <el-form label-position="top">
+        <el-form-item label="Source">
+          <el-input :model-value="selectedPublishKnowledge?.title ?? ''" disabled />
+        </el-form-item>
+        <el-form-item label="From Branch">
+          <el-input :model-value="selectedPublishKnowledge ? knowledgeGroupKey(selectedPublishKnowledge) : ''" disabled />
+        </el-form-item>
+        <el-form-item label="Target Branch">
+          <el-select v-model="knowledgePublishForm.targetBranchKey" filterable>
+            <el-option
+              v-for="branch in branches"
+              :key="branch.branchKey"
+              :disabled="selectedPublishKnowledge !== null && branch.branchKey === knowledgeGroupKey(selectedPublishKnowledge)"
+              :label="branch.displayName"
+              :value="branch.branchKey"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Reason">
+          <el-input v-model="knowledgePublishForm.reason" type="textarea" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="knowledgePublishDialogOpen = false">Cancel</el-button>
+        <el-button :disabled="!knowledgePublishForm.targetBranchKey" type="primary" @click="submitKnowledgePublish">
+          Publish
+        </el-button>
       </template>
     </el-dialog>
 

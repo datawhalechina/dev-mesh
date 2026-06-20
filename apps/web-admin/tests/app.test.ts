@@ -8,6 +8,7 @@ describe('web-admin app structure', () => {
 
     expect(source).toContain("key: 'overview'");
     expect(source).toContain("key: 'groups'");
+    expect(source).toContain("key: 'crdt'");
     expect(source).toContain("key: 'members'");
     expect(source).toContain("key: 'invites'");
     expect(source).toContain("key: 'projects'");
@@ -32,6 +33,9 @@ describe('web-admin app structure', () => {
     expect(source).toContain('qualityStats');
     expect(source).toContain('reloadTaskDigest');
     expect(source).toContain('taskDigestStats');
+    expect(source).toContain('reloadCrdtDocuments');
+    expect(source).toContain('crdtDocumentScope');
+    expect(source).toContain('CRDT Docs');
     expect(source).toContain('disableMemberRow');
     expect(source).toContain('rotateMemberTokenRow');
     expect(source).toContain('revokeInviteRow');

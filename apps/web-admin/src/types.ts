@@ -26,6 +26,91 @@ export interface GroupSummary {
   memberCount: number;
 }
 
+export interface BranchSummary {
+  branchKey: string;
+  groupKey: string;
+  displayName: string;
+  description?: string;
+  joinMode: GroupSummary['joinMode'];
+  counts: {
+    members: number;
+    projects: number;
+    crdtDocuments: number;
+    knowledge: number;
+    relations: number;
+    qualitySignals: number;
+    conflicts: number;
+  };
+  projects: ProjectSummary[];
+  updatedAt?: string;
+}
+
+export interface BranchInput {
+  branchKey: string;
+  displayName: string;
+  description?: string;
+  joinMode: GroupSummary['joinMode'];
+}
+
+export interface BranchMergePreview {
+  sourceBranchKey: string;
+  targetBranchKey: string;
+  summary: {
+    sourceKnowledge: number;
+    targetKnowledge: number;
+    publishable: number;
+    alreadyPublished: number;
+    possibleConflicts: number;
+  };
+  items: BranchMergePreviewItem[];
+}
+
+export interface BranchMergePreviewItem {
+  source: KnowledgeItem;
+  status: 'publishable' | 'already_published' | 'possible_conflict';
+  target?: KnowledgeItem;
+  reason: string;
+}
+
+export interface CrdtDocumentSummary {
+  key: string;
+  document: {
+    kind: string;
+    groupKey?: string;
+    projectKey?: string;
+    documentId?: string;
+    namespace?: string;
+    schemaVersion?: number;
+  };
+  kind: string;
+  groupKey?: string;
+  projectKey?: string;
+  documentId?: string;
+  namespace?: string;
+  schemaVersion?: number;
+  updatedAt: string;
+  heads: string[];
+  changeCount: number;
+  snapshotPresent: boolean;
+  latestChange?: CrdtChangeSummary;
+}
+
+export interface CrdtChangeSummary {
+  id: string;
+  receivedAt: string;
+  clientId: string;
+  groupKey: string;
+  actorId?: string;
+  createdAt?: string;
+  summary?: string;
+}
+
+export interface CrdtDocumentFilters {
+  kind?: string;
+  groupKey?: string;
+  projectKey?: string;
+}
+
 export interface MemberSummary {
   memberId: string;
   clientId: string;
@@ -211,6 +296,10 @@ export interface ProjectInput {
   description?: string;
 }
 
+export interface ProjectBranchInput {
+  branchKey: string;
+}
+
 export interface InviteInput {
   groupKey: string;
   token?: string;
@@ -239,6 +328,28 @@ export interface KnowledgeEdgeInput {
   toId: string;
   groupKey?: string;
   reason?: string;
+}
+
+export interface KnowledgeBranchPublishInput {
+  sourceId: string;
+  targetBranchKey: string;
+  reason?: string;
+}
+
+export interface KnowledgeBranchBulkPublishInput {
+  sourceBranchKey: string;
+  targetBranchKey: string;
+  sourceIds: string[];
+  reason?: string;
+}
+
+export interface KnowledgeBranchBulkPublishResult {
+  published: KnowledgeItem[];
+  rejected: Array<{
+    sourceId: string;
+    code: string;
+    reason: string;
+  }>;
 }
 
 export interface QualityReviewFilters {

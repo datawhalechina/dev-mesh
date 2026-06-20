@@ -1,16 +1,25 @@
 import type {
   AdminOverview,
   AuditLog,
+  BranchInput,
+  BranchMergePreview,
+  BranchSummary,
+  CrdtDocumentFilters,
+  CrdtDocumentSummary,
   GlossaryInput,
   GroupInput,
   GroupSummary,
   InviteInput,
   InviteSummary,
+  KnowledgeBranchPublishInput,
+  KnowledgeBranchBulkPublishInput,
+  KnowledgeBranchBulkPublishResult,
   KnowledgeEdge,
   KnowledgeEdgeInput,
   KnowledgeItem,
   MemberSummary,
   ProjectAclInput,
+  ProjectBranchInput,
   ProjectInput,
   ProjectSummary,
   QualityReviewFilters,
@@ -29,6 +38,55 @@ export async function fetchGroups(): Promise<GroupSummary[]> {
   const response = await requestJson<{ groups: GroupSummary[] }>('/api/v1/admin/groups');
 
   return response.groups;
+}
+
+export async function fetchBranches(): Promise<BranchSummary[]> {
+  const response = await requestJson<{ branches: BranchSummary[] }>('/api/v1/admin/branches');
+
+  return response.branches;
+}
+
+export async function createBranch(input: BranchInput): Promise<BranchSummary> {
+  return requestJson<BranchSummary>('/api/v1/admin/branches', {
+    method: 'POST',
+    body: input
+  });
+}
+
+export async function fetchBranchMergePreview(
+  sourceBranchKey: string,
+  targetBranchKey: string,
+  limit?: number
+): Promise<BranchMergePreview> {
+  const params = new URLSearchParams({
+    sourceBranchKey,
+    targetBranchKey
+  });
+
+  setNumberParam(params, 'limit', limit);
+
+  return requestJson<BranchMergePreview>(`/api/v1/admin/branches/merge-preview?${params.toString()}`);
+}
+
+export async function fetchCrdtDocuments(input: CrdtDocumentFilters = {}): Promise<CrdtDocumentSummary[]> {
+  const params = new URLSearchParams();
+
+  if (input.kind?.trim()) {
+    params.set('kind', input.kind.trim());
+  }
+
+  if (input.groupKey?.trim()) {
+    params.set('groupKey', input.groupKey.trim());
+  }
+
+  if (input.projectKey?.trim()) {
+    params.set('projectKey', input.projectKey.trim());
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const response = await requestJson<{ documents: CrdtDocumentSummary[] }>(`/api/v1/admin/crdt-documents${suffix}`);
+
+  return response.documents;
 }
 
 export async function createGroup(input: GroupInput): Promise<GroupSummary> {
@@ -89,6 +147,20 @@ export async function createProject(input: ProjectInput): Promise<ProjectSummary
   });
 }
 
+export async function checkoutProjectBranch(
+  groupKey: string,
+  projectId: string,
+  input: ProjectBranchInput
+): Promise<ProjectSummary> {
+  return requestJson<ProjectSummary>(
+    `/api/v1/admin/projects/${encodeURIComponent(groupKey)}/${encodeURIComponent(projectId)}/branch`,
+    {
+      method: 'PUT',
+      body: input
+    }
+  );
+}
+
 export async function updateProjectAcl(groupKey: string, projectId: string, input: ProjectAclInput): Promise<ProjectSummary> {
   return requestJson<ProjectSummary>(
     `/api/v1/admin/projects/${encodeURIComponent(groupKey)}/${encodeURIComponent(projectId)}/acl`,
@@ -139,6 +211,22 @@ export async function fetchKnowledgeEdges(kind = '', groupKey = ''): Promise<Kno
 
 export async function createKnowledgeEdge(input: KnowledgeEdgeInput): Promise<KnowledgeEdge> {
   return requestJson<KnowledgeEdge>('/api/v1/admin/knowledge-edges', {
+    method: 'POST',
+    body: input
+  });
+}
+
+export async function publishKnowledgeToBranch(input: KnowledgeBranchPublishInput): Promise<KnowledgeItem> {
+  return requestJson<KnowledgeItem>('/api/v1/admin/knowledge/branch-publish', {
+    method: 'POST',
+    body: input
+  });
+}
+
+export async function bulkPublishKnowledgeToBranch(
+  input: KnowledgeBranchBulkPublishInput
+): Promise<KnowledgeBranchBulkPublishResult> {
+  return requestJson<KnowledgeBranchBulkPublishResult>('/api/v1/admin/branches/bulk-publish', {
     method: 'POST',
     body: input
   });
@@ -249,8 +337,9 @@ function setNumberParam(params: URLSearchParams, key: string, value: number | un
 async function requestJson<T>(url: string, init: ApiRequestInit = {}): Promise<T> {
   const { body: requestPayload, ...rest } = init;
   const headers = new Headers(init.headers);
-  const request: RequestInit = {
+  const request: RequestInit & { cache: 'no-store' } = {
     ...rest,
+    cache: 'no-store',
     headers
   };
 

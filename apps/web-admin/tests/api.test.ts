@@ -6,6 +6,7 @@ import {
   createKnowledgeEdge,
   disableMember,
   fetchAdminOverview,
+  fetchCrdtDocuments,
   fetchGlossary,
   fetchKnowledge,
   fetchKnowledgeEdges,
@@ -223,6 +224,27 @@ describe('web-admin API client', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/admin/task-digest?projectKey=TASK-123&status=blocked&includeDone=true&includeSuperseded=false&limit=20',
+      expect.any(Object)
+    );
+  });
+
+  it('builds CRDT document status filters', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        documents: []
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchCrdtDocuments({
+      kind: 'project',
+      groupKey: 'frontend-team',
+      projectKey: 'frontend-dashboard'
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/admin/crdt-documents?kind=project&groupKey=frontend-team&projectKey=frontend-dashboard',
       expect.any(Object)
     );
   });
