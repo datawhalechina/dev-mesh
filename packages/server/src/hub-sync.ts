@@ -3,6 +3,7 @@ import type { DevMeshCore, KnowledgeItem } from '@devmesh/core';
 import type { SyncEvent, SyncPullResponse, SyncPushRequest, SyncPushResponse } from '@devmesh/protocol';
 import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubKnowledgeEdge, HubResult, HubState, HubSyncEvent } from './hub-model.js';
+import { withKnowledgeGroupKey } from './hub-knowledge-scope.js';
 import { hubError, ok } from './hub-utils.js';
 
 export interface HubSyncEventLogPage {
@@ -63,6 +64,19 @@ export interface HubSyncConflictReplayResult {
   scanned: number;
   conflicts: number;
   edgesCreated: number;
+  skipped: number;
+  cursor: string;
+}
+
+export interface HubSyncKnowledgeSnapshotReplayInput {
+  groupKey: string;
+  cursor?: string;
+  actor?: string;
+}
+
+export interface HubSyncKnowledgeSnapshotReplayResult {
+  scanned: number;
+  upserted: number;
   skipped: number;
   cursor: string;
 }
@@ -328,6 +342,41 @@ export async function replayHubSyncConflicts(
     scanned: page.events.length,
     conflicts,
     edgesCreated,
+    skipped,
+    cursor: page.cursor
+  };
+}
+
+export async function replayHubSyncKnowledgeSnapshots(
+  state: HubState,
+  core: DevMeshCore,
+  input: HubSyncKnowledgeSnapshotReplayInput
+): Promise<HubSyncKnowledgeSnapshotReplayResult> {
+  const page = pullHubSyncEventLog(state, input.groupKey, input.cursor);
+  let upserted = 0;
+  let skipped = 0;
+
+  for (const event of page.events) {
+    const item = readKnowledgeSnapshot(event);
+
+    if (item === undefined) {
+      skipped += 1;
+      continue;
+    }
+
+    await core.repository.upsert(withKnowledgeGroupKey(item, input.groupKey));
+    upserted += 1;
+    auditSyncKnowledgeSnapshotReplayed(state, {
+      actor: input.actor ?? event.clientId,
+      groupKey: input.groupKey,
+      event,
+      item
+    });
+  }
+
+  return {
+    scanned: page.events.length,
+    upserted,
     skipped,
     cursor: page.cursor
   };
@@ -810,6 +859,16 @@ function readKnowledgeTombstonePayload(
   return tombstone;
 }
 
+function readKnowledgeSnapshot(event: HubSyncEvent): KnowledgeItem | undefined {
+  if (event.kind === 'knowledge.deleted') {
+    return undefined;
+  }
+
+  const value = event.payload.knowledge;
+
+  return isKnowledgeItem(value) ? value : undefined;
+}
+
 function collectKnowledgeConflictRevisions(
   state: HubState,
   groupKey: string
@@ -948,6 +1007,94 @@ function createTombstoneKnowledgeItem(item: KnowledgeItem, updatedAt: string): K
     status: 'tombstone',
     updatedAt
   };
+}
+
+function isKnowledgeItem(value: unknown): value is KnowledgeItem {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    isKnowledgeLayer(value.layer) &&
+    typeof value.entryKey === 'string' &&
+    typeof value.type === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.summary === 'string' &&
+    (value.content === undefined || typeof value.content === 'string') &&
+    isParaRef(value.para) &&
+    Array.isArray(value.tags) &&
+    value.tags.every((tag) => typeof tag === 'string') &&
+    isKnowledgeSource(value.source) &&
+    isMemberIdentity(value.createdBy) &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string' &&
+    isKnowledgeVisibility(value.visibility) &&
+    isKnowledgeStatus(value.status) &&
+    isQualitySignals(value.quality)
+  );
+}
+
+function isKnowledgeLayer(value: unknown): value is KnowledgeItem['layer'] {
+  return value === 'raw' || value === 'extract' || value === 'canonical';
+}
+
+function isParaRef(value: unknown): value is KnowledgeItem['para'] {
+  return (
+    isPlainRecord(value) &&
+    (value.category === 'projects' ||
+      value.category === 'areas' ||
+      value.category === 'resources' ||
+      value.category === 'archives') &&
+    typeof value.key === 'string'
+  );
+}
+
+function isKnowledgeSource(value: unknown): value is KnowledgeItem['source'] {
+  return (
+    isPlainRecord(value) &&
+    typeof value.kind === 'string' &&
+    (value.ref === undefined || typeof value.ref === 'string') &&
+    (value.url === undefined || typeof value.url === 'string') &&
+    (value.commit === undefined || typeof value.commit === 'string') &&
+    (value.storageRef === undefined || typeof value.storageRef === 'string') &&
+    (value.metadata === undefined || isPlainRecord(value.metadata))
+  );
+}
+
+function isMemberIdentity(value: unknown): value is KnowledgeItem['createdBy'] {
+  return (
+    isPlainRecord(value) &&
+    (value.memberId === undefined || typeof value.memberId === 'string') &&
+    typeof value.displayName === 'string' &&
+    (value.handle === undefined || typeof value.handle === 'string') &&
+    (value.clientId === undefined || typeof value.clientId === 'string')
+  );
+}
+
+function isKnowledgeVisibility(value: unknown): value is KnowledgeItem['visibility'] {
+  return value === 'private' || value === 'project' || value === 'team' || value === 'org';
+}
+
+function isKnowledgeStatus(value: unknown): value is KnowledgeItem['status'] {
+  return value === 'active' || value === 'superseded' || value === 'tombstone';
+}
+
+function isQualitySignals(value: unknown): value is KnowledgeItem['quality'] {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+
+  return [
+    value.confidence,
+    value.weight,
+    value.rating,
+    value.adoptionScore,
+    value.sourceTrust,
+    value.evidence,
+    value.freshness,
+    value.qualityScore
+  ].every((entry) => typeof entry === 'number' && Number.isFinite(entry));
 }
 
 function createSyncEventSignature(auth: HubAuthContext, event: SyncEvent): string {
@@ -1130,6 +1277,30 @@ function auditSyncTombstoneReplayed(
     targetId: input.tombstone.knowledgeId,
     groupKey: input.groupKey,
     payload
+  });
+}
+
+function auditSyncKnowledgeSnapshotReplayed(
+  state: HubState,
+  input: {
+    actor: string;
+    groupKey: string;
+    event: HubSyncEvent;
+    item: KnowledgeItem;
+  }
+): void {
+  appendHubAuditLog(state, {
+    actor: input.actor,
+    action: 'sync.knowledge_snapshot_replayed',
+    targetType: 'knowledge',
+    targetId: input.item.id,
+    groupKey: input.groupKey,
+    payload: {
+      eventId: input.event.id,
+      clientId: input.event.clientId,
+      layer: input.item.layer,
+      type: input.item.type
+    }
   });
 }
 

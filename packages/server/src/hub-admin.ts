@@ -13,6 +13,10 @@ import {
   ACCESS_TOKEN_TTL_MS,
   DEFAULT_ADMIN_INVITE_TTL_MS,
   DEFAULT_GROUP_KEY,
+  type HubCrdtChange,
+  type HubCrdtDocument,
+  type HubGlobalProjection,
+  type HubGlobalProjectionDocument,
   type HubGroup,
   type HubInvite,
   type HubKnowledgeEdge,
@@ -21,6 +25,8 @@ import {
   type HubState
 } from './hub-model.js';
 import { appendHubAuditLog } from './hub-audit.js';
+import { appendAdminGlobalCrdtOperation } from './hub-global-crdt.js';
+import { filterKnowledgeByGroup, knowledgeBelongsToGroup, readKnowledgeMetadataString } from './hub-knowledge-scope.js';
 import { withNormalizedAccess } from './hub-projects.js';
 import { countByGroup, hubError, ok, projectMapKey, slugHandle } from './hub-utils.js';
 
@@ -50,12 +56,40 @@ export interface AdminGroupInput {
   joinMode?: 'invite' | 'open' | 'admin';
 }
 
+export interface AdminBranchSummary {
+  branchKey: string;
+  groupKey: string;
+  displayName: string;
+  joinMode: HubGroup['joinMode'];
+  description?: string;
+  counts: {
+    members: number;
+    projects: number;
+    crdtDocuments: number;
+    knowledge: number;
+    relations: number;
+    qualitySignals: number;
+    conflicts: number;
+  };
+  projects: ProjectSummary[];
+  updatedAt?: string;
+}
+
+export interface AdminBranchInput extends AdminGroupInput {
+  branchKey?: string;
+}
+
 export interface AdminProjectInput {
   groupKey?: string;
   id?: string;
   projectKey?: string;
   name?: string;
   description?: string;
+}
+
+export interface AdminProjectBranchInput {
+  branchKey?: string;
+  groupKey?: string;
 }
 
 export interface AdminProjectAclInput {
@@ -93,6 +127,91 @@ export interface AdminKnowledgeEdgeInput {
   toId?: string;
   groupKey?: string;
   reason?: string;
+}
+
+export interface AdminKnowledgeBranchPublishInput {
+  sourceId?: string;
+  targetBranchKey?: string;
+  targetGroupKey?: string;
+  reason?: string;
+}
+
+export interface AdminKnowledgeBranchBulkPublishInput {
+  sourceBranchKey?: string;
+  sourceGroupKey?: string;
+  targetBranchKey?: string;
+  targetGroupKey?: string;
+  sourceIds?: string[];
+  reason?: string;
+}
+
+export interface AdminKnowledgeBranchBulkPublishResult {
+  published: KnowledgeItem[];
+  rejected: Array<{
+    sourceId: string;
+    code: string;
+    reason: string;
+  }>;
+}
+
+export interface AdminBranchMergePreviewInput {
+  sourceBranchKey?: string;
+  sourceGroupKey?: string;
+  targetBranchKey?: string;
+  targetGroupKey?: string;
+  limit?: number;
+}
+
+export interface AdminBranchMergePreview {
+  sourceBranchKey: string;
+  targetBranchKey: string;
+  summary: {
+    sourceKnowledge: number;
+    targetKnowledge: number;
+    publishable: number;
+    alreadyPublished: number;
+    possibleConflicts: number;
+  };
+  items: AdminBranchMergePreviewItem[];
+}
+
+export interface AdminBranchMergePreviewItem {
+  source: KnowledgeItem;
+  status: 'publishable' | 'already_published' | 'possible_conflict';
+  target?: KnowledgeItem;
+  reason: string;
+}
+
+export interface AdminCrdtDocumentQuery {
+  kind?: string;
+  groupKey?: string;
+  projectKey?: string;
+}
+
+export interface AdminCrdtDocumentSummary {
+  key: string;
+  document: HubCrdtDocument['document'];
+  kind: string;
+  updatedAt: string;
+  heads: string[];
+  changeCount: number;
+  snapshotPresent: boolean;
+  groupKey?: string;
+  projectKey?: string;
+  documentId?: string;
+  namespace?: string;
+  schemaVersion?: number;
+  latestChange?: AdminCrdtChangeSummary;
+}
+
+export interface AdminCrdtChangeSummary {
+  id: string;
+  receivedAt: string;
+  clientId: string;
+  groupKey: string;
+  actorId?: string;
+  createdAt?: string;
+  summary?: string;
 }
 
 export async function createAdminOverview(
@@ -145,6 +264,218 @@ export function listAdminProjects(state: HubState): ProjectSummary[] {
     .sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.id.localeCompare(b.id));
 }
 
+export function listAdminBranches(state: HubState): AdminBranchSummary[] {
+  return [...state.groups.values()]
+    .map((group) => createAdminBranchSummary(state, group))
+    .sort((a, b) => a.branchKey.localeCompare(b.branchKey));
+}
+
+export function createAdminBranch(state: HubState, input: AdminBranchInput): HubResult<AdminBranchSummary> {
+  const requestedKey = slugHandle(input.branchKey ?? input.key ?? input.displayName ?? '');
+  const existing = requestedKey ? state.groups.get(requestedKey) : undefined;
+  const groupInput: AdminGroupInput = {};
+  const groupKey = input.branchKey ?? input.key;
+
+  if (groupKey !== undefined) {
+    groupInput.key = groupKey;
+  }
+
+  if (input.displayName !== undefined) {
+    groupInput.displayName = input.displayName;
+  }
+
+  if (input.description !== undefined) {
+    groupInput.description = input.description;
+  }
+
+  if (input.joinMode !== undefined) {
+    groupInput.joinMode = input.joinMode;
+  }
+
+  const result = createAdminGroup(state, groupInput);
+
+  if (!result.ok) {
+    return result;
+  }
+
+  appendAdminGlobalCrdtOperation(state, {
+    action: existing === undefined ? 'branch.created' : 'branch.updated',
+    targetType: 'branch',
+    targetId: result.value.key,
+    groupKey: result.value.key,
+    payload: {
+      branchKey: result.value.key,
+      displayName: result.value.displayName,
+      joinMode: result.value.joinMode,
+      description: result.value.description
+    }
+  });
+
+  return ok(createAdminBranchSummary(state, result.value));
+}
+
+export async function createAdminBranchMergePreview(
+  state: HubState,
+  core: DevMeshCore,
+  input: AdminBranchMergePreviewInput
+): Promise<HubResult<AdminBranchMergePreview>> {
+  const sourceBranchKey = (input.sourceBranchKey ?? input.sourceGroupKey)?.trim();
+  const targetBranchKey = (input.targetBranchKey ?? input.targetGroupKey)?.trim();
+
+  if (!sourceBranchKey || !targetBranchKey) {
+    return hubError(400, 'admin.branch_merge_target_required', 'Source and target branch keys are required.');
+  }
+
+  if (!state.groups.has(sourceBranchKey)) {
+    return hubError(404, 'admin.source_branch_not_found', 'The source branch/group does not exist.');
+  }
+
+  if (!state.groups.has(targetBranchKey)) {
+    return hubError(404, 'admin.target_branch_not_found', 'The target branch/group does not exist.');
+  }
+
+  if (sourceBranchKey === targetBranchKey) {
+    return hubError(409, 'admin.branch_merge_same_branch', 'Source and target branch must be different.');
+  }
+
+  const limit = Math.min(Math.max(input.limit ?? 100, 1), 500);
+  const allKnowledge = await core.listKnowledge({
+    includeSuperseded: false
+  });
+  const sourceItems = filterKnowledgeByBranchKey(allKnowledge, sourceBranchKey)
+    .slice()
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
+  const targetItems = filterKnowledgeByBranchKey(allKnowledge, targetBranchKey);
+  const targetByPublishedSource = new Map<string, KnowledgeItem>();
+  const targetByEntryKey = new Map<string, KnowledgeItem>();
+  const targetByTitle = new Map<string, KnowledgeItem>();
+
+  for (const target of targetItems) {
+    const publishedFromId = readKnowledgeMetadataString(target, 'publishedFromId');
+
+    if (publishedFromId !== undefined) {
+      targetByPublishedSource.set(publishedFromId, target);
+    }
+
+    targetByEntryKey.set(target.entryKey, target);
+    targetByTitle.set(normalizeMergeTitle(target.title), target);
+  }
+
+  const items = sourceItems.slice(0, limit).map((source) =>
+    createBranchMergePreviewItem(source, {
+      targetByPublishedSource,
+      targetByEntryKey,
+      targetByTitle
+    })
+  );
+
+  return ok({
+    sourceBranchKey,
+    targetBranchKey,
+    summary: {
+      sourceKnowledge: sourceItems.length,
+      targetKnowledge: targetItems.length,
+      publishable: items.filter((item) => item.status === 'publishable').length,
+      alreadyPublished: items.filter((item) => item.status === 'already_published').length,
+      possibleConflicts: items.filter((item) => item.status === 'possible_conflict').length
+    },
+    items
+  });
+}
+
+function createAdminBranchSummary(state: HubState, group: HubGroup): AdminBranchSummary {
+  const projects = [...state.projects.values()]
+    .filter((project) => project.groupKey === group.key)
+    .map((project) => withNormalizedAccess(project))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const documents = Object.values(state.globalProjection.documents).filter((document) => document.groupKey === group.key);
+  const updatedAt = documents
+    .map((document) => document.materializedAt)
+    .sort((a, b) => b.localeCompare(a))[0];
+  const summary: AdminBranchSummary = {
+    branchKey: group.key,
+    groupKey: group.key,
+    displayName: group.displayName,
+    joinMode: group.joinMode,
+    counts: {
+      members: [...state.members.values()].filter((member) => member.groupKey === group.key).length,
+      projects: projects.length,
+      crdtDocuments: documents.length,
+      knowledge: documents.reduce((total, document) => total + document.knowledgeIds.length, 0),
+      relations: documents.reduce((total, document) => total + document.relationIds.length, 0),
+      qualitySignals: documents.reduce((total, document) => total + document.qualitySignalIds.length, 0),
+      conflicts: documents.reduce((total, document) => total + document.conflictIds.length, 0)
+    },
+    projects
+  };
+
+  if (group.description !== undefined) {
+    summary.description = group.description;
+  }
+
+  if (updatedAt !== undefined) {
+    summary.updatedAt = updatedAt;
+  }
+
+  return summary;
+}
+
+function createBranchMergePreviewItem(
+  source: KnowledgeItem,
+  targetIndexes: {
+    targetByPublishedSource: Map<string, KnowledgeItem>;
+    targetByEntryKey: Map<string, KnowledgeItem>;
+    targetByTitle: Map<string, KnowledgeItem>;
+  }
+): AdminBranchMergePreviewItem {
+  const publishedTarget = targetIndexes.targetByPublishedSource.get(source.id);
+
+  if (publishedTarget !== undefined) {
+    return {
+      source,
+      target: publishedTarget,
+      status: 'already_published',
+      reason: 'target branch already has a published copy of this source'
+    };
+  }
+
+  const entryKeyTarget = targetIndexes.targetByEntryKey.get(source.entryKey);
+
+  if (entryKeyTarget !== undefined) {
+    return {
+      source,
+      target: entryKeyTarget,
+      status: 'possible_conflict',
+      reason: 'target branch already has knowledge with the same entryKey'
+    };
+  }
+
+  const titleTarget = targetIndexes.targetByTitle.get(normalizeMergeTitle(source.title));
+
+  if (titleTarget !== undefined) {
+    return {
+      source,
+      target: titleTarget,
+      status: 'possible_conflict',
+      reason: 'target branch already has knowledge with the same title'
+    };
+  }
+
+  return {
+    source,
+    status: 'publishable',
+    reason: 'no matching target knowledge found'
+  };
+}
+
+function normalizeMergeTitle(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function filterKnowledgeByBranchKey(items: KnowledgeItem[], branchKey: string): KnowledgeItem[] {
+  return items.filter((item) => (readKnowledgeMetadataString(item, 'groupKey') ?? DEFAULT_GROUP_KEY) === branchKey);
+}
+
 export function listAdminInvites(state: HubState): AdminInviteSummary[] {
   return [...state.invites.values()]
     .map((invite) => ({
@@ -174,7 +505,7 @@ export async function listAdminKnowledge(
       search.layers = [input.layer];
     }
 
-    return core.searchKnowledge(search);
+    return filterKnowledgeByGroup(await core.searchKnowledge(search), input.groupKey).slice(0, limit);
   }
 
   const filter: KnowledgeFilter = {};
@@ -187,7 +518,7 @@ export async function listAdminKnowledge(
     filter.layers = [input.layer];
   }
 
-  const items = await core.listKnowledge(filter);
+  const items = filterKnowledgeByGroup(await core.listKnowledge(filter), input.groupKey);
 
   return items.slice(0, limit);
 }
@@ -219,7 +550,7 @@ export async function createAdminQualityReview(
     filter.layers = [input.layer];
   }
 
-  const items = await core.listKnowledge(filter);
+  const items = filterKnowledgeByGroup(await core.listKnowledge(filter), input.groupKey);
   const reviewItems = items
     .map((item) => createQualityReviewItem(item, policy))
     .filter((item): item is AdminQualityReviewItem => item !== undefined)
@@ -236,10 +567,10 @@ export async function createAdminTaskDigest(
   input: AdminTaskDigestQuery = {}
 ): Promise<AdminTaskDigestResponse> {
   const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
-  const items = await core.listKnowledge({
+  const items = filterKnowledgeByGroup(await core.listKnowledge({
     types: ['task'],
     includeSuperseded: input.includeSuperseded ?? true
-  });
+  }), input.groupKey);
   const entries = [...groupTaskDigestEntries(items, input).values()]
     .map(createTaskDigestEntry)
     .filter((entry) => input.projectKey === undefined || entry.taskKey === input.projectKey)
@@ -270,7 +601,7 @@ export async function listAdminGlossary(
         types: ['glossary']
       });
 
-  return items.filter((item) => matchesGlossaryQuery(item, input)).slice(0, limit);
+  return filterKnowledgeByGroup(items, input.groupKey).filter((item) => matchesGlossaryQuery(item, input)).slice(0, limit);
 }
 
 export function createAdminGroup(state: HubState, input: AdminGroupInput): HubResult<HubGroup> {
@@ -366,6 +697,85 @@ export function createAdminProject(state: HubState, input: AdminProjectInput): H
   return ok(withNormalizedAccess(project));
 }
 
+export function checkoutAdminProjectBranch(
+  state: HubState,
+  sourceGroupKey: string,
+  projectId: string,
+  input: AdminProjectBranchInput
+): HubResult<ProjectSummary> {
+  const project = state.projects.get(projectMapKey(sourceGroupKey, projectId));
+
+  if (project === undefined) {
+    return hubError(404, 'admin.project_not_found', 'Project was not found.');
+  }
+
+  const targetGroupKey = (input.branchKey ?? input.groupKey)?.trim();
+
+  if (!targetGroupKey) {
+    return hubError(400, 'admin.project_branch_required', 'A target branchKey or groupKey is required.');
+  }
+
+  if (!state.groups.has(targetGroupKey)) {
+    return hubError(404, 'admin.group_not_found', 'The target branch/group does not exist.');
+  }
+
+  if (targetGroupKey === sourceGroupKey) {
+    return ok(withNormalizedAccess(project));
+  }
+
+  const targetKey = projectMapKey(targetGroupKey, project.id);
+
+  if (state.projects.has(targetKey)) {
+    return hubError(409, 'admin.project_branch_conflict', 'A project with the same id already exists in the target branch.');
+  }
+
+  const previousAccess = project.access ?? {
+    visibility: 'group' as const,
+    members: []
+  };
+  const moved: ProjectSummary = {
+    ...project,
+    groupKey: targetGroupKey
+  };
+
+  if (previousAccess.visibility === 'restricted') {
+    moved.access = {
+      visibility: 'group',
+      members: []
+    };
+  }
+
+  state.projects.delete(projectMapKey(sourceGroupKey, project.id));
+  state.projects.set(targetKey, moved);
+  appendHubAuditLog(state, {
+    actor: 'admin',
+    action: 'project.branch.checked_out',
+    targetType: 'project',
+    targetId: moved.id,
+    groupKey: targetGroupKey,
+    payload: {
+      projectKey: moved.projectKey,
+      fromBranch: sourceGroupKey,
+      toBranch: targetGroupKey,
+      resetRestrictedAcl: previousAccess.visibility === 'restricted'
+    }
+  });
+  appendAdminGlobalCrdtOperation(state, {
+    action: 'project.branch.checked_out',
+    targetType: 'project',
+    targetId: moved.id,
+    groupKey: targetGroupKey,
+    payload: {
+      projectKey: moved.projectKey,
+      fromBranch: sourceGroupKey,
+      toBranch: targetGroupKey,
+      resetRestrictedAcl: previousAccess.visibility === 'restricted'
+    }
+  });
+
+  return ok(withNormalizedAccess(moved));
+}
+
 export function updateAdminProjectAcl(
   state: HubState,
   groupKey: string,
@@ -439,13 +849,13 @@ export async function createAdminKnowledgeEdge(
 
   const fromItem = await core.getKnowledge(fromId);
 
-  if (fromItem === undefined) {
+  if (fromItem === undefined || !knowledgeBelongsToGroup(fromItem, groupKey.value)) {
     return hubError(404, 'admin.knowledge_edge_from_not_found', 'Knowledge edge source item was not found.');
   }
 
   const toItem = await core.getKnowledge(toId);
 
-  if (toItem === undefined) {
+  if (toItem === undefined || !knowledgeBelongsToGroup(toItem, groupKey.value)) {
     return hubError(404, 'admin.knowledge_edge_to_not_found', 'Knowledge edge target item was not found.');
   }
 
@@ -501,6 +911,191 @@ export async function createAdminKnowledgeEdge(
   );
 
   return ok(edge);
+}
+
+export async function publishAdminKnowledgeToBranch(
+  state: HubState,
+  core: DevMeshCore,
+  input: AdminKnowledgeBranchPublishInput
+): Promise<HubResult<KnowledgeItem>> {
+  const sourceId = input.sourceId?.trim();
+
+  if (!sourceId) {
+    return hubError(400, 'admin.knowledge_publish_source_required', 'A source knowledge id is required.');
+  }
+
+  const targetGroupKey = (input.targetBranchKey ?? input.targetGroupKey)?.trim();
+
+  if (!targetGroupKey) {
+    return hubError(400, 'admin.knowledge_publish_target_required', 'A target branchKey or groupKey is required.');
+  }
+
+  if (!state.groups.has(targetGroupKey)) {
+    return hubError(404, 'admin.group_not_found', 'The target branch/group does not exist.');
+  }
+
+  const source = await core.getKnowledge(sourceId);
+
+  if (source === undefined) {
+    return hubError(404, 'admin.knowledge_not_found', 'Source knowledge was not found.');
+  }
+
+  const sourceGroupKey = readKnowledgeMetadataString(source, 'groupKey') ?? DEFAULT_GROUP_KEY;
+
+  if (sourceGroupKey === targetGroupKey) {
+    return hubError(409, 'admin.knowledge_publish_same_branch', 'Source knowledge is already in the target branch.');
+  }
+
+  return ok(await publishKnowledgeItemToBranch(state, core, source, sourceGroupKey, targetGroupKey, input.reason, 'single'));
+}
+
+export async function publishAdminKnowledgeBatchToBranch(
+  state: HubState,
+  core: DevMeshCore,
+  input: AdminKnowledgeBranchBulkPublishInput
+): Promise<HubResult<AdminKnowledgeBranchBulkPublishResult>> {
+  const sourceBranchKey = (input.sourceBranchKey ?? input.sourceGroupKey)?.trim();
+  const targetBranchKey = (input.targetBranchKey ?? input.targetGroupKey)?.trim();
+
+  if (!sourceBranchKey || !targetBranchKey) {
+    return hubError(400, 'admin.branch_publish_target_required', 'Source and target branch keys are required.');
+  }
+
+  const sourceIds = normalizeSourceIds(input.sourceIds);
+
+  if (sourceIds.length === 0) {
+    return hubError(400, 'admin.branch_publish_source_ids_required', 'At least one source knowledge id is required.');
+  }
+
+  if (sourceIds.length > 500) {
+    return hubError(400, 'admin.branch_publish_source_ids_too_many', 'At most 500 source knowledge ids can be published at once.');
+  }
+
+  const preview = await createAdminBranchMergePreview(state, core, {
+    sourceBranchKey,
+    targetBranchKey,
+    limit: 500
+  });
+
+  if (!preview.ok) {
+    return preview;
+  }
+
+  const previewBySourceId = new Map(preview.value.items.map((item) => [item.source.id, item]));
+  const published: KnowledgeItem[] = [];
+  const rejected: AdminKnowledgeBranchBulkPublishResult['rejected'] = [];
+
+  for (const sourceId of sourceIds) {
+    const item = previewBySourceId.get(sourceId);
+
+    if (item === undefined) {
+      rejected.push({
+        sourceId,
+        code: 'source_not_publishable',
+        reason: 'source knowledge is missing or is not in the source branch preview'
+      });
+      continue;
+    }
+
+    if (item.status !== 'publishable') {
+      rejected.push({
+        sourceId,
+        code: item.status,
+        reason: item.reason
+      });
+      continue;
+    }
+
+    published.push(await publishKnowledgeItemToBranch(state, core, item.source, sourceBranchKey, targetBranchKey, input.reason, 'bulk'));
+  }
+
+  return ok({
+    published,
+    rejected
+  });
+}
+
+async function publishKnowledgeItemToBranch(
+  state: HubState,
+  core: DevMeshCore,
+  source: KnowledgeItem,
+  sourceGroupKey: string,
+  targetGroupKey: string,
+  reasonInput: string | undefined,
+  publishMode: 'single' | 'bulk'
+): Promise<KnowledgeItem> {
+  const reason = reasonInput?.trim();
+  const capture: CaptureKnowledgeInput = {
+    layer: source.layer,
+    type: source.type,
+    title: source.title,
+    summary: source.summary,
+    para: source.para,
+    tags: [...new Set([...source.tags, 'branch-published'])],
+    source: {
+      ...source.source,
+      kind: 'admin-branch-publish',
+      metadata: {
+        ...(source.source.metadata ?? {}),
+        groupKey: targetGroupKey,
+        publishedFromId: source.id,
+        publishedFromBranch: sourceGroupKey,
+        publishedFromKind: source.source.kind,
+        publishedBy: 'admin',
+        ...(reason ? { publishedReason: reason } : {})
+      }
+    },
+    createdBy: {
+      ...source.createdBy,
+      displayName: source.createdBy.displayName || 'admin'
+    },
+    visibility: source.visibility,
+    confidence: source.quality.confidence,
+    weight: source.quality.weight
+  };
+
+  if (source.content !== undefined) {
+    capture.content = source.content;
+  }
+
+  const published = await core.captureKnowledge(capture);
+
+  appendHubAuditLog(state, {
+    actor: 'admin',
+    action: 'knowledge.branch.published',
+    targetType: 'knowledge',
+    targetId: published.id,
+    groupKey: targetGroupKey,
+    payload: {
+      sourceId: source.id,
+      sourceBranch: sourceGroupKey,
+      targetBranch: targetGroupKey,
+      ...(reason ? { reason } : {})
+    }
+  });
+  appendAdminGlobalCrdtOperation(state, {
+    action: 'knowledge.branch.published',
+    targetType: 'knowledge',
+    targetId: published.id,
+    groupKey: targetGroupKey,
+    payload: {
+      sourceId: source.id,
+      sourceBranch: sourceGroupKey,
+      targetBranch: targetGroupKey,
+      mode: publishMode,
+      ...(reason ? { reason } : {})
+    }
+  });
+
+  return published;
+}
+
+function normalizeSourceIds(sourceIds: string[] | undefined): string[] {
+  if (!Array.isArray(sourceIds)) {
+    return [];
+  }
+
+  return [...new Set(sourceIds.map((sourceId) => sourceId.trim()).filter(Boolean))];
 }
 
 export async function createAdminGlossary(
@@ -846,6 +1441,31 @@ export function listAdminReviewQueue(): { items: AdminReviewQueueItem[] } {
   };
 }
 
+export function getAdminGlobalProjection(state: HubState, input: AdminGlobalProjectionQuery = {}): HubGlobalProjection {
+  return filterGlobalProjection(state.globalProjection, input);
+}
+
+export function listAdminCrdtDocuments(
+  state: HubState,
+  input: AdminCrdtDocumentQuery = {}
+): { documents: AdminCrdtDocumentSummary[] } {
+  const documents = [...state.crdtDocuments.values()]
+    .filter((document) => input.kind === undefined || document.document.kind === input.kind)
+    .filter((document) => input.groupKey === undefined || document.document.groupKey === input.groupKey)
+    .filter((document) => input.projectKey === undefined || document.document.projectKey === input.projectKey)
+    .map(createAdminCrdtDocumentSummary)
+    .sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        left.kind.localeCompare(right.kind) ||
+        left.key.localeCompare(right.key)
+    );
+
+  return {
+    documents
+  };
+}
+
 export interface AdminMemberSummary {
   memberId: string;
   clientId: string;
@@ -861,6 +1481,7 @@ export interface AdminMemberSummary {
 
 export interface AdminKnowledgeQuery {
   query?: string;
+  groupKey?: string;
   layer?: KnowledgeLayer;
   limit?: number;
   includeSuperseded?: boolean;
@@ -873,6 +1494,7 @@ export interface AdminKnowledgeEdgeQuery {
 }
 
 export interface AdminQualityReviewQuery {
+  groupKey?: string;
   layer?: KnowledgeLayer;
   limit?: number;
   includeSuperseded?: boolean;
@@ -887,6 +1509,8 @@ export interface AdminQualityReviewResponse {
   summary: AdminQualityReviewSummary;
   items: AdminQualityReviewItem[];
 }
+
+type QualityReviewPolicy = Required<Omit<AdminQualityReviewQuery, 'groupKey' | 'layer'>>;
 
 export interface AdminQualityReviewSummary {
   totalKnowledge: number;
@@ -909,6 +1533,7 @@ export interface AdminQualityReviewItem {
 export type AdminTaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done' | 'unknown';
 
 export interface AdminTaskDigestQuery {
+  groupKey?: string;
   projectKey?: string;
   status?: AdminTaskStatus;
   limit?: number;
@@ -966,6 +1591,11 @@ export interface AdminAuditQuery {
   limit?: number;
 }
 
+export interface AdminGlobalProjectionQuery {
+  groupKey?: string;
+  projectKey?: string;
+}
+
 export interface AdminInviteSummary {
   token: string;
   groupKey: string;
@@ -1004,7 +1634,7 @@ function createKnowledgeEdgeId(): string {
   return `edge_${randomUUID().replace(/-/g, '')}`;
 }
 
-function normalizeQualityReviewPolicy(input: AdminQualityReviewQuery): Required<Omit<AdminQualityReviewQuery, 'layer'>> {
+function normalizeQualityReviewPolicy(input: AdminQualityReviewQuery): QualityReviewPolicy {
   return {
     limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
     includeSuperseded: input.includeSuperseded ?? true,
@@ -1013,6 +1643,131 @@ function normalizeQualityReviewPolicy(input: AdminQualityReviewQuery): Required<
     maxRating: normalizeUnitThreshold(input.maxRating, 0.4),
     maxAdoptionScore: normalizeUnitThreshold(input.maxAdoptionScore, 0.2),
     staleDays: Math.max(input.staleDays ?? 180, 1)
+  };
+}
+
+function filterGlobalProjection(projection: HubGlobalProjection, input: AdminGlobalProjectionQuery): HubGlobalProjection {
+  const documents = Object.fromEntries(
+    Object.entries(projection.documents)
+      .filter(([, document]) => input.groupKey === undefined || document.groupKey === input.groupKey)
+      .filter(([, document]) => input.projectKey === undefined || document.projectKey === input.projectKey)
+      .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+      .map(([key, document]) => [key, cloneGlobalProjectionDocument(document)])
+  );
+  const result: HubGlobalProjection = {
+    schemaVersion: projection.schemaVersion,
+    documents,
+    counts: createGlobalProjectionCounts(Object.values(documents))
+  };
+
+  if (projection.updatedAt !== undefined) {
+    result.updatedAt = projection.updatedAt;
+  }
+
+  return result;
+}
+
+function cloneGlobalProjectionDocument(document: HubGlobalProjectionDocument): HubGlobalProjectionDocument {
+  const clone: HubGlobalProjectionDocument = {
+    documentKey: document.documentKey,
+    document: {
+      ...document.document
+    },
+    sourceHeads: [...document.sourceHeads],
+    materializedAt: document.materializedAt,
+    knowledgeIds: [...document.knowledgeIds],
+    relationIds: [...document.relationIds],
+    qualitySignalIds: [...document.qualitySignalIds],
+    conflictIds: [...document.conflictIds]
+  };
+
+  if (document.groupKey !== undefined) {
+    clone.groupKey = document.groupKey;
+  }
+
+  if (document.projectKey !== undefined) {
+    clone.projectKey = document.projectKey;
+  }
+
+  return clone;
+}
+
+function createAdminCrdtDocumentSummary(document: HubCrdtDocument): AdminCrdtDocumentSummary {
+  const summary: AdminCrdtDocumentSummary = {
+    key: document.key,
+    document: {
+      ...document.document
+    },
+    kind: document.document.kind,
+    updatedAt: document.updatedAt,
+    heads: [...document.heads],
+    changeCount: document.changes.length,
+    snapshotPresent: document.snapshot !== undefined
+  };
+  const latestChange = document.changes
+    .slice()
+    .sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))[0];
+
+  if (document.document.groupKey !== undefined) {
+    summary.groupKey = document.document.groupKey;
+  }
+
+  if (document.document.projectKey !== undefined) {
+    summary.projectKey = document.document.projectKey;
+  }
+
+  if (document.document.documentId !== undefined) {
+    summary.documentId = document.document.documentId;
+  }
+
+  if (document.document.namespace !== undefined) {
+    summary.namespace = document.document.namespace;
+  }
+
+  if (document.document.schemaVersion !== undefined) {
+    summary.schemaVersion = document.document.schemaVersion;
+  }
+
+  if (latestChange !== undefined) {
+    summary.latestChange = createAdminCrdtChangeSummary(latestChange);
+  }
+
+  return summary;
+}
+
+function createAdminCrdtChangeSummary(change: HubCrdtChange): AdminCrdtChangeSummary {
+  const summary: AdminCrdtChangeSummary = {
+    id: change.id,
+    receivedAt: change.receivedAt,
+    clientId: change.clientId,
+    groupKey: change.groupKey
+  };
+
+  if (change.actorId !== undefined) {
+    summary.actorId = change.actorId;
+  }
+
+  if (change.createdAt !== undefined) {
+    summary.createdAt = change.createdAt;
+  }
+
+  if (change.summary !== undefined) {
+    summary.summary = change.summary;
+  }
+
+  return summary;
+}
+
+function createGlobalProjectionCounts(documents: HubGlobalProjectionDocument[]): HubGlobalProjection['counts'] {
+  const groups = new Set(documents.map((document) => document.groupKey).filter((groupKey): groupKey is string => groupKey !== undefined));
+
+  return {
+    documents: documents.length,
+    groups: groups.size,
+    knowledge: documents.reduce((total, document) => total + document.knowledgeIds.length, 0),
+    relations: documents.reduce((total, document) => total + document.relationIds.length, 0),
+    qualitySignals: documents.reduce((total, document) => total + document.qualitySignalIds.length, 0),
+    conflicts: documents.reduce((total, document) => total + document.conflictIds.length, 0)
   };
 }
 
@@ -1026,7 +1781,7 @@ function normalizeUnitThreshold(value: number | undefined, fallback: number): nu
 
 function createQualityReviewSummary(
   items: KnowledgeItem[],
-  policy: Required<Omit<AdminQualityReviewQuery, 'layer'>>,
+  policy: QualityReviewPolicy,
   needsReview: number
 ): AdminQualityReviewSummary {
   return {
@@ -1043,7 +1798,7 @@ function createQualityReviewSummary(
 
 function createQualityReviewItem(
   item: KnowledgeItem,
-  policy: Required<Omit<AdminQualityReviewQuery, 'layer'>>
+  policy: QualityReviewPolicy
 ): AdminQualityReviewItem | undefined {
   const reasons = createQualityReviewReasons(item, policy);
 
@@ -1059,7 +1814,7 @@ function createQualityReviewItem(
   };
 }
 
-function createQualityReviewReasons(item: KnowledgeItem, policy: Required<Omit<AdminQualityReviewQuery, 'layer'>>): string[] {
+function createQualityReviewReasons(item: KnowledgeItem, policy: QualityReviewPolicy): string[] {
   const reasons: string[] = [];
 
   if (item.status !== 'active') {
@@ -1092,7 +1847,7 @@ function createQualityReviewReasons(item: KnowledgeItem, policy: Required<Omit<A
 function createQualityReviewPriority(
   item: KnowledgeItem,
   reasons: string[],
-  policy: Required<Omit<AdminQualityReviewQuery, 'layer'>>
+  policy: QualityReviewPolicy
 ): AdminQualityReviewItem['priority'] {
   if (
     item.status !== 'active' ||

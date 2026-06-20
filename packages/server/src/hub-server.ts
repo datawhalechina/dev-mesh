@@ -9,6 +9,7 @@ import type { DevMeshCore } from '@devmesh/core';
 import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   createDefaultWellKnown,
+  type CrdtSyncExchangeRequest,
   type CreateProjectRequest,
   type ErrorResponse,
   type JoinRequest,
@@ -17,6 +18,8 @@ import {
   type SyncPushRequest
 } from '@devmesh/protocol';
 import {
+  createAdminBranch,
+  createAdminBranchMergePreview,
   createAdminGroup,
   createAdminGlossary,
   createAdminInvite,
@@ -25,8 +28,12 @@ import {
   createAdminProject,
   createAdminQualityReview,
   createAdminTaskDigest,
+  checkoutAdminProjectBranch,
   disableAdminMember,
+  getAdminGlobalProjection,
+  listAdminBranches,
   listAdminAuditLogs,
+  listAdminCrdtDocuments,
   listAdminGlossary,
   listAdminInvites,
   listAdminKnowledge,
@@ -34,19 +41,28 @@ import {
   listAdminMembers,
   listAdminProjects,
   listAdminReviewQueue,
+  publishAdminKnowledgeToBranch,
+  publishAdminKnowledgeBatchToBranch,
   revokeAdminInvite,
   rotateAdminMemberAccessToken,
   updateAdminGlossary,
   updateAdminProjectAcl,
   type AdminAuditQuery,
+  type AdminBranchMergePreviewInput,
+  type AdminBranchInput,
+  type AdminCrdtDocumentQuery,
   type AdminGlossaryInput,
   type AdminGlossaryQuery,
   type AdminGroupInput,
+  type AdminGlobalProjectionQuery,
   type AdminInviteInput,
   type AdminKnowledgeEdgeInput,
   type AdminKnowledgeEdgeQuery,
+  type AdminKnowledgeBranchPublishInput,
+  type AdminKnowledgeBranchBulkPublishInput,
   type AdminKnowledgeQuery,
   type AdminMemberDisableInput,
+  type AdminProjectBranchInput,
   type AdminProjectAclInput,
   type AdminProjectInput,
   type AdminQualityReviewQuery,
@@ -67,6 +83,7 @@ import {
   type HubState,
   type HubStateOptions
 } from './hub-state.js';
+import { exchangeHubCrdtChanges, materializeHubCrdtDocument } from './hub-crdt-sync.js';
 import { createHubProjectBrief } from './hub-knowledge.js';
 import { createJsonHubStateStore, type HubStatePersistenceStore } from './hub-persistence.js';
 import {
@@ -74,6 +91,7 @@ import {
   pullHubSyncEvents,
   pushHubSyncEvents,
   replayHubSyncConflicts,
+  replayHubSyncKnowledgeSnapshots,
   replayHubSyncTombstones
 } from './hub-sync.js';
 import { createMeshMcpServer } from './mcp.js';
@@ -244,6 +262,10 @@ function createHubRouter(
     const result = pushHubSyncEvents(hub, auth.value, readBody<SyncPushRequest>(ctx));
 
     if (result.ok && result.value.accepted > 0) {
+      await replayHubSyncKnowledgeSnapshots(hub, core, {
+        groupKey: auth.value.groupKey,
+        actor: auth.value.memberId
+      });
       await replayHubSyncTombstones(hub, core, {
         groupKey: auth.value.groupKey,
         actor: auth.value.memberId
@@ -266,6 +288,54 @@ function createHubRouter(
     }
 
     ctx.body = pullHubSyncEvents(hub, auth.value, readQueryString(ctx, 'cursor'));
+  });
+
+  router.get('/api/v2/projections/global', (ctx) => {
+    const auth = requireHubAuth(hub, ctx.headers);
+
+    if (!auth.ok) {
+      sendHubError(ctx, auth.error);
+      return;
+    }
+
+    const projectKey = readQueryString(ctx, 'projectKey');
+    const query: AdminGlobalProjectionQuery = {
+      groupKey: auth.value.groupKey
+    };
+
+    if (projectKey !== undefined) {
+      query.projectKey = projectKey;
+    }
+
+    ctx.body = getAdminGlobalProjection(hub, query);
+  });
+
+  router.post('/api/v2/sync/exchange', async (ctx) => {
+    const auth = requireHubAuth(hub, ctx.headers);
+
+    if (!auth.ok) {
+      sendHubError(ctx, auth.error);
+      return;
+    }
+
+    const result = exchangeHubCrdtChanges(hub, auth.value, readBody<CrdtSyncExchangeRequest>(ctx));
+
+    if (!result.ok) {
+      sendHubError(ctx, result.error);
+      return;
+    }
+
+    if (result.value.acceptedChanges.length > 0) {
+      const materialized = await materializeHubCrdtDocument(hub, core, result.value.document, auth.value.memberId);
+
+      result.value.projection = {
+        materialized: materialized.materialized > 0,
+        sourceHeads: materialized.heads,
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    ctx.body = result.value;
   });
 
   router.get('/api/v1/federation/sync-events', (ctx) => {
@@ -440,8 +510,38 @@ function createHubRouter(
     };
   });
 
+  router.get('/api/v1/admin/branches', (ctx) => {
+    ctx.body = {
+      branches: listAdminBranches(hub)
+    };
+  });
+
+  router.post('/api/v1/admin/branches', (ctx) => {
+    sendHubResult(ctx, createAdminBranch(hub, readBody<AdminBranchInput>(ctx)));
+  });
+
+  router.get('/api/v1/admin/branches/merge-preview', async (ctx) => {
+    sendHubResult(ctx, await createAdminBranchMergePreview(hub, core, readAdminBranchMergePreviewInput(ctx)));
+  });
+
   router.post('/api/v1/admin/projects', (ctx) => {
     sendHubResult(ctx, createAdminProject(hub, readBody<AdminProjectInput>(ctx)));
+  });
+
+  router.put('/api/v1/admin/projects/:groupKey/:id/branch', (ctx) => {
+    const groupKey = ctx.params.groupKey;
+    const projectId = ctx.params.id;
+
+    if (groupKey === undefined || projectId === undefined) {
+      sendHubError(ctx, {
+        statusCode: 400,
+        code: 'admin.project_branch_target_required',
+        message: 'Project groupKey and id are required.'
+      });
+      return;
+    }
+
+    sendHubResult(ctx, checkoutAdminProjectBranch(hub, groupKey, projectId, readBody<AdminProjectBranchInput>(ctx)));
   });
 
   router.put('/api/v1/admin/projects/:groupKey/:id/acl', (ctx) => {
@@ -491,6 +591,14 @@ function createHubRouter(
     };
   });
 
+  router.get('/api/v1/admin/global-projection', (ctx) => {
+    ctx.body = getAdminGlobalProjection(hub, readAdminGlobalProjectionQuery(ctx));
+  });
+
+  router.get('/api/v1/admin/crdt-documents', (ctx) => {
+    ctx.body = listAdminCrdtDocuments(hub, readAdminCrdtDocumentQuery(ctx));
+  });
+
   router.get('/api/v1/admin/knowledge-edges', (ctx) => {
     ctx.body = {
       edges: listAdminKnowledgeEdges(hub, readAdminKnowledgeEdgeQuery(ctx))
@@ -499,6 +607,14 @@ function createHubRouter(
 
   router.post('/api/v1/admin/knowledge-edges', async (ctx) => {
     sendHubResult(ctx, await createAdminKnowledgeEdge(hub, core, readBody<AdminKnowledgeEdgeInput>(ctx)));
+  });
+
+  router.post('/api/v1/admin/knowledge/branch-publish', async (ctx) => {
+    sendHubResult(ctx, await publishAdminKnowledgeToBranch(hub, core, readBody<AdminKnowledgeBranchPublishInput>(ctx)));
+  });
+
+  router.post('/api/v1/admin/branches/bulk-publish', async (ctx) => {
+    sendHubResult(ctx, await publishAdminKnowledgeBatchToBranch(hub, core, readBody<AdminKnowledgeBranchBulkPublishInput>(ctx)));
   });
 
   router.get('/api/v1/admin/quality-review', async (ctx) => {
@@ -667,6 +783,10 @@ async function createMcpHttpSession(
         edgeInput.reason = input.reason;
       }
 
+      if (input.project !== 'auto') {
+        edgeInput.groupKey = input.project;
+      }
+
       const result = await createAdminKnowledgeEdge(hub, core, edgeInput);
 
       return result.ok
@@ -739,12 +859,17 @@ function readFederationEventLogLimit(ctx: Context): number | undefined {
 function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
   const query: AdminKnowledgeQuery = {};
   const search = readQueryString(ctx, 'query');
+  const groupKey = readQueryString(ctx, 'groupKey');
   const layer = readQueryString(ctx, 'layer');
   const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
 
   if (search !== undefined) {
     query.query = search;
+  }
+
+  if (groupKey !== undefined) {
+    query.groupKey = groupKey;
   }
 
   if (layer === 'raw' || layer === 'extract' || layer === 'canonical') {
@@ -762,8 +887,30 @@ function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
   return query;
 }
 
+function readAdminBranchMergePreviewInput(ctx: Context): AdminBranchMergePreviewInput {
+  const input: AdminBranchMergePreviewInput = {};
+  const sourceBranchKey = readQueryString(ctx, 'sourceBranchKey') ?? readQueryString(ctx, 'sourceGroupKey');
+  const targetBranchKey = readQueryString(ctx, 'targetBranchKey') ?? readQueryString(ctx, 'targetGroupKey');
+  const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  if (sourceBranchKey !== undefined) {
+    input.sourceBranchKey = sourceBranchKey;
+  }
+
+  if (targetBranchKey !== undefined) {
+    input.targetBranchKey = targetBranchKey;
+  }
+
+  if (Number.isFinite(limit) && limit > 0) {
+    input.limit = Math.min(limit, 500);
+  }
+
+  return input;
+}
+
 function readAdminQualityReviewQuery(ctx: Context): AdminQualityReviewQuery {
   const query: AdminQualityReviewQuery = {};
+  const groupKey = readQueryString(ctx, 'groupKey');
   const layer = readQueryString(ctx, 'layer');
   const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
   const maxQualityScore = readQueryNumber(ctx, 'maxQualityScore');
@@ -772,6 +919,10 @@ function readAdminQualityReviewQuery(ctx: Context): AdminQualityReviewQuery {
   const maxAdoptionScore = readQueryNumber(ctx, 'maxAdoptionScore');
   const staleDays = readQueryNumber(ctx, 'staleDays');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  if (groupKey !== undefined) {
+    query.groupKey = groupKey;
+  }
 
   if (layer === 'raw' || layer === 'extract' || layer === 'canonical') {
     query.layer = layer;
@@ -810,11 +961,16 @@ function readAdminQualityReviewQuery(ctx: Context): AdminQualityReviewQuery {
 
 function readAdminTaskDigestQuery(ctx: Context): AdminTaskDigestQuery {
   const query: AdminTaskDigestQuery = {};
+  const groupKey = readQueryString(ctx, 'groupKey');
   const projectKey = readQueryString(ctx, 'projectKey');
   const status = readQueryString(ctx, 'status');
   const includeDone = readQueryBoolean(ctx, 'includeDone');
   const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
+
+  if (groupKey !== undefined) {
+    query.groupKey = groupKey;
+  }
 
   if (projectKey !== undefined) {
     query.projectKey = projectKey;
@@ -855,6 +1011,43 @@ function readAdminKnowledgeEdgeQuery(ctx: Context): AdminKnowledgeEdgeQuery {
 
   if (Number.isFinite(limit) && limit > 0) {
     query.limit = Math.min(limit, 100);
+  }
+
+  return query;
+}
+
+function readAdminGlobalProjectionQuery(ctx: Context): AdminGlobalProjectionQuery {
+  const query: AdminGlobalProjectionQuery = {};
+  const groupKey = readQueryString(ctx, 'groupKey');
+  const projectKey = readQueryString(ctx, 'projectKey');
+
+  if (groupKey !== undefined) {
+    query.groupKey = groupKey;
+  }
+
+  if (projectKey !== undefined) {
+    query.projectKey = projectKey;
+  }
+
+  return query;
+}
+
+function readAdminCrdtDocumentQuery(ctx: Context): AdminCrdtDocumentQuery {
+  const query: AdminCrdtDocumentQuery = {};
+  const kind = readQueryString(ctx, 'kind');
+  const groupKey = readQueryString(ctx, 'groupKey');
+  const projectKey = readQueryString(ctx, 'projectKey');
+
+  if (kind !== undefined) {
+    query.kind = kind;
+  }
+
+  if (groupKey !== undefined) {
+    query.groupKey = groupKey;
+  }
+
+  if (projectKey !== undefined) {
+    query.projectKey = projectKey;
   }
 
   return query;

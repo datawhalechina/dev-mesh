@@ -2,6 +2,7 @@ import type { ProjectSummary } from '@devmesh/protocol';
 import {
   DEFAULT_GROUP_KEY,
   DEFAULT_LOCAL_INVITE_TOKEN,
+  createEmptyHubGlobalProjection,
   type HubGroup,
   type HubGroupSeed,
   type HubInvite,
@@ -26,6 +27,8 @@ export function createHubState(options: HubStateOptions = {}): HubState {
     projects: new Map(),
     knowledgeEdges: [],
     syncEvents: new Map(),
+    crdtDocuments: new Map(),
+    globalProjection: createEmptyHubGlobalProjection(),
     federationCursors: new Map(),
     auditLogs: []
   };

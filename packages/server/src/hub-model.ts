@@ -1,4 +1,4 @@
-import type { ProjectAccess, ProjectSummary, SyncEvent } from '@devmesh/protocol';
+import type { CrdtSyncChange, CrdtSyncDocumentRef, ProjectAccess, ProjectSummary, SyncEvent } from '@devmesh/protocol';
 
 export const DEFAULT_LOCAL_INVITE_TOKEN = 'devmesh-local-invite';
 export const DEFAULT_GROUP_KEY = 'default';
@@ -118,6 +118,64 @@ export interface HubSyncEvent extends SyncEvent {
   acceptedAt: string;
 }
 
+export interface HubCrdtChange extends CrdtSyncChange {
+  id: string;
+  receivedAt: string;
+  clientId: string;
+  groupKey: string;
+}
+
+export interface HubCrdtDocument {
+  key: string;
+  document: CrdtSyncDocumentRef;
+  heads: string[];
+  changes: HubCrdtChange[];
+  snapshot?: string;
+  updatedAt: string;
+}
+
+export interface HubGlobalProjectionDocument {
+  documentKey: string;
+  document: CrdtSyncDocumentRef;
+  groupKey?: string;
+  projectKey?: string;
+  sourceHeads: string[];
+  materializedAt: string;
+  knowledgeIds: string[];
+  relationIds: string[];
+  qualitySignalIds: string[];
+  conflictIds: string[];
+}
+
+export interface HubGlobalProjection {
+  schemaVersion: 2;
+  updatedAt?: string;
+  documents: Record<string, HubGlobalProjectionDocument>;
+  counts: {
+    documents: number;
+    groups: number;
+    knowledge: number;
+    relations: number;
+    qualitySignals: number;
+    conflicts: number;
+  };
+}
+
+export function createEmptyHubGlobalProjection(): HubGlobalProjection {
+  return {
+    schemaVersion: 2,
+    documents: {},
+    counts: {
+      documents: 0,
+      groups: 0,
+      knowledge: 0,
+      relations: 0,
+      qualitySignals: 0,
+      conflicts: 0
+    }
+  };
+}
+
 export interface HubState {
   groups: Map<string, HubGroup>;
   invites: Map<string, HubInvite>;
@@ -126,6 +184,8 @@ export interface HubState {
   projects: Map<string, ProjectSummary>;
   knowledgeEdges: HubKnowledgeEdge[];
   syncEvents: Map<string, HubSyncEvent[]>;
+  crdtDocuments: Map<string, HubCrdtDocument>;
+  globalProjection: HubGlobalProjection;
   federationCursors: Map<string, string>;
   auditLogs: HubAuditLog[];
 }

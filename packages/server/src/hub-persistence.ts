@@ -4,6 +4,8 @@ import type { ProjectSummary } from '@devmesh/protocol';
 import type {
   HubAccessToken,
   HubAuditLog,
+  HubCrdtDocument,
+  HubGlobalProjection,
   HubGroup,
   HubInvite,
   HubKnowledgeEdge,
@@ -12,6 +14,7 @@ import type {
   HubStateOptions,
   HubSyncEvent
 } from './hub-model.js';
+import { createEmptyHubGlobalProjection } from './hub-model.js';
 import { createHubState } from './hub-seed.js';
 
 export interface HubStatePersistenceOptions {
@@ -24,7 +27,7 @@ export interface HubStatePersistenceStore {
 }
 
 interface SerializedHubState {
-  version: 1;
+  version: 2;
   groups: HubGroup[];
   invites: HubInvite[];
   members: HubMember[];
@@ -32,6 +35,8 @@ interface SerializedHubState {
   projects: ProjectSummary[];
   knowledgeEdges: HubKnowledgeEdge[];
   syncEvents: Array<[string, HubSyncEvent[]]>;
+  crdtDocuments: Array<[string, HubCrdtDocument]>;
+  globalProjection?: HubGlobalProjection;
   federationCursors: Array<[string, string]>;
   auditLogs: HubAuditLog[];
 }
@@ -72,7 +77,7 @@ export async function saveHubStateToFile(state: HubState, path: string): Promise
 
 export function serializeHubState(state: HubState): SerializedHubState {
   return {
-    version: 1,
+    version: 2,
     groups: [...state.groups.values()].sort((a, b) => a.key.localeCompare(b.key)),
     invites: [...state.invites.values()].sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.token.localeCompare(b.token)),
     members: [...state.members.values()].sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.memberId.localeCompare(b.memberId)),
@@ -82,6 +87,8 @@ export function serializeHubState(state: HubState): SerializedHubState {
     syncEvents: [...state.syncEvents.entries()]
       .map(([groupKey, events]) => [groupKey, events] as [string, HubSyncEvent[]])
       .sort(([leftGroupKey], [rightGroupKey]) => leftGroupKey.localeCompare(rightGroupKey)),
+    crdtDocuments: [...state.crdtDocuments.entries()].sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+    globalProjection: state.globalProjection,
     federationCursors: [...state.federationCursors.entries()].sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
     auditLogs: state.auditLogs.slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
   };
@@ -100,6 +107,8 @@ export function deserializeHubState(value: unknown): HubState {
     projects: new Map(value.projects.map((project) => [`${project.groupKey}:${project.id}`, project])),
     knowledgeEdges: value.knowledgeEdges,
     syncEvents: new Map(value.syncEvents),
+    crdtDocuments: new Map(value.crdtDocuments),
+    globalProjection: value.globalProjection ?? createEmptyHubGlobalProjection(),
     federationCursors: new Map(value.federationCursors),
     auditLogs: value.auditLogs
   };
@@ -109,7 +118,7 @@ function isSerializedHubState(value: unknown): value is SerializedHubState {
   return (
     typeof value === 'object' &&
     value !== null &&
-    (value as { version?: unknown }).version === 1 &&
+    (value as { version?: unknown }).version === 2 &&
     Array.isArray((value as { groups?: unknown }).groups) &&
     Array.isArray((value as { invites?: unknown }).invites) &&
     Array.isArray((value as { members?: unknown }).members) &&
@@ -117,6 +126,7 @@ function isSerializedHubState(value: unknown): value is SerializedHubState {
     Array.isArray((value as { projects?: unknown }).projects) &&
     Array.isArray((value as { knowledgeEdges?: unknown }).knowledgeEdges) &&
     Array.isArray((value as { syncEvents?: unknown }).syncEvents) &&
+    Array.isArray((value as { crdtDocuments?: unknown }).crdtDocuments) &&
     Array.isArray((value as { federationCursors?: unknown }).federationCursors) &&
     Array.isArray((value as { auditLogs?: unknown }).auditLogs)
   );

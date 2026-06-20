@@ -2,12 +2,16 @@ import { createHmac } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import * as Automerge from '@automerge/automerge';
+import type { Change as AutomergeBinaryChange, Doc as AutomergeDoc } from '@automerge/automerge';
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createDevMeshCore, type DevMeshCore } from '@devmesh/core';
-import { JsonlKnowledgeRepository } from '@devmesh/local-store';
+import { captureProjectKnowledge, JsonlKnowledgeRepository } from '@devmesh/local-store';
+import type { CrdtSyncChange } from '@devmesh/protocol';
 import { DEV_MESH_VERSION } from '@devmesh/shared';
+import type { HubCrdtDocument } from '../src/hub-model.js';
 import { createHubState, DEFAULT_LOCAL_INVITE_TOKEN, type HubState, type HubStateOptions } from '../src/hub-state.js';
 import {
   createHubServer,
@@ -141,6 +145,486 @@ describe('hub server HTTP integration', () => {
         cursor: 'cur_frontend-team_1',
         events: []
       });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('exchanges v2 CRDT changes by authenticated group and document heads', async () => {
+    const { heads, changes } = createAutomergeSyncPayload((doc) => {
+      doc.schemaVersion = 2;
+      doc.knowledge = {
+        ki_v2_sync: {
+          id: 'ki_v2_sync',
+          layer: 'canonical',
+          entryKey: 'projects/frontend-dashboard/v2-crdt-exchange',
+          type: 'decision',
+          title: 'V2 CRDT exchange',
+          summary: 'Hub applies Automerge changes and materializes knowledge for Admin queries.',
+          tags: ['crdt', 'sync'],
+          para: {
+            category: 'projects',
+            key: 'frontend-dashboard'
+          },
+          status: 'active',
+          source: {
+            kind: 'crdt-test'
+          },
+          createdBy: {
+            displayName: 'Writer',
+            clientId: 'client_test_writer'
+          },
+          createdAt: '2026-06-18T09:00:00.000Z',
+          updatedAt: '2026-06-18T09:00:00.000Z',
+          visibility: 'team',
+          quality: {
+            confidence: 0.8,
+            weight: 1,
+            rating: 0.5,
+            adoptionScore: 0,
+            sourceTrust: 0.7,
+            evidence: 0.5,
+            freshness: 1,
+            qualityScore: 0.61
+          }
+        }
+      };
+    });
+    const { heads: backendHeads, changes: backendChanges } = createAutomergeSyncPayload((doc) => {
+      doc.schemaVersion = 2;
+    });
+    const store = new TestHubStateStore();
+    const { app, url } = await startHubServer({
+      core: createDevMeshCore(),
+      hubStateStore: store,
+      hub: {
+        groups: [
+          {
+            key: 'frontend-team',
+            displayName: 'Frontend Team'
+          },
+          {
+            key: 'backend-team',
+            displayName: 'Backend Team'
+          }
+        ],
+        invites: [
+          {
+            token: 'inv_frontend_a',
+            groupKey: 'frontend-team'
+          },
+          {
+            token: 'inv_frontend_b',
+            groupKey: 'frontend-team'
+          },
+          {
+            token: 'inv_backend',
+            groupKey: 'backend-team'
+          }
+        ]
+      }
+    });
+
+    try {
+      const writer = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_frontend_a',
+          displayName: 'Writer',
+          handle: 'writer'
+        }
+      });
+      const reader = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_frontend_b',
+          displayName: 'Reader',
+          handle: 'reader'
+        }
+      });
+      const backend = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_backend',
+          displayName: 'Backend',
+          handle: 'backend'
+        }
+      });
+      const pushed = await requestJson(`${url}/api/v2/sync/exchange`, {
+        method: 'POST',
+        headers: authHeaders(writer.body.accessToken),
+        body: {
+          clientId: writer.body.clientId,
+          projectKey: 'frontend-dashboard',
+          document: {
+            kind: 'project',
+            projectKey: 'frontend-dashboard',
+            schemaVersion: 2
+          },
+          heads,
+          changes
+        }
+      });
+      const pulled = await requestJson(`${url}/api/v2/sync/exchange`, {
+        method: 'POST',
+        headers: authHeaders(reader.body.accessToken),
+        body: {
+          clientId: reader.body.clientId,
+          projectKey: 'frontend-dashboard',
+          heads: [],
+          changes: []
+        }
+      });
+      const retry = await requestJson(`${url}/api/v2/sync/exchange`, {
+        method: 'POST',
+        headers: authHeaders(writer.body.accessToken),
+        body: {
+          clientId: writer.body.clientId,
+          projectKey: 'frontend-dashboard',
+          heads,
+          changes
+        }
+      });
+      const isolated = await requestJson(`${url}/api/v2/sync/exchange`, {
+        method: 'POST',
+        headers: authHeaders(backend.body.accessToken),
+        body: {
+          clientId: backend.body.clientId,
+          projectKey: 'frontend-dashboard',
+          heads: backendHeads,
+          changes: backendChanges
+        }
+      });
+      const forbiddenGroup = await requestJson(`${url}/api/v2/sync/exchange`, {
+        method: 'POST',
+        headers: authHeaders(backend.body.accessToken),
+        body: {
+          clientId: backend.body.clientId,
+          document: {
+            kind: 'project',
+            groupKey: 'frontend-team',
+            projectKey: 'frontend-dashboard'
+          },
+          heads: [],
+          changes: []
+        }
+      });
+      const audit = await requestJson(`${url}/api/v1/admin/audit?action=sync.crdt_exchange`);
+      const materializedAudit = await requestJson(`${url}/api/v1/admin/audit?action=sync.crdt_materialized`);
+      const adminKnowledge = await requestJson(
+        `${url}/api/v1/admin/knowledge?groupKey=frontend-team&query=${encodeURIComponent('V2 CRDT exchange')}`
+      );
+      const globalProjection = await requestJson(`${url}/api/v1/admin/global-projection`);
+      const crdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents`);
+      const frontendCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?groupKey=frontend-team`);
+      const frontendProjectCrdtDocuments = await requestJson(
+        `${url}/api/v1/admin/crdt-documents?kind=project&groupKey=frontend-team&projectKey=frontend-dashboard`
+      );
+      const serverGlobalCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?kind=server-global`);
+      const branches = await requestJson(`${url}/api/v1/admin/branches`);
+      const frontendAdminProjection = await requestJson(`${url}/api/v1/admin/global-projection?groupKey=frontend-team`);
+      const backendAdminProjection = await requestJson(`${url}/api/v1/admin/global-projection?groupKey=backend-team`);
+      const frontendScopedProjection = await requestJson(`${url}/api/v2/projections/global`, {
+        headers: authHeaders(reader.body.accessToken)
+      });
+      const backendScopedProjection = await requestJson(`${url}/api/v2/projections/global`, {
+        headers: authHeaders(backend.body.accessToken)
+      });
+      const unauthenticatedProjection = await requestJson(`${url}/api/v2/projections/global`);
+      const persistedState = await store.load();
+
+      expect(pushed.status).toBe(200);
+      expect(pushed.body).toMatchObject({
+        document: {
+          kind: 'project',
+          groupKey: 'frontend-team',
+          projectKey: 'frontend-dashboard',
+          schemaVersion: 2
+        },
+        acceptedChanges: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.stringMatching(/^am_[a-f0-9]{32}$/),
+            headsAfter: expect.any(Array)
+          })
+        ]),
+        rejected: [],
+        heads,
+        changes: [],
+        projection: {
+          materialized: true,
+          sourceHeads: heads
+        }
+      });
+      expect(pulled.body).toMatchObject({
+        heads,
+        rejected: [],
+        changes: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.stringMatching(/^am_[a-f0-9]{32}$/),
+            engine: 'automerge',
+            encoding: 'base64'
+          })
+        ])
+      });
+      expect(pulled.body.changes).toHaveLength(changes.length);
+      expect(Automerge.toJS(applyAutomergeSyncChanges(pulled.body.changes as CrdtSyncChange[]))).toMatchObject({
+        schemaVersion: 2,
+        knowledge: {
+          ki_v2_sync: {
+            id: 'ki_v2_sync',
+            title: 'V2 CRDT exchange'
+          }
+        }
+      });
+      expect(retry.body).toMatchObject({
+        acceptedChanges: [],
+        rejected: [],
+        heads,
+        changes: []
+      });
+      expect(isolated.body).toMatchObject({
+        document: {
+          groupKey: 'backend-team'
+        },
+        heads: backendHeads,
+        changes: []
+      });
+      expect(forbiddenGroup.status).toBe(403);
+      expect(forbiddenGroup.body).toMatchObject({
+        error: {
+          code: 'crdt_sync.group_mismatch'
+        }
+      });
+      expect(audit.body.auditLogs).toHaveLength(2);
+      expect(audit.body.auditLogs).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          actor: writer.body.memberId,
+          action: 'sync.crdt_exchange',
+          targetType: 'crdt_document',
+          groupKey: 'frontend-team',
+          payload: expect.objectContaining({
+            clientId: writer.body.clientId,
+            acceptedChanges: changes.length,
+            rejectedChanges: 0,
+            returnedChanges: 0,
+            heads
+          })
+        })
+      ]));
+      expect(materializedAudit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          actor: writer.body.memberId,
+          action: 'sync.crdt_materialized',
+          targetType: 'crdt_document',
+          groupKey: 'frontend-team',
+          payload: expect.objectContaining({
+            materialized: 1,
+            skipped: 0,
+            heads
+          })
+        })
+      ]);
+      expect(adminKnowledge.body.items).toEqual([
+        expect.objectContaining({
+          id: 'ki_v2_sync',
+          layer: 'canonical',
+          title: 'V2 CRDT exchange',
+          source: expect.objectContaining({
+            metadata: expect.objectContaining({
+              groupKey: 'frontend-team',
+              projectKey: 'frontend-dashboard'
+            })
+          })
+        })
+      ]);
+      expect(globalProjection.body).toMatchObject({
+        schemaVersion: 2,
+        counts: {
+          documents: 2,
+          groups: 2,
+          knowledge: 1,
+          relations: 0,
+          qualitySignals: 0,
+          conflicts: 0
+        }
+      });
+      expect(Object.values(globalProjection.body.documents)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            groupKey: 'frontend-team',
+            projectKey: 'frontend-dashboard',
+            sourceHeads: heads,
+            knowledgeIds: ['ki_v2_sync'],
+            relationIds: [],
+            qualitySignalIds: [],
+            conflictIds: []
+          }),
+          expect.objectContaining({
+            groupKey: 'backend-team',
+            projectKey: 'frontend-dashboard',
+            sourceHeads: backendHeads,
+            knowledgeIds: []
+          })
+        ])
+      );
+      expect(crdtDocuments.body.documents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            document: expect.objectContaining({
+              kind: 'project',
+              groupKey: 'frontend-team',
+              projectKey: 'frontend-dashboard',
+              schemaVersion: 2
+            }),
+            kind: 'project',
+            groupKey: 'frontend-team',
+            projectKey: 'frontend-dashboard',
+            heads,
+            changeCount: 1,
+            snapshotPresent: true,
+            latestChange: expect.objectContaining({
+              id: expect.stringMatching(/^am_[a-f0-9]{32}$/),
+              clientId: writer.body.clientId,
+              groupKey: 'frontend-team',
+              summary: 'Test CRDT change'
+            })
+          })
+        ])
+      );
+      expect(JSON.stringify(crdtDocuments.body)).not.toContain('"bytes"');
+      expect(JSON.stringify(crdtDocuments.body)).not.toContain('"snapshot"');
+      expect(frontendCrdtDocuments.body.documents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'project',
+            groupKey: 'frontend-team',
+            projectKey: 'frontend-dashboard'
+          })
+        ])
+      );
+      expect(frontendCrdtDocuments.body.documents).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'server-global'
+          })
+        ])
+      );
+      expect(frontendProjectCrdtDocuments.body.documents).toEqual([
+        expect.objectContaining({
+          kind: 'project',
+          groupKey: 'frontend-team',
+          projectKey: 'frontend-dashboard'
+        })
+      ]);
+      expect(serverGlobalCrdtDocuments.body.documents).toEqual([]);
+      expect(branches.body.branches).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            branchKey: 'frontend-team',
+            groupKey: 'frontend-team',
+            displayName: 'Frontend Team',
+            counts: expect.objectContaining({
+              members: expect.any(Number),
+              projects: 0,
+              crdtDocuments: 1,
+              knowledge: 1,
+              relations: 0,
+              qualitySignals: 0,
+              conflicts: 0
+            }),
+            projects: [],
+            updatedAt: expect.any(String)
+          }),
+          expect.objectContaining({
+            branchKey: 'backend-team',
+            groupKey: 'backend-team',
+            displayName: 'Backend Team',
+            counts: expect.objectContaining({
+              crdtDocuments: 1,
+              knowledge: 0
+            }),
+            updatedAt: expect.any(String)
+          })
+        ])
+      );
+      expect(frontendAdminProjection.body.counts).toMatchObject({
+        documents: 1,
+        groups: 1,
+        knowledge: 1
+      });
+      expect(Object.values(frontendAdminProjection.body.documents)).toEqual([
+        expect.objectContaining({
+          groupKey: 'frontend-team',
+          projectKey: 'frontend-dashboard',
+          sourceHeads: heads,
+          knowledgeIds: ['ki_v2_sync'],
+          relationIds: [],
+          qualitySignalIds: [],
+          conflictIds: []
+        })
+      ]);
+      expect(backendAdminProjection.body.counts).toMatchObject({
+        documents: 1,
+        groups: 1,
+        knowledge: 0
+      });
+      expect(Object.values(backendAdminProjection.body.documents)).toEqual([
+        expect.objectContaining({
+          groupKey: 'backend-team',
+          sourceHeads: backendHeads,
+          knowledgeIds: []
+        })
+      ]);
+      expect(frontendScopedProjection.body.counts).toMatchObject({
+        documents: 1,
+        groups: 1,
+        knowledge: 1
+      });
+      expect(Object.values(frontendScopedProjection.body.documents)).toEqual([
+        expect.objectContaining({
+          groupKey: 'frontend-team',
+          knowledgeIds: ['ki_v2_sync']
+        })
+      ]);
+      expect(backendScopedProjection.body.counts).toMatchObject({
+        documents: 1,
+        groups: 1,
+        knowledge: 0
+      });
+      expect(Object.values(backendScopedProjection.body.documents)).toEqual([
+        expect.objectContaining({
+          groupKey: 'backend-team',
+          sourceHeads: backendHeads,
+          knowledgeIds: []
+        })
+      ]);
+      expect(unauthenticatedProjection.status).toBe(401);
+      expect(unauthenticatedProjection.body).toMatchObject({
+        error: {
+          code: 'auth.missing_token'
+        }
+      });
+      expect(persistedState.globalProjection.counts).toMatchObject({
+        documents: 2,
+        groups: 2,
+        knowledge: 1
+      });
+      expect(Object.values(persistedState.globalProjection.documents)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            groupKey: 'frontend-team',
+            projectKey: 'frontend-dashboard',
+            sourceHeads: heads,
+            knowledgeIds: ['ki_v2_sync']
+          }),
+          expect.objectContaining({
+            groupKey: 'backend-team',
+            projectKey: 'frontend-dashboard',
+            sourceHeads: backendHeads,
+            knowledgeIds: []
+          })
+        ])
+      );
     } finally {
       await app.close();
     }
@@ -383,6 +867,576 @@ describe('hub server HTTP integration', () => {
         }
       });
     } finally {
+      await app.close();
+    }
+  });
+
+  it('materializes synced knowledge snapshots into admin-visible knowledge', async () => {
+    const sourceCore = createDevMeshCore();
+    const serverCore = createDevMeshCore();
+    const item = await sourceCore.captureKnowledge({
+      id: 'kn_synced_admin_visible',
+      type: 'decision',
+      layer: 'canonical',
+      title: 'Synced knowledge appears in admin',
+      summary: 'Hub sync should materialize valid knowledge snapshots for dashboard visibility.',
+      tags: ['sync'],
+      createdBy: {
+        displayName: 'Alice',
+        handle: 'alice'
+      },
+      visibility: 'team'
+    });
+    const { app, url } = await startHubServer({ core: serverCore });
+
+    try {
+      const joined = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: DEFAULT_LOCAL_INVITE_TOKEN,
+          displayName: 'Alice',
+          handle: 'alice'
+        }
+      });
+      const push = await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(joined.body.accessToken),
+        body: {
+          clientId: joined.body.clientId,
+          events: [
+            {
+              id: 'evt_synced_admin_visible',
+              kind: 'knowledge.captured',
+              payload: {
+                knowledgeId: item.id,
+                knowledge: item
+              },
+              createdAt: item.createdAt
+            }
+          ]
+        }
+      });
+      const overview = await requestJson(`${url}/api/v1/admin/overview`);
+      const knowledge = await requestJson(`${url}/api/v1/admin/knowledge?layer=canonical`);
+      const audit = await requestJson(`${url}/api/v1/admin/audit?action=sync.knowledge_snapshot_replayed`);
+
+      expect(push.body).toMatchObject({
+        accepted: 1,
+        rejected: [],
+        cursor: 'cur_default_1'
+      });
+      expect(overview.body).toMatchObject({
+        counts: {
+          members: 1,
+          knowledgeItems: 1
+        }
+      });
+      expect(knowledge.body.items).toEqual([
+        expect.objectContaining({
+          id: item.id,
+          title: 'Synced knowledge appears in admin',
+          layer: 'canonical',
+          visibility: 'team',
+          source: expect.objectContaining({
+            metadata: expect.objectContaining({
+              groupKey: 'default'
+            })
+          })
+        })
+      ]);
+      expect(audit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          actor: joined.body.memberId,
+          action: 'sync.knowledge_snapshot_replayed',
+          targetType: 'knowledge',
+          targetId: item.id,
+          groupKey: 'default',
+          payload: expect.objectContaining({
+            eventId: 'evt_synced_admin_visible',
+            clientId: joined.body.clientId,
+            layer: 'canonical',
+            type: 'decision'
+          })
+        })
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('scopes synced knowledge queries by hub group branch', async () => {
+    const frontendCore = createDevMeshCore();
+    const backendCore = createDevMeshCore();
+    const serverCore = createDevMeshCore();
+    const store = new TestHubStateStore();
+    const frontendItem = await frontendCore.captureKnowledge({
+      id: 'kn_group_branch_frontend',
+      type: 'decision',
+      layer: 'canonical',
+      title: 'Frontend group branch decision',
+      summary: 'Only the frontend-team knowledge branch should expose this item.',
+      visibility: 'team'
+    });
+    const frontendConflictItem = await frontendCore.captureKnowledge({
+      id: 'kn_group_branch_frontend_conflict',
+      type: 'decision',
+      layer: 'canonical',
+      title: 'Backend group branch decision',
+      summary: 'This frontend item intentionally collides with a backend branch title.',
+      visibility: 'team'
+    });
+    const frontendBulkItem = await frontendCore.captureKnowledge({
+      id: 'kn_group_branch_frontend_bulk',
+      type: 'decision',
+      layer: 'canonical',
+      title: 'Frontend bulk publish decision',
+      summary: 'This item should be bulk published after preview.',
+      visibility: 'team'
+    });
+    const backendItem = await backendCore.captureKnowledge({
+      id: 'kn_group_branch_backend',
+      type: 'decision',
+      layer: 'canonical',
+      title: 'Backend group branch decision',
+      summary: 'Only the backend-team knowledge branch should expose this item.',
+      visibility: 'team'
+    });
+    const { app, url } = await startHubServer({
+      core: serverCore,
+      hubStateStore: store,
+      hub: {
+        groups: [
+          {
+            key: 'frontend-team',
+            displayName: 'Frontend Team'
+          },
+          {
+            key: 'backend-team',
+            displayName: 'Backend Team'
+          }
+        ],
+        invites: [
+          {
+            token: 'inv_branch_frontend',
+            groupKey: 'frontend-team'
+          },
+          {
+            token: 'inv_branch_backend',
+            groupKey: 'backend-team'
+          }
+        ]
+      }
+    });
+    const client = new Client({
+      name: 'dev-mesh-hub-branch-scope-test',
+      version: '0.1.0'
+    });
+
+    try {
+      const frontendJoin = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_branch_frontend',
+          displayName: 'Xiaoyun'
+        }
+      });
+      const backendJoin = await requestJson<JoinResponseBody>(`${url}/api/v1/join`, {
+        method: 'POST',
+        body: {
+          inviteToken: 'inv_branch_backend',
+          displayName: 'Ayuan'
+        }
+      });
+
+      await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(frontendJoin.body.accessToken),
+        body: {
+          clientId: frontendJoin.body.clientId,
+          events: [
+            {
+              id: 'evt_group_branch_frontend',
+              kind: 'knowledge.captured',
+              payload: {
+                knowledgeId: frontendItem.id,
+                knowledge: frontendItem
+              },
+              createdAt: frontendItem.createdAt
+            },
+            {
+              id: 'evt_group_branch_frontend_conflict',
+              kind: 'knowledge.captured',
+              payload: {
+                knowledgeId: frontendConflictItem.id,
+                knowledge: frontendConflictItem
+              },
+              createdAt: frontendConflictItem.createdAt
+            },
+            {
+              id: 'evt_group_branch_frontend_bulk',
+              kind: 'knowledge.captured',
+              payload: {
+                knowledgeId: frontendBulkItem.id,
+                knowledge: frontendBulkItem
+              },
+              createdAt: frontendBulkItem.createdAt
+            }
+          ]
+        }
+      });
+      await requestJson(`${url}/api/v1/sync/push`, {
+        method: 'POST',
+        headers: authHeaders(backendJoin.body.accessToken),
+        body: {
+          clientId: backendJoin.body.clientId,
+          events: [
+            {
+              id: 'evt_group_branch_backend',
+              kind: 'knowledge.captured',
+              payload: {
+                knowledgeId: backendItem.id,
+                knowledge: backendItem
+              },
+              createdAt: backendItem.createdAt
+            }
+          ]
+        }
+      });
+
+      const allKnowledge = await requestJson(`${url}/api/v1/admin/knowledge?layer=canonical&limit=10`);
+      const frontendKnowledge = await requestJson(`${url}/api/v1/admin/knowledge?groupKey=frontend-team&layer=canonical&limit=10`);
+      const backendKnowledge = await requestJson(`${url}/api/v1/admin/knowledge?groupKey=backend-team&layer=canonical&limit=10`);
+      const mergePreviewBeforePublish = await requestJson(
+        `${url}/api/v1/admin/branches/merge-preview?sourceBranchKey=frontend-team&targetBranchKey=backend-team`
+      );
+      const published = await requestJson(`${url}/api/v1/admin/knowledge/branch-publish`, {
+        method: 'POST',
+        body: {
+          sourceId: frontendItem.id,
+          targetBranchKey: 'backend-team',
+          reason: 'Publish a frontend decision for backend reuse.'
+        }
+      });
+      const rejectedSameBranchPublish = await requestJson(`${url}/api/v1/admin/knowledge/branch-publish`, {
+        method: 'POST',
+        body: {
+          sourceId: frontendItem.id,
+          targetBranchKey: 'frontend-team'
+        }
+      });
+      const backendAfterPublish = await requestJson(
+        `${url}/api/v1/admin/knowledge?groupKey=backend-team&query=${encodeURIComponent('Frontend group branch decision')}`
+      );
+      const mergePreviewAfterPublish = await requestJson(
+        `${url}/api/v1/admin/branches/merge-preview?sourceBranchKey=frontend-team&targetBranchKey=backend-team`
+      );
+      const bulkPublished = await requestJson(`${url}/api/v1/admin/branches/bulk-publish`, {
+        method: 'POST',
+        body: {
+          sourceBranchKey: 'frontend-team',
+          targetBranchKey: 'backend-team',
+          sourceIds: [frontendItem.id, frontendConflictItem.id, frontendBulkItem.id, 'missing-source'],
+          reason: 'Bulk publish selected preview candidates.'
+        }
+      });
+      const mergePreviewAfterBulkPublish = await requestJson(
+        `${url}/api/v1/admin/branches/merge-preview?sourceBranchKey=frontend-team&targetBranchKey=backend-team`
+      );
+      const transport = new StreamableHTTPClientTransport(new URL(`${url}/mcp`));
+      await client.connect(transport as never);
+      const frontendListResult = await client.callTool({
+        name: 'mesh_list_knowledge',
+        arguments: {
+          branch: 'frontend-team',
+          layers: ['canonical'],
+          limit: 10
+        }
+      });
+      const backendSearchResult = await client.callTool({
+        name: 'mesh_search_context',
+        arguments: {
+          branch: 'backend-team',
+          query: 'group branch decision',
+          layers: ['canonical']
+        }
+      });
+      const frontendGraphResult = await client.callTool({
+        name: 'mesh_explore_knowledge_graph',
+        arguments: {
+          branch: 'frontend-team',
+          query: 'group branch decision',
+          depth: 1
+        }
+      });
+      const crossGroupLinkResult = await client.callTool({
+        name: 'mesh_link_knowledge',
+        arguments: {
+          kind: 'duplicates',
+          fromId: frontendItem.id,
+          toId: backendItem.id,
+          project: 'frontend-team'
+        }
+      });
+      const frontendListText = readTextToolResult(frontendListResult);
+      const backendSearchText = readTextToolResult(backendSearchResult);
+      const frontendGraphText = readTextToolResult(frontendGraphResult);
+      const crossGroupLinkText = readTextToolResult(crossGroupLinkResult);
+      const persistedState = await store.load();
+      const adminOperationsDocument = getServerGlobalAdminOperationsDocument(persistedState);
+      const adminOperations = getAdminCrdtOperations(persistedState);
+
+      expect(allKnowledge.body.items.map((item: { id: string }) => item.id)).toEqual(
+        expect.arrayContaining([frontendItem.id, frontendConflictItem.id, frontendBulkItem.id, backendItem.id])
+      );
+      expect(frontendKnowledge.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: frontendItem.id,
+            source: expect.objectContaining({
+              metadata: expect.objectContaining({
+                groupKey: 'frontend-team'
+              })
+            })
+          }),
+          expect.objectContaining({
+            id: frontendConflictItem.id,
+            source: expect.objectContaining({
+              metadata: expect.objectContaining({
+                groupKey: 'frontend-team'
+              })
+            })
+          }),
+          expect.objectContaining({
+            id: frontendBulkItem.id,
+            source: expect.objectContaining({
+              metadata: expect.objectContaining({
+                groupKey: 'frontend-team'
+              })
+            })
+          })
+        ])
+      );
+      expect(backendKnowledge.body.items).toEqual([
+        expect.objectContaining({
+          id: backendItem.id,
+          source: expect.objectContaining({
+            metadata: expect.objectContaining({
+              groupKey: 'backend-team'
+            })
+          })
+        })
+      ]);
+      expect(mergePreviewBeforePublish.body).toMatchObject({
+        sourceBranchKey: 'frontend-team',
+        targetBranchKey: 'backend-team',
+        summary: {
+          sourceKnowledge: 3,
+          targetKnowledge: 1,
+          publishable: 2,
+          alreadyPublished: 0,
+          possibleConflicts: 1
+        },
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            status: 'publishable',
+            source: expect.objectContaining({
+              id: frontendItem.id
+            })
+          }),
+          expect.objectContaining({
+            status: 'possible_conflict',
+            source: expect.objectContaining({
+              id: frontendConflictItem.id
+            }),
+            target: expect.objectContaining({
+              id: backendItem.id
+            })
+          }),
+          expect.objectContaining({
+            status: 'publishable',
+            source: expect.objectContaining({
+              id: frontendBulkItem.id
+            })
+          })
+        ])
+      });
+      expect(published.body).toMatchObject({
+        title: 'Frontend group branch decision',
+        source: expect.objectContaining({
+          metadata: expect.objectContaining({
+            groupKey: 'backend-team',
+            publishedFromId: frontendItem.id,
+            publishedFromBranch: 'frontend-team'
+          })
+        })
+      });
+      expect(published.body.id).not.toBe(frontendItem.id);
+      expect(rejectedSameBranchPublish.status).toBe(409);
+      expect(rejectedSameBranchPublish.body).toMatchObject({
+        error: {
+          code: 'admin.knowledge_publish_same_branch'
+        }
+      });
+      expect(backendAfterPublish.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: backendItem.id,
+            source: expect.objectContaining({
+              metadata: expect.objectContaining({
+                groupKey: 'backend-team'
+              })
+            })
+          }),
+          expect.objectContaining({
+            id: published.body.id,
+            title: 'Frontend group branch decision',
+            source: expect.objectContaining({
+              metadata: expect.objectContaining({
+                groupKey: 'backend-team',
+                publishedFromId: frontendItem.id
+              })
+            })
+          })
+        ])
+      );
+      expect(mergePreviewAfterPublish.body).toMatchObject({
+        summary: {
+          sourceKnowledge: 3,
+          targetKnowledge: 2,
+          publishable: 1,
+          alreadyPublished: 1,
+          possibleConflicts: 1
+        },
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            status: 'already_published',
+            source: expect.objectContaining({
+              id: frontendItem.id
+            }),
+            target: expect.objectContaining({
+              id: published.body.id
+            })
+          })
+        ])
+      });
+      expect(bulkPublished.body).toMatchObject({
+        published: [
+          expect.objectContaining({
+            title: 'Frontend bulk publish decision',
+            source: expect.objectContaining({
+              metadata: expect.objectContaining({
+                groupKey: 'backend-team',
+                publishedFromId: frontendBulkItem.id,
+                publishedFromBranch: 'frontend-team'
+              })
+            })
+          })
+        ],
+        rejected: expect.arrayContaining([
+          expect.objectContaining({
+            sourceId: frontendItem.id,
+            code: 'already_published'
+          }),
+          expect.objectContaining({
+            sourceId: frontendConflictItem.id,
+            code: 'possible_conflict'
+          }),
+          expect.objectContaining({
+            sourceId: 'missing-source',
+            code: 'source_not_publishable'
+          })
+        ])
+      });
+      expect(mergePreviewAfterBulkPublish.body).toMatchObject({
+        summary: {
+          sourceKnowledge: 3,
+          targetKnowledge: 3,
+          publishable: 0,
+          alreadyPublished: 2,
+          possibleConflicts: 1
+        },
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            status: 'already_published',
+            source: expect.objectContaining({
+              id: frontendBulkItem.id
+            }),
+            target: expect.objectContaining({
+              source: expect.objectContaining({
+                metadata: expect.objectContaining({
+                  publishedFromId: frontendBulkItem.id
+                })
+              })
+            })
+          })
+        ])
+      });
+      const publishAudit = await requestJson(`${url}/api/v1/admin/audit?action=knowledge.branch.published`);
+
+      expect(publishAudit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'knowledge.branch.published',
+          targetType: 'knowledge',
+          targetId: expect.any(String),
+          groupKey: 'backend-team',
+          payload: expect.objectContaining({
+            sourceId: frontendBulkItem.id,
+            sourceBranch: 'frontend-team',
+            targetBranch: 'backend-team'
+          })
+        }),
+        expect.objectContaining({
+          action: 'knowledge.branch.published',
+          targetType: 'knowledge',
+          targetId: published.body.id,
+          groupKey: 'backend-team',
+          payload: expect.objectContaining({
+            sourceId: frontendItem.id,
+            sourceBranch: 'frontend-team',
+            targetBranch: 'backend-team'
+          })
+        })
+      ]);
+      expect(adminOperationsDocument.changes).toHaveLength(2);
+      expect(adminOperationsDocument.heads.length).toBeGreaterThan(0);
+      expect(adminOperations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: 'knowledge.branch.published',
+            actor: 'admin',
+            targetType: 'knowledge',
+            targetId: published.body.id,
+            groupKey: 'backend-team',
+            payload: expect.objectContaining({
+              sourceId: frontendItem.id,
+              sourceBranch: 'frontend-team',
+              targetBranch: 'backend-team',
+              mode: 'single'
+            })
+          }),
+          expect.objectContaining({
+            action: 'knowledge.branch.published',
+            actor: 'admin',
+            targetType: 'knowledge',
+            groupKey: 'backend-team',
+            payload: expect.objectContaining({
+              sourceId: frontendBulkItem.id,
+              sourceBranch: 'frontend-team',
+              targetBranch: 'backend-team',
+              mode: 'bulk'
+            })
+          })
+        ])
+      );
+      expect(frontendListText).toContain(`id=${frontendItem.id}`);
+      expect(frontendListText).not.toContain(backendItem.id);
+      expect(backendSearchText).toContain(`id=${backendItem.id}`);
+      expect(backendSearchText).not.toContain(frontendItem.id);
+      expect(frontendGraphText).toContain(`node id=knowledge:${frontendItem.id}`);
+      expect(frontendGraphText).not.toContain(backendItem.id);
+      expect(crossGroupLinkText).toContain('admin.knowledge_edge_to_not_found');
+    } finally {
+      await client.close().catch(() => undefined);
       await app.close();
     }
   });
@@ -1146,13 +2200,17 @@ describe('hub server HTTP integration', () => {
 
   it('serves admin data for the Vue management dashboard', async () => {
     const core = createDevMeshCore();
+    const store = new TestHubStateStore();
     await core.captureKnowledge({
       type: 'decision',
       layer: 'canonical',
       title: 'Admin dashboard lists knowledge',
       summary: 'The management page should show server knowledge and quality signals.'
     });
-    const { app, url } = await startHubServer({ core });
+    const { app, url } = await startHubServer({
+      core,
+      hubStateStore: store
+    });
 
     try {
       const group = await requestJson(`${url}/api/v1/admin/groups`, {
@@ -1163,6 +2221,15 @@ describe('hub server HTTP integration', () => {
           description: 'Owns UI system decisions.'
         }
       });
+      const branch = await requestJson(`${url}/api/v1/admin/branches`, {
+        method: 'POST',
+        body: {
+          branchKey: 'research',
+          displayName: 'Research',
+          description: 'Shared research knowledge branch.',
+          joinMode: 'open'
+        }
+      });
       const project = await requestJson(`${url}/api/v1/admin/projects`, {
         method: 'POST',
         body: {
@@ -1171,24 +2238,59 @@ describe('hub server HTTP integration', () => {
           name: 'Component Library'
         }
       });
+      const checkedOutProject = await requestJson(`${url}/api/v1/admin/projects/design-team/component-library/branch`, {
+        method: 'PUT',
+        body: {
+          branchKey: 'research'
+        }
+      });
       const overview = await requestJson(`${url}/api/v1/admin/overview`);
       const groups = await requestJson(`${url}/api/v1/admin/groups`);
+      const branches = await requestJson(`${url}/api/v1/admin/branches`);
       const projects = await requestJson(`${url}/api/v1/admin/projects`);
       const knowledge = await requestJson(`${url}/api/v1/admin/knowledge?layer=canonical`);
       const reviewQueue = await requestJson(`${url}/api/v1/admin/review-queue`);
+      const branchAudit = await requestJson(`${url}/api/v1/admin/audit?action=project.branch.checked_out`);
+      const globalProjection = await requestJson(`${url}/api/v1/admin/global-projection`);
+      const crdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents`);
+      const serverGlobalCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?kind=server-global`);
+      const researchCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?groupKey=research`);
+      const persistedState = await store.load();
+      const adminOperationsDocument = getServerGlobalAdminOperationsDocument(persistedState);
+      const adminOperations = getAdminCrdtOperations(persistedState);
 
       expect(group.body).toMatchObject({
         key: 'design-team',
         displayName: 'Design Team'
+      });
+      expect(branch.body).toMatchObject({
+        branchKey: 'research',
+        groupKey: 'research',
+        displayName: 'Research',
+        joinMode: 'open',
+        counts: {
+          members: 0,
+          projects: 0,
+          crdtDocuments: 0,
+          knowledge: 0,
+          relations: 0,
+          qualitySignals: 0,
+          conflicts: 0
+        }
       });
       expect(project.body).toMatchObject({
         id: 'component-library',
         groupKey: 'design-team',
         name: 'Component Library'
       });
+      expect(checkedOutProject.body).toMatchObject({
+        id: 'component-library',
+        groupKey: 'research',
+        name: 'Component Library'
+      });
       expect(overview.body).toMatchObject({
         counts: {
-          groups: 2,
+          groups: 3,
           projects: 1,
           knowledgeItems: 1
         },
@@ -1198,16 +2300,35 @@ describe('hub server HTTP integration', () => {
         expect.arrayContaining([
           expect.objectContaining({
             key: 'design-team',
-            projectCount: 1
+            projectCount: 0
           })
         ])
       );
       expect(projects.body.projects).toEqual([
         expect.objectContaining({
           id: 'component-library',
-          groupKey: 'design-team'
+          groupKey: 'research'
         })
       ]);
+      expect(branches.body.branches).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            branchKey: 'research',
+            groupKey: 'research',
+            displayName: 'Research',
+            joinMode: 'open',
+            counts: expect.objectContaining({
+              projects: 1
+            }),
+            projects: [
+              expect.objectContaining({
+                id: 'component-library',
+                groupKey: 'research'
+              })
+            ]
+          })
+        ])
+      );
       expect(knowledge.body.items).toEqual([
         expect.objectContaining({
           title: 'Admin dashboard lists knowledge',
@@ -1217,6 +2338,100 @@ describe('hub server HTTP integration', () => {
       expect(reviewQueue.body).toEqual({
         items: []
       });
+      expect(branchAudit.body.auditLogs).toEqual([
+        expect.objectContaining({
+          action: 'project.branch.checked_out',
+          targetType: 'project',
+          targetId: 'component-library',
+          groupKey: 'research',
+          payload: expect.objectContaining({
+            fromBranch: 'design-team',
+            toBranch: 'research'
+          })
+        })
+      ]);
+      expect(globalProjection.body).toMatchObject({
+        counts: {
+          documents: 1,
+          groups: 0
+        },
+        documents: {
+          [adminOperationsDocument.key]: expect.objectContaining({
+            document: expect.objectContaining({
+              kind: 'server-global',
+              namespace: 'admin-operations',
+              schemaVersion: 2
+            }),
+            sourceHeads: adminOperationsDocument.heads,
+            knowledgeIds: [],
+            relationIds: [],
+            qualitySignalIds: [],
+            conflictIds: []
+          })
+        }
+      });
+      expect(crdtDocuments.body.documents).toEqual([
+        expect.objectContaining({
+          key: adminOperationsDocument.key,
+          document: expect.objectContaining({
+            kind: 'server-global',
+            namespace: 'admin-operations',
+            schemaVersion: 2
+          }),
+          kind: 'server-global',
+          namespace: 'admin-operations',
+          heads: adminOperationsDocument.heads,
+          changeCount: 2,
+          snapshotPresent: true,
+          latestChange: expect.objectContaining({
+            clientId: 'admin',
+            groupKey: 'research',
+            actorId: 'admin',
+            summary: 'project.branch.checked_out'
+          })
+        })
+      ]);
+      expect(JSON.stringify(crdtDocuments.body)).not.toContain('"bytes"');
+      expect(JSON.stringify(crdtDocuments.body)).not.toContain('"snapshot"');
+      expect(serverGlobalCrdtDocuments.body.documents).toEqual([
+        expect.objectContaining({
+          key: adminOperationsDocument.key,
+          kind: 'server-global',
+          namespace: 'admin-operations'
+        })
+      ]);
+      expect(researchCrdtDocuments.body.documents).toEqual([]);
+      expect(adminOperationsDocument.changes).toHaveLength(2);
+      expect(adminOperationsDocument.heads.length).toBeGreaterThan(0);
+      expect(adminOperations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: 'branch.created',
+            actor: 'admin',
+            targetType: 'branch',
+            targetId: 'research',
+            groupKey: 'research',
+            payload: expect.objectContaining({
+              branchKey: 'research',
+              displayName: 'Research',
+              joinMode: 'open'
+            })
+          }),
+          expect.objectContaining({
+            action: 'project.branch.checked_out',
+            actor: 'admin',
+            targetType: 'project',
+            targetId: 'component-library',
+            groupKey: 'research',
+            payload: expect.objectContaining({
+              projectKey: 'component-library',
+              fromBranch: 'design-team',
+              toBranch: 'research',
+              resetRestrictedAcl: false
+            })
+          })
+        ])
+      );
     } finally {
       await app.close();
     }
@@ -1671,14 +2886,26 @@ describe('hub server HTTP integration', () => {
       title: 'quality-review stale canonical decision',
       summary: 'Old low-confidence canonical knowledge should be revisited.',
       confidence: 0.25,
-      createdAt: '2024-01-01T00:00:00.000Z'
+      createdAt: '2024-01-01T00:00:00.000Z',
+      source: {
+        kind: 'admin',
+        metadata: {
+          groupKey: 'default'
+        }
+      }
     });
     const healthyItem = await core.captureKnowledge({
       type: 'decision',
       layer: 'canonical',
       title: 'quality-review healthy canonical decision',
       summary: 'High-confidence adopted canonical knowledge should not be flagged.',
-      confidence: 0.95
+      confidence: 0.95,
+      source: {
+        kind: 'admin',
+        metadata: {
+          groupKey: 'default'
+        }
+      }
     });
     await core.rateKnowledge({
       id: healthyItem.id,
@@ -1690,7 +2917,13 @@ describe('hub server HTTP integration', () => {
       layer: 'canonical',
       title: 'quality-review superseded canonical decision',
       summary: 'Superseded canonical knowledge should remain visible to maintainers.',
-      confidence: 0.9
+      confidence: 0.9,
+      source: {
+        kind: 'admin',
+        metadata: {
+          groupKey: 'default'
+        }
+      }
     });
     await core.repository.upsert({
       ...supersededItem,
@@ -1701,7 +2934,13 @@ describe('hub server HTTP integration', () => {
       layer: 'extract',
       title: 'quality-review low rating extract',
       summary: 'Low-rated extracted knowledge should show up when extract is selected.',
-      confidence: 0.7
+      confidence: 0.7,
+      source: {
+        kind: 'admin',
+        metadata: {
+          groupKey: 'default'
+        }
+      }
     });
     await core.rateKnowledge({
       id: extractItem.id,
@@ -1718,6 +2957,9 @@ describe('hub server HTTP integration', () => {
       );
       const extract = await requestJson(
         `${url}/api/v1/admin/quality-review?layer=extract&maxRating=0.2&maxQualityScore=0.4`
+      );
+      const otherGroup = await requestJson(
+        `${url}/api/v1/admin/quality-review?groupKey=other-team&layer=canonical&maxQualityScore=0.6&staleDays=30`
       );
 
       expect(canonical.body.summary).toMatchObject({
@@ -1777,6 +3019,10 @@ describe('hub server HTTP integration', () => {
           reasons: expect.arrayContaining(['low rating'])
         })
       ]);
+      expect(otherGroup.body.summary).toMatchObject({
+        totalKnowledge: 0,
+        needsReview: 0
+      });
     } finally {
       await app.close();
     }
@@ -1797,7 +3043,13 @@ describe('hub server HTTP integration', () => {
       createdBy: {
         displayName: 'Xiaoyun'
       },
-      createdAt: '2026-06-05T08:00:00.000Z'
+      createdAt: '2026-06-05T08:00:00.000Z',
+      source: {
+        kind: 'task',
+        metadata: {
+          groupKey: 'default'
+        }
+      }
     });
     const blocked = await core.captureKnowledge({
       type: 'task',
@@ -1812,7 +3064,13 @@ describe('hub server HTTP integration', () => {
       createdBy: {
         displayName: 'Ayuan'
       },
-      createdAt: '2026-06-06T08:00:00.000Z'
+      createdAt: '2026-06-06T08:00:00.000Z',
+      source: {
+        kind: 'task',
+        metadata: {
+          groupKey: 'default'
+        }
+      }
     });
     await core.captureKnowledge({
       type: 'task',
@@ -1827,7 +3085,13 @@ describe('hub server HTTP integration', () => {
       createdBy: {
         displayName: 'Xiaoyun'
       },
-      createdAt: '2026-06-04T08:00:00.000Z'
+      createdAt: '2026-06-04T08:00:00.000Z',
+      source: {
+        kind: 'task',
+        metadata: {
+          groupKey: 'default'
+        }
+      }
     });
     await core.captureKnowledge({
       type: 'task',
@@ -1838,6 +3102,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'task',
         metadata: {
+          groupKey: 'default',
           taskKey: 'TASK-789',
           status: 'in_progress'
         }
@@ -1854,6 +3119,7 @@ describe('hub server HTTP integration', () => {
       const blockedOnly = await requestJson(`${url}/api/v1/admin/task-digest?status=blocked`);
       const doneIncluded = await requestJson(`${url}/api/v1/admin/task-digest?includeDone=true`);
       const taskKey = await requestJson(`${url}/api/v1/admin/task-digest?projectKey=TASK-123`);
+      const otherGroup = await requestJson(`${url}/api/v1/admin/task-digest?groupKey=other-team&includeDone=true`);
 
       expect(digest.body.summary).toMatchObject({
         totalTasks: 2,
@@ -1894,6 +3160,9 @@ describe('hub server HTTP integration', () => {
           status: 'blocked'
         })
       ]);
+      expect(otherGroup.body.summary).toMatchObject({
+        totalTasks: 0
+      });
     } finally {
       await app.close();
     }
@@ -2239,7 +3508,7 @@ describe('hub server HTTP integration', () => {
 
       const persisted = JSON.parse(await readFile(hubStatePath, 'utf8'));
       expect(persisted).toMatchObject({
-        version: 1,
+        version: 2,
         groups: [
           expect.objectContaining({
             key: 'default'
@@ -2358,6 +3627,18 @@ describe('hub server HTTP integration', () => {
       projectRoot,
       repository: new JsonlKnowledgeRepository(projectRoot)
     });
+    const seededFrontend = await captureProjectKnowledge(
+      projectRoot,
+      {
+        type: 'decision',
+        title: 'Frontend MCP branch query',
+        summary: 'Local-store backed MCP should read this only when branch frontend is requested.',
+        tags: ['mcp', 'branch']
+      },
+      {
+        branch: 'frontend'
+      }
+    );
     const { app, url } = await startHubServer({ core });
     const client = new Client({
       name: 'dev-mesh-local-store-test',
@@ -2398,6 +3679,58 @@ describe('hub server HTTP integration', () => {
         }
       });
       const ratedText = readTextToolResult(rateResult);
+      const frontendListResult = await client.callTool({
+        name: 'mesh_list_knowledge',
+        arguments: {
+          branch: 'frontend',
+          tags: ['branch'],
+          limit: 5
+        }
+      });
+      const frontendListText = readTextToolResult(frontendListResult);
+      const mainListResult = await client.callTool({
+        name: 'mesh_list_knowledge',
+        arguments: {
+          branch: 'main',
+          tags: ['branch'],
+          limit: 5
+        }
+      });
+      const mainListText = readTextToolResult(mainListResult);
+      const frontendSearchResult = await client.callTool({
+        name: 'mesh_search_context',
+        arguments: {
+          branch: 'frontend',
+          query: 'Frontend MCP branch query'
+        }
+      });
+      const frontendSearchText = readTextToolResult(frontendSearchResult);
+      const mainSearchResult = await client.callTool({
+        name: 'mesh_search_context',
+        arguments: {
+          branch: 'main',
+          query: 'Frontend MCP branch query'
+        }
+      });
+      const mainSearchText = readTextToolResult(mainSearchResult);
+      const frontendGraphResult = await client.callTool({
+        name: 'mesh_explore_knowledge_graph',
+        arguments: {
+          branch: 'frontend',
+          query: 'Frontend MCP branch query',
+          depth: 1
+        }
+      });
+      const frontendGraphText = readTextToolResult(frontendGraphResult);
+      const mainGraphResult = await client.callTool({
+        name: 'mesh_explore_knowledge_graph',
+        arguments: {
+          branch: 'main',
+          query: 'Frontend MCP branch query',
+          depth: 1
+        }
+      });
+      const mainGraphText = readTextToolResult(mainGraphResult);
       const ratedEventCreatedAt = readInlineField(ratedText, 'event', 'createdAt');
       const ratingEventCreatedAt = readInlineField(ratedText, 'ratingEvent', 'createdAt');
       const knowledgeJsonl = await readFile(
@@ -2426,7 +3759,16 @@ describe('hub server HTTP integration', () => {
       expect(ratedText).toContain('rating=0');
       expect(ratedText).toContain('ratingEvent: rating=0');
       expect(ratedText).toContain('event: kind=knowledge.rated');
+      expect(frontendListText).toContain(`id=${seededFrontend.item.id}`);
+      expect(mainListText).toContain('items: 0');
+      expect(mainListText).not.toContain(seededFrontend.item.id);
+      expect(frontendSearchText).toContain(`id=${seededFrontend.item.id}`);
+      expect(mainSearchText).not.toContain(seededFrontend.item.id);
+      expect(frontendGraphText).toContain(`node id=knowledge:${seededFrontend.item.id}`);
+      expect(mainGraphText).not.toContain(seededFrontend.item.id);
       expect(knowledgeJsonl).toContain('"title":"Persist MCP capture locally"');
+      expect(knowledgeJsonl).toContain('"title":"Frontend MCP branch query"');
+      expect(knowledgeJsonl).toContain('"branch":"frontend"');
       expect(knowledgeJsonl).toContain('"title":"Persist MCP task progress"');
       expect(eventsJsonl).toContain('"kind":"knowledge.captured"');
       expect(eventsJsonl).toContain('"kind":"task.progress.captured"');
@@ -2590,6 +3932,73 @@ function authHeaders(accessToken: string): { authorization: string } {
   return {
     authorization: `Bearer ${accessToken}`
   };
+}
+
+function createAutomergeSyncPayload(
+  mutate: (doc: Record<string, unknown>) => void
+): { heads: string[]; changes: CrdtSyncChange[] } {
+  const initial = Automerge.init<Record<string, unknown>>();
+  const changed = Automerge.change(initial, mutate);
+  const binaryChanges = Automerge.getAllChanges(changed);
+
+  return {
+    heads: [...Automerge.getHeads(changed)],
+    changes: binaryChanges.map((change) => ({
+      id: `am_${createHashBase64ChangeId(change)}`,
+      engine: 'automerge',
+      encoding: 'base64',
+      bytes: Buffer.from(change).toString('base64'),
+      headsBefore: [],
+      headsAfter: [...Automerge.getHeads(changed)],
+      summary: 'Test CRDT change'
+    }))
+  };
+}
+
+function applyAutomergeSyncChanges(changes: CrdtSyncChange[]): AutomergeDoc<Record<string, unknown>> {
+  const [doc] = Automerge.applyChanges(
+    Automerge.init<Record<string, unknown>>(),
+    changes.map((change) => Buffer.from(change.bytes, 'base64')) as AutomergeBinaryChange[]
+  );
+
+  return doc;
+}
+
+function getServerGlobalAdminOperationsDocument(state: HubState): HubCrdtDocument {
+  const document = [...state.crdtDocuments.values()].find(
+    (item) => item.document.kind === 'server-global' && item.document.namespace === 'admin-operations'
+  );
+
+  if (document === undefined) {
+    throw new Error('Expected persisted server-global admin operations CRDT document.');
+  }
+
+  return document;
+}
+
+function getAdminCrdtOperations(state: HubState): Array<Record<string, unknown>> {
+  const document = getServerGlobalAdminOperationsDocument(state);
+
+  if (document.snapshot === undefined) {
+    throw new Error('Expected server-global admin operations CRDT snapshot.');
+  }
+
+  const automergeDoc = Automerge.load<Record<string, unknown>>(Buffer.from(document.snapshot, 'base64'));
+  const snapshot = Automerge.toJS(automergeDoc);
+  const operations = snapshot.operations;
+
+  if (typeof operations !== 'object' || operations === null || Array.isArray(operations)) {
+    throw new Error('Expected server-global admin operations snapshot to contain operations.');
+  }
+
+  return Object.values(operations).filter(
+    (operation): operation is Record<string, unknown> =>
+      typeof operation === 'object' && operation !== null && !Array.isArray(operation)
+  );
+}
+
+function createHashBase64ChangeId(change: Uint8Array): string {
+  return createHmac('sha256', 'test-crdt-change-id').update(change).digest('hex').slice(0, 32);
 }
 
 interface JsonRequestInit {

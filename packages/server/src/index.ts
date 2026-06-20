@@ -8,13 +8,21 @@ export { createHubState } from './hub-state.js';
 export type { HubState, HubStateOptions } from './hub-state.js';
 export { createJsonHubStateStore, deserializeHubState, loadHubStateFromFile, saveHubStateToFile, serializeHubState } from './hub-persistence.js';
 export type { HubStatePersistenceOptions, HubStatePersistenceStore } from './hub-persistence.js';
-export { replayHubSyncConflicts, replayHubSyncTombstones, verifyHubSyncEventLog } from './hub-sync.js';
+export { exchangeHubCrdtChanges } from './hub-crdt-sync.js';
+export {
+  replayHubSyncConflicts,
+  replayHubSyncKnowledgeSnapshots,
+  replayHubSyncTombstones,
+  verifyHubSyncEventLog
+} from './hub-sync.js';
 export type {
   HubSyncConflictReplayInput,
   HubSyncConflictReplayResult,
   HubSyncEventLogVerificationFailure,
   HubSyncEventLogVerificationInput,
   HubSyncEventLogVerificationResult,
+  HubSyncKnowledgeSnapshotReplayInput,
+  HubSyncKnowledgeSnapshotReplayResult,
   HubSyncTombstoneReplayInput,
   HubSyncTombstoneReplayResult
 } from './hub-sync.js';

@@ -12,6 +12,7 @@ import type {
   RateKnowledgeInput,
   UpdateKnowledgeInput
 } from '@devmesh/core';
+import { createDevMeshCore } from '@devmesh/core';
 import { buildKnowledgeGraph, exploreKnowledgeGraph, type KnowledgeGraphSemanticEdge } from '@devmesh/graph';
 import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
@@ -33,6 +34,8 @@ import {
   captureProjectTask,
   createProjectKnowledgeEdge,
   deleteProjectKnowledge,
+  readProjectProjectionStatus,
+  rebuildProjectProjectionsFromCrdt,
   JsonlKnowledgeRepository,
   rateProjectKnowledge,
   updateProjectKnowledge,
@@ -43,6 +46,7 @@ import {
   type RateProjectKnowledgeResult,
   type UpdateProjectKnowledgeResult
 } from '@devmesh/local-store';
+import { filterKnowledgeByGroup } from './hub-knowledge-scope.js';
 
 interface ListKnowledgeRequest extends KnowledgeFilter {
   limit?: number;
@@ -63,7 +67,6 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
       instructions: DEV_MESH_MCP_INSTRUCTIONS
     }
   );
-  const agent = createAgentContextService({ core });
 
   registerMeshTools(mcp, {
     async getStatus() {
@@ -77,11 +80,89 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
         mode: isLocalStoreBacked(core) ? 'local-store' : 'server',
         projectRoot: core.projectRoot,
         repository: core.repository.constructor.name,
-        knowledgeItems: items.length
+        knowledgeItems: items.length,
+        activeBranch: 'main',
+        branches: [
+          {
+            name: 'main',
+            policy: 'balanced'
+          }
+        ]
       };
     },
+    async getProjectionStatus() {
+      if (isLocalStoreBacked(core)) {
+        return readProjectProjectionStatus(core.projectRoot);
+      }
+
+      return {
+        state: 'server_projection_pending',
+        backend: 'hub-crdt',
+        materialized: false,
+        message: 'Hub CRDT projections will be materialized by the v2 global projection backend.'
+      };
+    },
+    async rebuildProjection() {
+      if (isLocalStoreBacked(core)) {
+        return rebuildProjectProjectionsFromCrdt(core.projectRoot);
+      }
+
+      return {
+        state: 'server_projection_pending',
+        backend: 'hub-crdt',
+        materialized: false,
+        rebuilt: false,
+        message: 'Hub CRDT projections will be materialized by the v2 global projection backend.'
+      };
+    },
+    async listBranches() {
+      return createServerBranchResult();
+    },
+    async createBranch(input) {
+      return createServerBranchResult({
+        active: 'main',
+        branch: {
+          name: input.name,
+          active: false,
+          base: false,
+          policy: input.policy ?? 'balanced'
+        },
+        ...(input.base === undefined ? {} : { base: input.base })
+      });
+    },
+    async switchBranch(input) {
+      return createServerBranchResult({
+        active: input.name,
+        branch: {
+          name: input.name,
+          active: true,
+          base: false,
+          policy: input.policy ?? 'balanced'
+        },
+        ...(input.base === undefined ? {} : { base: input.base })
+      });
+    },
+    async setBranchPolicy(input) {
+      const name = input.branch ?? 'main';
+
+      return createServerBranchResult({
+        active: name,
+        branch: {
+          name,
+          active: true,
+          base: false,
+          policy: input.policy
+        }
+      });
+    },
     async searchContext(input) {
-      return agent.buildContextPack(toContextPackInput(input));
+      if (input.branch !== undefined && !isLocalStoreBacked(core)) {
+        return buildServerScopedContextPack(core, input);
+      }
+
+      return createAgentContextService({
+        core: coreForBranch(input.branch, core)
+      }).buildContextPack(toContextPackInput(input));
     },
     async getKnowledge(input) {
       const item = await core.getKnowledge(input.id);
@@ -98,7 +179,8 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
     },
     async listKnowledge(input) {
       const { limit = 20, ...filter } = toListKnowledgeInput(input);
-      const items = await core.listKnowledge(filter);
+      const branchCore = coreForBranch(input.branch, core);
+      const items = filterKnowledgeForMcpScope(await branchCore.listKnowledge(filter), input.branch, core);
 
       return {
         total: items.length,
@@ -165,7 +247,16 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
       };
     },
     async searchMemberExperience(input) {
-      return agent.buildContextPack({
+      if (input.branch !== undefined && !isLocalStoreBacked(core)) {
+        return buildServerScopedContextPack(core, {
+          ...input,
+          authorName: input.memberName
+        });
+      }
+
+      return createAgentContextService({
+        core: coreForBranch(input.branch, core)
+      }).buildContextPack({
         ...toContextPackInput(input),
         authorName: input.memberName
       });
@@ -191,10 +282,11 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
       };
     },
     async exploreKnowledgeGraph(input: MeshExploreKnowledgeGraphInput) {
-      const items = await core.listKnowledge({
+      const branchCore = coreForBranch(input.branch, core);
+      const items = filterKnowledgeForMcpScope(await branchCore.listKnowledge({
         includeSuperseded: true
-      });
-      const semanticEdges = await options.knowledgeEdges?.();
+      }), input.branch, core);
+      const semanticEdges = filterSemanticEdgesByGroup(await options.knowledgeEdges?.(), input.branch);
       const graph = buildKnowledgeGraph(
         items,
         semanticEdges === undefined
@@ -209,6 +301,43 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
   });
 
   return mcp;
+}
+
+function createServerBranchResult(options: {
+  active?: string;
+  base?: string;
+  branch?: { name: string; active: boolean; base: boolean; policy: string };
+} = {}): unknown {
+  const active = options.active ?? 'main';
+  const branches = [
+    {
+      name: 'main',
+      active: active === 'main',
+      base: options.base === 'main',
+      policy: 'balanced'
+    }
+  ];
+
+  if (options.branch !== undefined && options.branch.name !== 'main') {
+    branches.push(options.branch);
+  }
+
+  const result: {
+    active: string;
+    base?: string;
+    branches: Array<{ name: string; active: boolean; base: boolean; policy: string }>;
+    note: string;
+  } = {
+    active,
+    branches,
+    note: 'Server MCP exposes branch-shaped responses; durable branch membership is managed by Hub group APIs until CRDT v2 branch storage lands.'
+  };
+
+  if (options.base !== undefined) {
+    result.base = options.base;
+  }
+
+  return result;
 }
 
 function toProjectKnowledgeEdgeInput(input: MeshLinkKnowledgeInput): Parameters<typeof createProjectKnowledgeEdge>[1] {
@@ -249,6 +378,10 @@ function toContextPackInput(input: MeshSearchContextInput): BuildContextPackInpu
     search.recencyDays = input.recencyDays;
   }
 
+  if (input.includeVolatile !== undefined) {
+    search.includeVolatile = input.includeVolatile;
+  }
+
   return search;
 }
 
@@ -282,6 +415,10 @@ function toListKnowledgeInput(input: MeshListKnowledgeInput): ListKnowledgeReque
     filter.recencyDays = input.recencyDays;
   }
 
+  if (input.includeVolatile !== undefined) {
+    filter.includeVolatile = input.includeVolatile;
+  }
+
   return filter;
 }
 
@@ -311,6 +448,96 @@ function toRateInput(input: MeshRateKnowledgeInput): RateKnowledgeInput {
 
 function isLocalStoreBacked(core: DevMeshCore): boolean {
   return core.repository instanceof JsonlKnowledgeRepository;
+}
+
+function coreForBranch(branch: string | undefined, core: DevMeshCore): DevMeshCore {
+  if (branch === undefined || !isLocalStoreBacked(core)) {
+    return core;
+  }
+
+  return createDevMeshCore({
+    projectRoot: core.projectRoot,
+    repository: new JsonlKnowledgeRepository(core.projectRoot, {
+      branchScope: {
+        active: branch,
+        readable: [branch]
+      }
+    })
+  });
+}
+
+function filterKnowledgeForMcpScope<T extends { visibility: string; source: { metadata?: Record<string, unknown> } }>(
+  items: T[],
+  branch: string | undefined,
+  core: DevMeshCore
+): T[] {
+  if (branch === undefined || isLocalStoreBacked(core)) {
+    return items;
+  }
+
+  return filterKnowledgeByGroup(items as never, branch) as never;
+}
+
+async function buildServerScopedContextPack(core: DevMeshCore, input: MeshSearchContextInput): Promise<unknown> {
+  const contextInput = toContextPackInput(input);
+  const limit = contextInput.limit ?? 8;
+  const searchInput: Parameters<DevMeshCore['searchKnowledge']>[0] = {
+    query: contextInput.query,
+    limit: Math.max(limit * 4, 20)
+  };
+
+  if (contextInput.layers !== undefined) {
+    searchInput.layers = contextInput.layers;
+  }
+
+  if (contextInput.types !== undefined) {
+    searchInput.types = contextInput.types;
+  }
+
+  if (contextInput.authorName !== undefined) {
+    searchInput.authorName = contextInput.authorName;
+  }
+
+  if (contextInput.para !== undefined) {
+    searchInput.para = contextInput.para;
+  }
+
+  if (contextInput.recencyDays !== undefined) {
+    searchInput.recencyDays = contextInput.recencyDays;
+  }
+
+  if (contextInput.includeSuperseded !== undefined) {
+    searchInput.includeSuperseded = contextInput.includeSuperseded;
+  }
+
+  if (contextInput.includeVolatile !== undefined) {
+    searchInput.includeVolatile = contextInput.includeVolatile;
+  }
+
+  const candidates = filterKnowledgeByGroup(await core.searchKnowledge(searchInput), input.branch).slice(0, limit);
+  const scopedCore = createDevMeshCore({
+    projectRoot: core.projectRoot
+  });
+
+  await Promise.all(candidates.map((item) => scopedCore.repository.upsert(item)));
+
+  return createAgentContextService({
+    core: scopedCore
+  }).buildContextPack(contextInput);
+}
+
+function filterSemanticEdgesByGroup(
+  edges: KnowledgeGraphSemanticEdge[] | undefined,
+  groupKey: string | undefined
+): KnowledgeGraphSemanticEdge[] | undefined {
+  if (edges === undefined || groupKey === undefined) {
+    return edges;
+  }
+
+  return edges.filter((edge) => {
+    const scoped = edge as KnowledgeGraphSemanticEdge & { groupKey?: string };
+    return scoped.groupKey === undefined || scoped.groupKey === groupKey;
+  });
 }
 
 function flattenCaptureResult(result: CaptureProjectKnowledgeResult): unknown {

@@ -16,6 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@automerge/automerge": "^3.2.6",
     "@koa/router": "^15.6.0",
     "@devmesh/agent": "workspace:*",
     "@devmesh/core": "workspace:*",
