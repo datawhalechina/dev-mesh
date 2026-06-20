@@ -1,0 +1,1 @@
+const mod = await import('../node_modules/.pnpm/zod@4.4.3/node_modules/zod/index.js'); console.log(Object.keys(mod).slice(0, 40).join(',')); console.log('z', typeof mod.z, typeof mod.z?.object, 'default', typeof mod.default, typeof mod.default?.object);

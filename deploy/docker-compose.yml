@@ -1,3 +1,5 @@
+name: devmesh
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -49,12 +51,12 @@ services:
     ports:
       - "5173:80"
 
-  website:
-    build:
-      context: ..
-      dockerfile: apps/website/Dockerfile
-    ports:
-      - "3000:80"
+  # website:
+  #   build:
+  #     context: ..
+  #     dockerfile: apps/website/Dockerfile
+  #   ports:
+  #     - "3000:80"
 
 volumes:
   devmesh-postgres:
