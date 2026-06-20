@@ -134,7 +134,7 @@ describe('web-admin API client', () => {
       kind: 'supersedes',
       fromId: 'can_new',
       toId: 'can_old',
-      groupKey: 'default',
+      branchKey: 'default',
       reason: 'Replaced by the latest canonical item.'
     });
 
@@ -145,7 +145,7 @@ describe('web-admin API client', () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      '/api/v1/admin/knowledge-edges?kind=contradicts&groupKey=default',
+      '/api/v1/admin/knowledge-edges?kind=contradicts&branchKey=default',
       expect.any(Object)
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -157,7 +157,7 @@ describe('web-admin API client', () => {
           kind: 'supersedes',
           fromId: 'can_new',
           toId: 'can_old',
-          groupKey: 'default',
+          branchKey: 'default',
           reason: 'Replaced by the latest canonical item.'
         })
       })
@@ -239,12 +239,12 @@ describe('web-admin API client', () => {
 
     await fetchCrdtDocuments({
       kind: 'project',
-      groupKey: 'frontend-team',
+      branchKey: 'frontend-team',
       projectKey: 'frontend-dashboard'
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/v1/admin/crdt-documents?kind=project&groupKey=frontend-team&projectKey=frontend-dashboard',
+      '/api/v1/admin/crdt-documents?kind=project&branchKey=frontend-team&projectKey=frontend-dashboard',
       expect.any(Object)
     );
   });
@@ -291,7 +291,7 @@ describe('web-admin API client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await createInvite({
-      groupKey: 'design-team',
+      branchKey: 'design-team',
       token: 'inv_design',
       maxUses: 2
     });
@@ -305,7 +305,7 @@ describe('web-admin API client', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          groupKey: 'design-team',
+          branchKey: 'design-team',
           token: 'inv_design',
           maxUses: 2
         })
@@ -396,7 +396,7 @@ describe('web-admin API client', () => {
 
     await fetchGlossary('mesh client', 'default', 'frontend-dashboard');
     await createGlossaryItem({
-      groupKey: 'default',
+      branchKey: 'default',
       projectKey: 'frontend-dashboard',
       term: 'Mesh Client',
       definition: 'Local proxy and capture runtime.',
@@ -404,7 +404,7 @@ describe('web-admin API client', () => {
       tags: ['client']
     });
     await updateGlossaryItem('can_mesh_client', {
-      groupKey: 'default',
+      branchKey: 'default',
       projectKey: 'frontend-dashboard',
       term: 'Mesh Client',
       definition: 'Local MCP proxy and capture runtime.'
@@ -412,7 +412,7 @@ describe('web-admin API client', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      '/api/v1/admin/glossary?query=mesh+client&groupKey=default&projectKey=frontend-dashboard',
+      '/api/v1/admin/glossary?query=mesh+client&branchKey=default&projectKey=frontend-dashboard',
       expect.any(Object)
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -421,7 +421,7 @@ describe('web-admin API client', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          groupKey: 'default',
+          branchKey: 'default',
           projectKey: 'frontend-dashboard',
           term: 'Mesh Client',
           definition: 'Local proxy and capture runtime.',
@@ -436,7 +436,7 @@ describe('web-admin API client', () => {
       expect.objectContaining({
         method: 'PUT',
         body: JSON.stringify({
-          groupKey: 'default',
+          branchKey: 'default',
           projectKey: 'frontend-dashboard',
           term: 'Mesh Client',
           definition: 'Local MCP proxy and capture runtime.'

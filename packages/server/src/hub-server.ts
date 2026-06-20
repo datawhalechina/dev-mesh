@@ -830,6 +830,10 @@ function readQueryString(ctx: Context, key: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function readBranchQueryString(ctx: Context): string | undefined {
+  return readQueryString(ctx, 'branchKey') ?? readQueryString(ctx, 'groupKey');
+}
+
 function readQueryBoolean(ctx: Context, key: string): boolean | undefined {
   const value = readQueryString(ctx, key)?.toLowerCase();
 
@@ -859,7 +863,7 @@ function readFederationEventLogLimit(ctx: Context): number | undefined {
 function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
   const query: AdminKnowledgeQuery = {};
   const search = readQueryString(ctx, 'query');
-  const groupKey = readQueryString(ctx, 'groupKey');
+  const branchKey = readBranchQueryString(ctx);
   const layer = readQueryString(ctx, 'layer');
   const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
@@ -868,8 +872,8 @@ function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
     query.query = search;
   }
 
-  if (groupKey !== undefined) {
-    query.groupKey = groupKey;
+  if (branchKey !== undefined) {
+    query.branchKey = branchKey;
   }
 
   if (layer === 'raw' || layer === 'extract' || layer === 'canonical') {
@@ -910,7 +914,7 @@ function readAdminBranchMergePreviewInput(ctx: Context): AdminBranchMergePreview
 
 function readAdminQualityReviewQuery(ctx: Context): AdminQualityReviewQuery {
   const query: AdminQualityReviewQuery = {};
-  const groupKey = readQueryString(ctx, 'groupKey');
+  const branchKey = readBranchQueryString(ctx);
   const layer = readQueryString(ctx, 'layer');
   const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
   const maxQualityScore = readQueryNumber(ctx, 'maxQualityScore');
@@ -920,8 +924,8 @@ function readAdminQualityReviewQuery(ctx: Context): AdminQualityReviewQuery {
   const staleDays = readQueryNumber(ctx, 'staleDays');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
 
-  if (groupKey !== undefined) {
-    query.groupKey = groupKey;
+  if (branchKey !== undefined) {
+    query.branchKey = branchKey;
   }
 
   if (layer === 'raw' || layer === 'extract' || layer === 'canonical') {
@@ -961,15 +965,15 @@ function readAdminQualityReviewQuery(ctx: Context): AdminQualityReviewQuery {
 
 function readAdminTaskDigestQuery(ctx: Context): AdminTaskDigestQuery {
   const query: AdminTaskDigestQuery = {};
-  const groupKey = readQueryString(ctx, 'groupKey');
+  const branchKey = readBranchQueryString(ctx);
   const projectKey = readQueryString(ctx, 'projectKey');
   const status = readQueryString(ctx, 'status');
   const includeDone = readQueryBoolean(ctx, 'includeDone');
   const includeSuperseded = readQueryBoolean(ctx, 'includeSuperseded');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
 
-  if (groupKey !== undefined) {
-    query.groupKey = groupKey;
+  if (branchKey !== undefined) {
+    query.branchKey = branchKey;
   }
 
   if (projectKey !== undefined) {
@@ -997,12 +1001,12 @@ function readAdminTaskDigestQuery(ctx: Context): AdminTaskDigestQuery {
 
 function readAdminKnowledgeEdgeQuery(ctx: Context): AdminKnowledgeEdgeQuery {
   const query: AdminKnowledgeEdgeQuery = {};
-  const groupKey = readQueryString(ctx, 'groupKey');
+  const branchKey = readBranchQueryString(ctx);
   const kind = readQueryString(ctx, 'kind');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
 
-  if (groupKey !== undefined) {
-    query.groupKey = groupKey;
+  if (branchKey !== undefined) {
+    query.branchKey = branchKey;
   }
 
   if (kind === 'supersedes' || kind === 'duplicates' || kind === 'contradicts') {
@@ -1018,11 +1022,11 @@ function readAdminKnowledgeEdgeQuery(ctx: Context): AdminKnowledgeEdgeQuery {
 
 function readAdminGlobalProjectionQuery(ctx: Context): AdminGlobalProjectionQuery {
   const query: AdminGlobalProjectionQuery = {};
-  const groupKey = readQueryString(ctx, 'groupKey');
+  const branchKey = readBranchQueryString(ctx);
   const projectKey = readQueryString(ctx, 'projectKey');
 
-  if (groupKey !== undefined) {
-    query.groupKey = groupKey;
+  if (branchKey !== undefined) {
+    query.branchKey = branchKey;
   }
 
   if (projectKey !== undefined) {
@@ -1035,15 +1039,15 @@ function readAdminGlobalProjectionQuery(ctx: Context): AdminGlobalProjectionQuer
 function readAdminCrdtDocumentQuery(ctx: Context): AdminCrdtDocumentQuery {
   const query: AdminCrdtDocumentQuery = {};
   const kind = readQueryString(ctx, 'kind');
-  const groupKey = readQueryString(ctx, 'groupKey');
+  const branchKey = readBranchQueryString(ctx);
   const projectKey = readQueryString(ctx, 'projectKey');
 
   if (kind !== undefined) {
     query.kind = kind;
   }
 
-  if (groupKey !== undefined) {
-    query.groupKey = groupKey;
+  if (branchKey !== undefined) {
+    query.branchKey = branchKey;
   }
 
   if (projectKey !== undefined) {
@@ -1056,7 +1060,7 @@ function readAdminCrdtDocumentQuery(ctx: Context): AdminCrdtDocumentQuery {
 function readAdminGlossaryQuery(ctx: Context): AdminGlossaryQuery {
   const query: AdminGlossaryQuery = {};
   const search = readQueryString(ctx, 'query');
-  const groupKey = readQueryString(ctx, 'groupKey');
+  const branchKey = readBranchQueryString(ctx);
   const projectKey = readQueryString(ctx, 'projectKey');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
 
@@ -1064,8 +1068,8 @@ function readAdminGlossaryQuery(ctx: Context): AdminGlossaryQuery {
     query.query = search;
   }
 
-  if (groupKey !== undefined) {
-    query.groupKey = groupKey;
+  if (branchKey !== undefined) {
+    query.branchKey = branchKey;
   }
 
   if (projectKey !== undefined) {
@@ -1081,12 +1085,12 @@ function readAdminGlossaryQuery(ctx: Context): AdminGlossaryQuery {
 
 function readAdminAuditQuery(ctx: Context): AdminAuditQuery {
   const query: AdminAuditQuery = {};
-  const groupKey = readQueryString(ctx, 'groupKey');
+  const branchKey = readBranchQueryString(ctx);
   const action = readQueryString(ctx, 'action');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
 
-  if (groupKey !== undefined) {
-    query.groupKey = groupKey;
+  if (branchKey !== undefined) {
+    query.branchKey = branchKey;
   }
 
   if (action !== undefined) {

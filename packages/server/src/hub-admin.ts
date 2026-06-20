@@ -80,6 +80,7 @@ export interface AdminBranchInput extends AdminGroupInput {
 }
 
 export interface AdminProjectInput {
+  branchKey?: string;
   groupKey?: string;
   id?: string;
   projectKey?: string;
@@ -101,6 +102,7 @@ export interface AdminProjectAclInput {
 }
 
 export interface AdminInviteInput {
+  branchKey?: string;
   groupKey?: string;
   token?: string;
   expiresAt?: string;
@@ -115,6 +117,7 @@ export interface AdminGlossaryInput {
   term?: string;
   definition?: string;
   content?: string;
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
   aliases?: string[];
@@ -125,8 +128,13 @@ export interface AdminKnowledgeEdgeInput {
   kind?: HubKnowledgeEdgeKind;
   fromId?: string;
   toId?: string;
+  branchKey?: string;
   groupKey?: string;
   reason?: string;
+}
+
+export interface AdminKnowledgeEdgeSummary extends HubKnowledgeEdge {
+  branchKey?: string;
 }
 
 export interface AdminKnowledgeBranchPublishInput {
@@ -184,6 +192,7 @@ export interface AdminBranchMergePreviewItem {
 
 export interface AdminCrdtDocumentQuery {
   kind?: string;
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
 }
@@ -196,6 +205,7 @@ export interface AdminCrdtDocumentSummary {
   heads: string[];
   changeCount: number;
   snapshotPresent: boolean;
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
   documentId?: string;
@@ -208,6 +218,7 @@ export interface AdminCrdtChangeSummary {
   id: string;
   receivedAt: string;
   clientId: string;
+  branchKey: string;
   groupKey: string;
   actorId?: string;
   createdAt?: string;
@@ -260,7 +271,7 @@ export function listAdminMembers(state: HubState): AdminMemberSummary[] {
 
 export function listAdminProjects(state: HubState): ProjectSummary[] {
   return [...state.projects.values()]
-    .map((project) => withNormalizedAccess(project))
+    .map((project) => withAdminProjectBranchKey(withNormalizedAccess(project)))
     .sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.id.localeCompare(b.id));
 }
 
@@ -473,13 +484,16 @@ function normalizeMergeTitle(value: string): string {
 }
 
 function filterKnowledgeByBranchKey(items: KnowledgeItem[], branchKey: string): KnowledgeItem[] {
-  return items.filter((item) => (readKnowledgeMetadataString(item, 'groupKey') ?? DEFAULT_GROUP_KEY) === branchKey);
+  return items.filter(
+    (item) => (readKnowledgeMetadataString(item, 'branchKey') ?? readKnowledgeMetadataString(item, 'groupKey') ?? DEFAULT_GROUP_KEY) === branchKey
+  );
 }
 
 export function listAdminInvites(state: HubState): AdminInviteSummary[] {
   return [...state.invites.values()]
     .map((invite) => ({
       ...invite,
+      branchKey: invite.groupKey,
       status: getInviteStatus(invite)
     }))
     .sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.createdAt.localeCompare(b.createdAt));
@@ -505,7 +519,7 @@ export async function listAdminKnowledge(
       search.layers = [input.layer];
     }
 
-    return filterKnowledgeByGroup(await core.searchKnowledge(search), input.groupKey).slice(0, limit);
+    return filterKnowledgeByGroup(await core.searchKnowledge(search), readAdminBranchFilter(input)).slice(0, limit);
   }
 
   const filter: KnowledgeFilter = {};
@@ -518,7 +532,7 @@ export async function listAdminKnowledge(
     filter.layers = [input.layer];
   }
 
-  const items = filterKnowledgeByGroup(await core.listKnowledge(filter), input.groupKey);
+  const items = filterKnowledgeByGroup(await core.listKnowledge(filter), readAdminBranchFilter(input));
 
   return items.slice(0, limit);
 }
@@ -526,12 +540,14 @@ export async function listAdminKnowledge(
 export function listAdminKnowledgeEdges(
   state: HubState,
   input: AdminKnowledgeEdgeQuery = {}
-): HubKnowledgeEdge[] {
+): AdminKnowledgeEdgeSummary[] {
   const limit = input.limit ?? 50;
+  const branchKey = readAdminBranchFilter(input);
 
   return state.knowledgeEdges
-    .filter((edge) => input.groupKey === undefined || edge.groupKey === input.groupKey)
+    .filter((edge) => branchKey === undefined || edge.groupKey === branchKey)
     .filter((edge) => input.kind === undefined || edge.kind === input.kind)
+    .map((edge) => withKnowledgeEdgeBranchKey(edge))
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
     .slice(0, limit);
@@ -550,7 +566,7 @@ export async function createAdminQualityReview(
     filter.layers = [input.layer];
   }
 
-  const items = filterKnowledgeByGroup(await core.listKnowledge(filter), input.groupKey);
+  const items = filterKnowledgeByGroup(await core.listKnowledge(filter), readAdminBranchFilter(input));
   const reviewItems = items
     .map((item) => createQualityReviewItem(item, policy))
     .filter((item): item is AdminQualityReviewItem => item !== undefined)
@@ -570,7 +586,7 @@ export async function createAdminTaskDigest(
   const items = filterKnowledgeByGroup(await core.listKnowledge({
     types: ['task'],
     includeSuperseded: input.includeSuperseded ?? true
-  }), input.groupKey);
+  }), readAdminBranchFilter(input));
   const entries = [...groupTaskDigestEntries(items, input).values()]
     .map(createTaskDigestEntry)
     .filter((entry) => input.projectKey === undefined || entry.taskKey === input.projectKey)
@@ -601,7 +617,7 @@ export async function listAdminGlossary(
         types: ['glossary']
       });
 
-  return filterKnowledgeByGroup(items, input.groupKey).filter((item) => matchesGlossaryQuery(item, input)).slice(0, limit);
+  return filterKnowledgeByGroup(items, readAdminBranchFilter(input)).filter((item) => matchesGlossaryQuery(item, input)).slice(0, limit);
 }
 
 export function createAdminGroup(state: HubState, input: AdminGroupInput): HubResult<HubGroup> {
@@ -642,7 +658,7 @@ export function createAdminGroup(state: HubState, input: AdminGroupInput): HubRe
 }
 
 export function createAdminProject(state: HubState, input: AdminProjectInput): HubResult<ProjectSummary> {
-  const groupKey = input.groupKey?.trim();
+  const groupKey = readInputBranchKey(input);
 
   if (!groupKey || !state.groups.has(groupKey)) {
     return hubError(404, 'admin.group_not_found', 'The target group does not exist.');
@@ -664,7 +680,7 @@ export function createAdminProject(state: HubState, input: AdminProjectInput): H
   const existing = state.projects.get(key);
 
   if (existing !== undefined) {
-    return ok(withNormalizedAccess(existing));
+    return ok(withAdminProjectBranchKey(withNormalizedAccess(existing)));
   }
 
   const project: ProjectSummary = {
@@ -694,7 +710,7 @@ export function createAdminProject(state: HubState, input: AdminProjectInput): H
     }
   });
 
-  return ok(withNormalizedAccess(project));
+  return ok(withAdminProjectBranchKey(withNormalizedAccess(project)));
 }
 
 export function checkoutAdminProjectBranch(
@@ -773,7 +789,7 @@ export function checkoutAdminProjectBranch(
     }
   });
 
-  return ok(withNormalizedAccess(moved));
+  return ok(withAdminProjectBranchKey(withNormalizedAccess(moved)));
 }
 
 export function updateAdminProjectAcl(
@@ -817,7 +833,7 @@ export function updateAdminProjectAcl(
     }
   });
 
-  return ok(withNormalizedAccess(project));
+  return ok(withAdminProjectBranchKey(withNormalizedAccess(project)));
 }
 
 export async function createAdminKnowledgeEdge(
@@ -841,7 +857,7 @@ export async function createAdminKnowledgeEdge(
     return hubError(400, 'admin.knowledge_edge_self_reference', 'Knowledge edge cannot reference the same item.');
   }
 
-  const groupKey = resolveKnowledgeEdgeGroupKey(state, input.groupKey);
+  const groupKey = resolveKnowledgeEdgeGroupKey(state, readInputBranchKey(input));
 
   if (!groupKey.ok) {
     return groupKey;
@@ -910,7 +926,7 @@ export async function createAdminKnowledgeEdge(
         }
   );
 
-  return ok(edge);
+  return ok(withKnowledgeEdgeBranchKey(edge));
 }
 
 export async function publishAdminKnowledgeToBranch(
@@ -1037,6 +1053,7 @@ async function publishKnowledgeItemToBranch(
       kind: 'admin-branch-publish',
       metadata: {
         ...(source.source.metadata ?? {}),
+        branchKey: targetGroupKey,
         groupKey: targetGroupKey,
         publishedFromId: source.id,
         publishedFromBranch: sourceGroupKey,
@@ -1114,7 +1131,7 @@ export async function createAdminGlossary(
     return hubError(400, 'admin.glossary_definition_required', 'Glossary definition is required.');
   }
 
-  const groupKey = resolveGlossaryGroupKey(state, input.groupKey);
+  const groupKey = resolveGlossaryGroupKey(state, readInputBranchKey(input));
 
   if (!groupKey.ok) {
     return groupKey;
@@ -1174,7 +1191,7 @@ export async function updateAdminGlossary(
 
   const term = input.term?.trim() || existing.title;
   const definition = input.definition?.trim() || existing.summary;
-  const groupKey = resolveGlossaryGroupKey(state, input.groupKey ?? readGlossaryMetadata(existing, 'groupKey'));
+  const groupKey = resolveGlossaryGroupKey(state, readInputBranchKey(input) ?? readGlossaryMetadata(existing, 'branchKey') ?? readGlossaryMetadata(existing, 'groupKey'));
 
   if (!groupKey.ok) {
     return groupKey;
@@ -1230,7 +1247,7 @@ export async function updateAdminGlossary(
 }
 
 export function createAdminInvite(state: HubState, input: AdminInviteInput): HubResult<AdminInviteSummary> {
-  const groupKey = input.groupKey?.trim();
+  const groupKey = readInputBranchKey(input);
 
   if (!groupKey || !state.groups.has(groupKey)) {
     return hubError(404, 'admin.group_not_found', 'The target group does not exist.');
@@ -1290,6 +1307,7 @@ export function createAdminInvite(state: HubState, input: AdminInviteInput): Hub
 
   return ok({
     ...invite,
+    branchKey: invite.groupKey,
     status: 'active'
   });
 }
@@ -1315,6 +1333,7 @@ export function revokeAdminInvite(state: HubState, token: string): HubResult<Adm
 
   return ok({
     ...invite,
+    branchKey: invite.groupKey,
     status: getInviteStatus(invite)
   });
 }
@@ -1423,11 +1442,13 @@ export function rotateAdminMemberAccessToken(state: HubState, memberId: string):
 
 export function listAdminAuditLogs(state: HubState, input: AdminAuditQuery = {}): { auditLogs: AdminAuditLog[] } {
   const limit = input.limit ?? 50;
+  const branchKey = readAdminBranchFilter(input);
   const auditLogs = state.auditLogs
-    .filter((log) => input.groupKey === undefined || log.groupKey === input.groupKey)
+    .filter((log) => branchKey === undefined || log.groupKey === branchKey)
     .filter((log) => input.action === undefined || log.action === input.action)
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((log) => withAdminAuditBranchKey(log))
     .slice(0, limit);
 
   return {
@@ -1449,9 +1470,10 @@ export function listAdminCrdtDocuments(
   state: HubState,
   input: AdminCrdtDocumentQuery = {}
 ): { documents: AdminCrdtDocumentSummary[] } {
+  const branchKey = readAdminBranchFilter(input);
   const documents = [...state.crdtDocuments.values()]
     .filter((document) => input.kind === undefined || document.document.kind === input.kind)
-    .filter((document) => input.groupKey === undefined || document.document.groupKey === input.groupKey)
+    .filter((document) => branchKey === undefined || document.document.groupKey === branchKey)
     .filter((document) => input.projectKey === undefined || document.document.projectKey === input.projectKey)
     .map(createAdminCrdtDocumentSummary)
     .sort(
@@ -1481,6 +1503,7 @@ export interface AdminMemberSummary {
 
 export interface AdminKnowledgeQuery {
   query?: string;
+  branchKey?: string;
   groupKey?: string;
   layer?: KnowledgeLayer;
   limit?: number;
@@ -1488,12 +1511,14 @@ export interface AdminKnowledgeQuery {
 }
 
 export interface AdminKnowledgeEdgeQuery {
+  branchKey?: string;
   groupKey?: string;
   kind?: HubKnowledgeEdgeKind;
   limit?: number;
 }
 
 export interface AdminQualityReviewQuery {
+  branchKey?: string;
   groupKey?: string;
   layer?: KnowledgeLayer;
   limit?: number;
@@ -1510,7 +1535,7 @@ export interface AdminQualityReviewResponse {
   items: AdminQualityReviewItem[];
 }
 
-type QualityReviewPolicy = Required<Omit<AdminQualityReviewQuery, 'groupKey' | 'layer'>>;
+type QualityReviewPolicy = Required<Omit<AdminQualityReviewQuery, 'branchKey' | 'groupKey' | 'layer'>>;
 
 export interface AdminQualityReviewSummary {
   totalKnowledge: number;
@@ -1533,6 +1558,7 @@ export interface AdminQualityReviewItem {
 export type AdminTaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done' | 'unknown';
 
 export interface AdminTaskDigestQuery {
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
   status?: AdminTaskStatus;
@@ -1569,6 +1595,7 @@ export interface AdminTaskDigestEntry {
 
 export interface AdminGlossaryQuery {
   query?: string;
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
   limit?: number;
@@ -1580,24 +1607,28 @@ export interface AdminAuditLog {
   action: string;
   targetType: string;
   targetId: string;
+  branchKey?: string;
   groupKey?: string;
   createdAt: string;
   payload?: Record<string, unknown>;
 }
 
 export interface AdminAuditQuery {
+  branchKey?: string;
   groupKey?: string;
   action?: string;
   limit?: number;
 }
 
 export interface AdminGlobalProjectionQuery {
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
 }
 
 export interface AdminInviteSummary {
   token: string;
+  branchKey: string;
   groupKey: string;
   uses: number;
   createdAt: string;
@@ -1646,10 +1677,44 @@ function normalizeQualityReviewPolicy(input: AdminQualityReviewQuery): QualityRe
   };
 }
 
+function readAdminBranchFilter(input: { branchKey?: string; groupKey?: string }): string | undefined {
+  return readInputBranchKey(input);
+}
+
+function readInputBranchKey(input: { branchKey?: string; groupKey?: string }): string | undefined {
+  return (input.branchKey ?? input.groupKey)?.trim() || undefined;
+}
+
+function withAdminProjectBranchKey(project: ProjectSummary): ProjectSummary & { branchKey: string } {
+  return {
+    ...project,
+    branchKey: project.groupKey
+  };
+}
+
+function withKnowledgeEdgeBranchKey(edge: HubKnowledgeEdge): AdminKnowledgeEdgeSummary {
+  return edge.groupKey === undefined
+    ? { ...edge }
+    : {
+        ...edge,
+        branchKey: edge.groupKey
+      };
+}
+
+function withAdminAuditBranchKey(log: AdminAuditLog): AdminAuditLog {
+  return log.groupKey === undefined
+    ? { ...log }
+    : {
+        ...log,
+        branchKey: log.groupKey
+      };
+}
+
 function filterGlobalProjection(projection: HubGlobalProjection, input: AdminGlobalProjectionQuery): HubGlobalProjection {
+  const branchKey = readAdminBranchFilter(input);
   const documents = Object.fromEntries(
     Object.entries(projection.documents)
-      .filter(([, document]) => input.groupKey === undefined || document.groupKey === input.groupKey)
+      .filter(([, document]) => branchKey === undefined || document.groupKey === branchKey)
       .filter(([, document]) => input.projectKey === undefined || document.projectKey === input.projectKey)
       .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
       .map(([key, document]) => [key, cloneGlobalProjectionDocument(document)])
@@ -1693,11 +1758,12 @@ function cloneGlobalProjectionDocument(document: HubGlobalProjectionDocument): H
 }
 
 function createAdminCrdtDocumentSummary(document: HubCrdtDocument): AdminCrdtDocumentSummary {
+  const documentRef = {
+    ...document.document
+  } as HubCrdtDocument['document'] & { branchKey?: string };
   const summary: AdminCrdtDocumentSummary = {
     key: document.key,
-    document: {
-      ...document.document
-    },
+    document: documentRef,
     kind: document.document.kind,
     updatedAt: document.updatedAt,
     heads: [...document.heads],
@@ -1709,6 +1775,8 @@ function createAdminCrdtDocumentSummary(document: HubCrdtDocument): AdminCrdtDoc
     .sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))[0];
 
   if (document.document.groupKey !== undefined) {
+    documentRef.branchKey = document.document.groupKey;
+    summary.branchKey = document.document.groupKey;
     summary.groupKey = document.document.groupKey;
   }
 
@@ -1740,6 +1808,7 @@ function createAdminCrdtChangeSummary(change: HubCrdtChange): AdminCrdtChangeSum
     id: change.id,
     receivedAt: change.receivedAt,
     clientId: change.clientId,
+    branchKey: change.groupKey,
     groupKey: change.groupKey
   };
 
@@ -2144,6 +2213,7 @@ function createGlossaryMetadata(
   aliases: string[] | undefined
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = {
+    branchKey: groupKey,
     groupKey
   };
   const normalizedAliases = aliases?.map((alias) => alias.trim()).filter(Boolean);
@@ -2161,9 +2231,11 @@ function createGlossaryMetadata(
 
 function matchesGlossaryQuery(item: KnowledgeItem, input: AdminGlossaryQuery): boolean {
   const groupKey = readGlossaryMetadata(item, 'groupKey');
+  const branchKey = readGlossaryMetadata(item, 'branchKey') ?? groupKey;
+  const inputBranchKey = readAdminBranchFilter(input);
   const projectKey = readGlossaryMetadata(item, 'projectKey');
 
-  if (input.groupKey !== undefined && groupKey !== input.groupKey) {
+  if (inputBranchKey !== undefined && branchKey !== inputBranchKey) {
     return false;
   }
 

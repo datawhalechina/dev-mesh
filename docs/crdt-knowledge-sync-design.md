@@ -363,6 +363,8 @@ knowledge branch = 用户理解和操作的知识分支
 group            = 服务端同步、ACL 和 CRDT namespace 边界
 ```
 
+对外 API、Web Admin、CLI/MCP branch 工具和文档统一使用 `branchKey` 表达知识分支。过渡期服务端存储、ACL、同步授权和部分旧接口仍保留 `groupKey` 作为内部 namespace / 兼容字段；新请求优先传 `branchKey`，旧 `groupKey` 输入继续兼容，响应在知识边界相关 summary 中提供 `branchKey`，必要时保留 `groupKey` 便于旧客户端平滑迁移。
+
 映射关系：
 
 | Git 概念 | DevMesh 用户概念 | 底层实现 |
@@ -390,7 +392,7 @@ group            = 服务端同步、ACL 和 CRDT namespace 边界
 - `project_fact` 默认像工作区临时状态，不自动 commit；宏观经验、设计原则、踩坑记录更适合进入长期 branch。
 - 早期避免暴露 rebase、force push、多目标自动写入等复杂能力。
 
-1.x 过渡实现可以先把 branch 写入 `KnowledgeItem.source.metadata.branch`，旧条目缺省视为 `main`。本地 JSONL repository、SQLite search 和 graph explore 按 active/base branch 过滤；Hub 同步投影先把 group 写入 `KnowledgeItem.source.metadata.groupKey`，Admin/MCP 查询按 group/branch 裁剪。Admin 的 branch create/update、project checkout、knowledge branch publish 和 bulk publish 成功项同时写入 `server-global/admin-operations` Automerge 操作日志，作为管理面 CRDT 化的过渡事实源。v2 CRDT 正式实现再把这些字段替换为 group / CRDT namespace projection，并把管理面拆入稳定 server/global schema 分片。
+1.x 过渡实现可以先把 branch 写入 `KnowledgeItem.source.metadata.branch`，旧条目缺省视为 `main`。本地 JSONL repository、SQLite search 和 graph explore 按 active/base branch 过滤；Hub 同步投影优先在对外 metadata / summary 暴露 `branchKey`，同时保留 `source.metadata.groupKey` 作为旧数据和内部 namespace 兼容。Admin/MCP 查询按 branch 裁剪，并兼容旧 group 参数。Admin 的 branch create/update、project checkout、knowledge branch publish 和 bulk publish 成功项同时写入 `server-global/admin-operations` Automerge 操作日志，作为管理面 CRDT 化的过渡事实源。v2 CRDT 正式实现再把这些字段替换为稳定 CRDT namespace projection，并把管理面拆入稳定 server/global schema 分片。
 
 策略第一版只暴露少量预设，避免把配置做成规则引擎：
 
@@ -529,14 +531,14 @@ Admin 还可以先提供单条知识的 publish/cherry-pick 过渡能力：从 s
 
 - **项目** 是本地开发单元，强调代码仓库、任务和当前工作上下文。
 - **Knowledge branch** 是用户操作的知识分支，强调当前读写哪套知识。
-- **Group** 是服务端共享单元，强调知识可以被哪些项目一起读取和写入。
+- **Group** 是服务端内部共享、ACL 和 CRDT namespace 单元；对用户和 Admin 界面默认不再作为知识边界语言出现。
 - 默认情况下，项目 checkout 到 `main` group，项目名只作为知识来源和本地入口。
 - 只有明确需要主题化或隔离时，项目才会切到 `frontend-platform`、`backend-platform`、`project-a-private` 这类 branch。
 - 用户在日常使用中通常只感知“当前 checkout 到哪个知识分支”，不需要同时维护两套边界概念。
 
 ## 连接地址配置
 
-DevMesh v2 的连接地址采用全局配置，项目只配置当前 active knowledge branch。实现上 active branch 会解析为 `group_key`，作为共享边界和 CRDT namespace。
+DevMesh v2 的连接地址采用全局配置，项目只配置当前 active knowledge branch。实现上 active branch 会解析为内部 `group_key`，作为共享边界、ACL 和 CRDT namespace；对外配置和管理 API 使用 `branchKey`。
 
 - 全局连接地址：这台机器默认连接哪个 Hub。
 - 项目 active branch：当前项目 checkout 到哪个知识空间。
@@ -836,9 +838,9 @@ document.namespace = admin-operations
 schemaVersion      = 2
 ```
 
-该文档随现有 `state.crdtDocuments` 持久化 `snapshot`、`heads` 和 `changes`，并在 global projection 中暴露 source heads。每条 operation 至少包含 `id`、`action`、`actor`、`targetType`、`targetId`、`createdAt`、`groupKey` 和 `payload`。它覆盖 branch create/update、project checkout、单条 publish 和 bulk publish 成功项，但仍是过渡日志，不替代后续 `server`、`groups`、`projects`、`knowledge` 等正式分片。
+该文档随现有 `state.crdtDocuments` 持久化 `snapshot`、`heads` 和 `changes`，并在 global projection 中暴露 source heads。每条 operation 至少包含 `id`、`action`、`actor`、`targetType`、`targetId`、`createdAt`、内部 `groupKey` 和 `payload`；Admin summary 对外补充 `branchKey`。它覆盖 branch create/update、project checkout、单条 publish 和 bulk publish 成功项，但仍是过渡日志，不替代后续 `server`、`groups`、`projects`、`knowledge` 等正式分片。
 
-Admin 过渡期还提供只读 CRDT document status：按 `kind`、`groupKey`、`projectKey` 过滤 `state.crdtDocuments`，返回 document ref、heads、change count、snapshot 是否存在和 latest change metadata。该接口和页面不会返回 Automerge `bytes` 或 `snapshot` 内容，避免把大型二进制 change log 暴露给管理 UI。`server-global` 文档没有 document-level `groupKey`，因此按 group 过滤时不会被误归入某个 branch；每条 change 里的 `groupKey` 只表示该 change 作用的管理对象或同步 group。
+Admin 过渡期还提供只读 CRDT document status：按 `kind`、`branchKey`、`projectKey` 过滤 `state.crdtDocuments`，并兼容旧 `groupKey` query；响应返回 document ref、heads、change count、snapshot 是否存在和 latest change metadata，并在 document/change summary 中提供 `branchKey`。该接口和页面不会返回 Automerge `bytes` 或 `snapshot` 内容，避免把大型二进制 change log 暴露给管理 UI。`server-global` 文档没有 document-level `branchKey` / `groupKey`，因此按 branch/group 过滤时不会被误归入某个 branch；每条 change 里的内部 `groupKey` 只表示该 change 作用的管理对象或同步 namespace。
 
 这样做的好处是：
 

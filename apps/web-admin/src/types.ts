@@ -76,6 +76,7 @@ export interface CrdtDocumentSummary {
   key: string;
   document: {
     kind: string;
+    branchKey?: string;
     groupKey?: string;
     projectKey?: string;
     documentId?: string;
@@ -83,6 +84,7 @@ export interface CrdtDocumentSummary {
     schemaVersion?: number;
   };
   kind: string;
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
   documentId?: string;
@@ -99,6 +101,7 @@ export interface CrdtChangeSummary {
   id: string;
   receivedAt: string;
   clientId: string;
+  branchKey: string;
   groupKey: string;
   actorId?: string;
   createdAt?: string;
@@ -107,6 +110,7 @@ export interface CrdtChangeSummary {
 
 export interface CrdtDocumentFilters {
   kind?: string;
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
 }
@@ -136,6 +140,7 @@ export interface RotatedAccessToken {
 export interface ProjectSummary {
   id: string;
   projectKey: string;
+  branchKey?: string;
   groupKey: string;
   name: string;
   description?: string;
@@ -167,6 +172,7 @@ export interface KnowledgeEdge {
   toId: string;
   createdBy: string;
   createdAt: string;
+  branchKey?: string;
   groupKey?: string;
   reason?: string;
 }
@@ -264,6 +270,7 @@ export interface AuditLog {
   action: string;
   targetType: string;
   targetId: string;
+  branchKey?: string;
   groupKey?: string;
   createdAt: string;
   payload?: Record<string, unknown>;
@@ -271,6 +278,7 @@ export interface AuditLog {
 
 export interface InviteSummary {
   token: string;
+  branchKey?: string;
   groupKey: string;
   uses: number;
   createdAt: string;
@@ -290,7 +298,8 @@ export interface GroupInput {
 }
 
 export interface ProjectInput {
-  groupKey: string;
+  branchKey?: string;
+  groupKey?: string;
   id?: string;
   name: string;
   description?: string;
@@ -301,7 +310,8 @@ export interface ProjectBranchInput {
 }
 
 export interface InviteInput {
-  groupKey: string;
+  branchKey?: string;
+  groupKey?: string;
   token?: string;
   expiresAt?: string;
   maxUses?: number;
@@ -316,6 +326,7 @@ export interface GlossaryInput {
   term: string;
   definition: string;
   content?: string;
+  branchKey?: string;
   groupKey?: string;
   projectKey?: string;
   aliases?: string[];
@@ -326,6 +337,7 @@ export interface KnowledgeEdgeInput {
   kind: KnowledgeEdgeKind;
   fromId: string;
   toId: string;
+  branchKey?: string;
   groupKey?: string;
   reason?: string;
 }
@@ -353,6 +365,8 @@ export interface KnowledgeBranchBulkPublishResult {
 }
 
 export interface QualityReviewFilters {
+  branchKey?: string;
+  groupKey?: string;
   layer?: string;
   limit?: number;
   includeSuperseded?: boolean;
@@ -364,6 +378,8 @@ export interface QualityReviewFilters {
 }
 
 export interface TaskDigestFilters {
+  branchKey?: string;
+  groupKey?: string;
   projectKey?: string;
   status?: TaskStatus | '';
   limit?: number;

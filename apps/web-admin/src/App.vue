@@ -113,10 +113,10 @@ const taskDigestStatus = ref<TaskStatus | ''>('');
 const taskDigestIncludeDone = ref(false);
 const taskDigestIncludeSuperseded = ref(true);
 const crdtDocumentKind = ref('');
-const crdtDocumentGroupKey = ref('');
+const crdtDocumentBranchKey = ref('');
 const crdtDocumentProjectKey = ref('');
 const glossaryQuery = ref('');
-const glossaryGroupKey = ref('');
+const glossaryBranchKey = ref('');
 const glossaryProjectKey = ref('');
 const groupDialogOpen = ref(false);
 const branchDialogOpen = ref(false);
@@ -155,13 +155,13 @@ const branchMergePreviewForm = reactive<BranchMergePreviewFormInput>({
   reason: ''
 });
 const projectForm = reactive<ProjectInput>({
-  groupKey: '',
+  branchKey: '',
   id: '',
   name: '',
   description: ''
 });
 const inviteForm = reactive<InviteFormInput>({
-  groupKey: '',
+  branchKey: '',
   token: '',
   expiresAt: '',
   maxUses: ''
@@ -175,7 +175,7 @@ const projectBranchForm = reactive<ProjectBranchInput>({
   branchKey: ''
 });
 const glossaryForm = reactive<GlossaryFormInput>({
-  groupKey: '',
+  branchKey: '',
   projectKey: '',
   term: '',
   definition: '',
@@ -189,7 +189,7 @@ const knowledgePublishForm = reactive<KnowledgePublishFormInput>({
 });
 const edgeForm = reactive<KnowledgeEdgeFormInput>({
   kind: 'supersedes',
-  groupKey: '',
+  branchKey: '',
   fromId: '',
   toId: '',
   reason: ''
@@ -309,7 +309,7 @@ async function refreshAll(): Promise<void> {
       fetchMembers(),
       fetchInvites(),
       fetchProjects(),
-      fetchGlossary(glossaryQuery.value, glossaryGroupKey.value, glossaryProjectKey.value),
+      fetchGlossary(glossaryQuery.value, glossaryBranchKey.value, glossaryProjectKey.value),
       fetchKnowledge(knowledgeLayer.value, knowledgeQuery.value, knowledgeIncludeSuperseded.value),
       fetchKnowledge('', '', true),
       fetchKnowledgeEdges(),
@@ -398,7 +398,7 @@ async function reloadGlossary(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    glossary.value = await fetchGlossary(glossaryQuery.value, glossaryGroupKey.value, glossaryProjectKey.value);
+    glossary.value = await fetchGlossary(glossaryQuery.value, glossaryBranchKey.value, glossaryProjectKey.value);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -522,7 +522,7 @@ async function submitProject(): Promise<void> {
     await createProject(projectForm);
     projectDialogOpen.value = false;
     Object.assign(projectForm, {
-      groupKey: '',
+      branchKey: '',
       id: '',
       name: '',
       description: ''
@@ -541,7 +541,7 @@ async function submitInvite(): Promise<void> {
 
   try {
     const payload: InviteInput = {
-      groupKey: inviteForm.groupKey
+      branchKey: inviteForm.branchKey
     };
     const token = inviteForm.token.trim();
     const expiresAt = inviteForm.expiresAt.trim();
@@ -562,7 +562,7 @@ async function submitInvite(): Promise<void> {
     await createInvite(payload);
     inviteDialogOpen.value = false;
     Object.assign(inviteForm, {
-      groupKey: '',
+      branchKey: '',
       token: '',
       expiresAt: '',
       maxUses: ''
@@ -697,7 +697,7 @@ async function submitProjectAcl(): Promise<void> {
 function openGlossaryDialog(row?: KnowledgeItem): void {
   editingGlossaryId.value = row?.id ?? null;
   Object.assign(glossaryForm, {
-    groupKey: readMetadataString(row, 'groupKey') ?? groups.value[0]?.key ?? '',
+    branchKey: readMetadataString(row, 'branchKey') ?? readMetadataString(row, 'groupKey') ?? branches.value[0]?.branchKey ?? '',
     projectKey: readMetadataString(row, 'projectKey') ?? '',
     term: row?.title ?? '',
     definition: row?.summary ?? '',
@@ -717,14 +717,14 @@ async function submitGlossary(): Promise<void> {
       term: glossaryForm.term,
       definition: glossaryForm.definition
     };
-    const groupKey = glossaryForm.groupKey.trim();
+    const branchKey = glossaryForm.branchKey.trim();
     const projectKey = glossaryForm.projectKey.trim();
     const content = glossaryForm.content.trim();
     const aliases = parseList(glossaryForm.aliases);
     const tags = parseList(glossaryForm.tags);
 
-    if (groupKey) {
-      payload.groupKey = groupKey;
+    if (branchKey) {
+      payload.branchKey = branchKey;
     }
 
     if (projectKey) {
@@ -752,7 +752,7 @@ async function submitGlossary(): Promise<void> {
     glossaryDialogOpen.value = false;
     editingGlossaryId.value = null;
     Object.assign(glossaryForm, {
-      groupKey: '',
+      branchKey: '',
       projectKey: '',
       term: '',
       definition: '',
@@ -769,7 +769,7 @@ async function submitGlossary(): Promise<void> {
 }
 
 function openKnowledgePublishDialog(row: KnowledgeItem): void {
-  const sourceBranch = knowledgeGroupKey(row);
+  const sourceBranch = knowledgeBranchKey(row);
   const targetBranch = branches.value.find((branch) => branch.branchKey !== sourceBranch);
 
   selectedPublishKnowledge.value = row;
@@ -817,7 +817,7 @@ async function submitKnowledgePublish(): Promise<void> {
 function openEdgeDialog(): void {
   Object.assign(edgeForm, {
     kind: 'supersedes',
-    groupKey: groups.value[0]?.key ?? '',
+    branchKey: branches.value[0]?.branchKey ?? '',
     fromId: edgeKnowledge.value[0]?.id ?? '',
     toId: edgeKnowledge.value[1]?.id ?? '',
     reason: ''
@@ -840,11 +840,11 @@ async function submitEdge(): Promise<void> {
       fromId: edgeForm.fromId,
       toId: edgeForm.toId
     };
-    const groupKey = edgeForm.groupKey.trim();
+    const branchKey = edgeForm.branchKey.trim();
     const reason = edgeForm.reason.trim();
 
-    if (groupKey) {
-      payload.groupKey = groupKey;
+    if (branchKey) {
+      payload.branchKey = branchKey;
     }
 
     if (reason) {
@@ -855,7 +855,7 @@ async function submitEdge(): Promise<void> {
     edgeDialogOpen.value = false;
     Object.assign(edgeForm, {
       kind: 'supersedes',
-      groupKey: '',
+      branchKey: '',
       fromId: '',
       toId: '',
       reason: ''
@@ -907,8 +907,8 @@ function createCrdtDocumentFilters(): CrdtDocumentFilters {
     filters.kind = crdtDocumentKind.value.trim();
   }
 
-  if (crdtDocumentGroupKey.value.trim()) {
-    filters.groupKey = crdtDocumentGroupKey.value.trim();
+  if (crdtDocumentBranchKey.value.trim()) {
+    filters.branchKey = crdtDocumentBranchKey.value.trim();
   }
 
   if (crdtDocumentProjectKey.value.trim()) {
@@ -960,9 +960,10 @@ function branchMergePreviewStatusType(status: BranchMergePreviewItem['status']):
 
 function crdtDocumentScope(row: CrdtDocumentSummary): string {
   const parts = [row.kind];
+  const branchKey = row.branchKey ?? row.groupKey;
 
-  if (row.groupKey !== undefined) {
-    parts.push(`group:${row.groupKey}`);
+  if (branchKey !== undefined) {
+    parts.push(`branch:${branchKey}`);
   }
 
   if (row.projectKey !== undefined) {
@@ -1058,8 +1059,20 @@ function glossaryScope(row: KnowledgeItem): string {
   return readMetadataString(row, 'projectKey') ?? row.para.key;
 }
 
-function knowledgeGroupKey(row: KnowledgeItem): string {
-  return readMetadataString(row, 'groupKey') ?? 'default';
+function knowledgeBranchKey(row: KnowledgeItem): string {
+  return readMetadataString(row, 'branchKey') ?? readMetadataString(row, 'groupKey') ?? 'default';
+}
+
+function projectBranchKey(row: ProjectSummary): string {
+  return row.branchKey ?? row.groupKey;
+}
+
+function knowledgeEdgeBranchKey(row: KnowledgeEdge): string {
+  return row.branchKey ?? row.groupKey ?? '-';
+}
+
+function auditLogBranchKey(row: AuditLog): string {
+  return row.branchKey ?? row.groupKey ?? '-';
 }
 
 function glossaryAliases(row: KnowledgeItem | undefined): string[] {
@@ -1090,7 +1103,7 @@ function parseList(value: string): string[] {
 }
 
 interface InviteFormInput {
-  groupKey: string;
+  branchKey: string;
   token: string;
   expiresAt: string;
   maxUses: string;
@@ -1109,7 +1122,7 @@ interface BranchMergePreviewFormInput {
 }
 
 interface GlossaryFormInput {
-  groupKey: string;
+  branchKey: string;
   projectKey: string;
   term: string;
   definition: string;
@@ -1125,7 +1138,7 @@ interface KnowledgePublishFormInput {
 
 interface KnowledgeEdgeFormInput {
   kind: KnowledgeEdgeKind;
-  groupKey: string;
+  branchKey: string;
   fromId: string;
   toId: string;
   reason: string;
@@ -1219,7 +1232,6 @@ interface KnowledgeEdgeFormInput {
             <el-table :data="branches" empty-text="No knowledge branches">
               <el-table-column prop="branchKey" label="Branch" min-width="170" />
               <el-table-column prop="displayName" label="Name" min-width="180" />
-              <el-table-column prop="groupKey" label="Group" width="150" />
               <el-table-column prop="joinMode" label="Join" width="110" />
               <el-table-column label="Members" width="100">
                 <template #default="{ row }">{{ row.counts.members }}</template>
@@ -1266,14 +1278,14 @@ interface KnowledgeEdgeFormInput {
                 <el-option label="server-global" value="server-global" />
               </el-select>
               <el-select
-                v-model="crdtDocumentGroupKey"
+                v-model="crdtDocumentBranchKey"
                 class="layer-select"
-                placeholder="Group"
+                placeholder="Branch"
                 clearable
                 filterable
                 @change="reloadCrdtDocuments"
               >
-                <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+                <el-option v-for="branch in branches" :key="branch.branchKey" :label="branch.displayName" :value="branch.branchKey" />
               </el-select>
               <el-input
                 v-model="crdtDocumentProjectKey"
@@ -1316,7 +1328,7 @@ interface KnowledgeEdgeFormInput {
             <el-table :data="members" empty-text="No members">
               <el-table-column prop="displayName" label="Name" min-width="160" />
               <el-table-column prop="handle" label="Handle" width="140" />
-              <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column prop="branchKey" label="Branch" width="150" />
               <el-table-column label="Status" width="120">
                 <template #default="{ row }">
                   <el-tag :type="memberStatusType(row.status)">{{ row.status }}</el-tag>
@@ -1389,7 +1401,9 @@ interface KnowledgeEdgeFormInput {
             <el-table :data="projects" empty-text="No projects">
               <el-table-column prop="id" label="ID" min-width="170" />
               <el-table-column prop="name" label="Name" min-width="190" />
-              <el-table-column prop="groupKey" label="Branch" width="150" />
+              <el-table-column label="Branch" width="150">
+                <template #default="{ row }">{{ projectBranchKey(row) }}</template>
+              </el-table-column>
               <el-table-column label="Access" width="140">
                 <template #default="{ row }">
                   <el-tag :type="projectAccessType(row)">{{ projectAccessVisibility(row) }}</el-tag>
@@ -1414,8 +1428,8 @@ interface KnowledgeEdgeFormInput {
           <section v-else-if="activeView === 'glossary'" class="view">
             <div class="toolbar">
               <el-button :icon="Plus" type="primary" @click="openGlossaryDialog()">New Term</el-button>
-              <el-select v-model="glossaryGroupKey" class="layer-select" placeholder="Group" clearable @change="reloadGlossary">
-                <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+              <el-select v-model="glossaryBranchKey" class="layer-select" placeholder="Branch" clearable @change="reloadGlossary">
+                <el-option v-for="branch in branches" :key="branch.branchKey" :label="branch.displayName" :value="branch.branchKey" />
               </el-select>
               <el-input
                 v-model="glossaryProjectKey"
@@ -1479,7 +1493,7 @@ interface KnowledgeEdgeFormInput {
             <el-table :data="knowledge" empty-text="No knowledge">
               <el-table-column prop="title" label="Title" min-width="260" />
               <el-table-column label="Branch" width="140">
-                <template #default="{ row }">{{ knowledgeGroupKey(row) }}</template>
+                <template #default="{ row }">{{ knowledgeBranchKey(row) }}</template>
               </el-table-column>
               <el-table-column prop="layer" label="Layer" width="120" />
               <el-table-column label="Status" width="130">
@@ -1591,7 +1605,9 @@ interface KnowledgeEdgeFormInput {
               <el-table-column label="To" min-width="260">
                 <template #default="{ row }">{{ knowledgeLabel(row.toId) }}</template>
               </el-table-column>
-              <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column label="Branch" width="150">
+                <template #default="{ row }">{{ knowledgeEdgeBranchKey(row) }}</template>
+              </el-table-column>
               <el-table-column prop="reason" label="Reason" min-width="220" />
               <el-table-column prop="createdAt" label="Created" width="190" />
             </el-table>
@@ -1665,7 +1681,9 @@ interface KnowledgeEdgeFormInput {
               <el-table-column prop="action" label="Action" min-width="220" />
               <el-table-column prop="targetType" label="Target Type" width="140" />
               <el-table-column prop="targetId" label="Target" min-width="190" />
-              <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column label="Branch" width="150">
+                <template #default="{ row }">{{ auditLogBranchKey(row) }}</template>
+              </el-table-column>
               <el-table-column prop="createdAt" label="Created" width="190" />
             </el-table>
           </section>
@@ -1700,9 +1718,9 @@ interface KnowledgeEdgeFormInput {
 
     <el-dialog v-model="inviteDialogOpen" title="New Invite" width="520px">
       <el-form label-position="top">
-        <el-form-item label="Group">
-          <el-select v-model="inviteForm.groupKey" filterable>
-            <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+        <el-form-item label="Branch">
+          <el-select v-model="inviteForm.branchKey" filterable>
+            <el-option v-for="branch in branches" :key="branch.branchKey" :label="branch.displayName" :value="branch.branchKey" />
           </el-select>
         </el-form-item>
         <el-form-item label="Token">
@@ -1849,7 +1867,7 @@ interface KnowledgeEdgeFormInput {
     <el-dialog v-model="projectDialogOpen" title="New Project" width="520px">
       <el-form label-position="top">
         <el-form-item label="Branch">
-          <el-select v-model="projectForm.groupKey" filterable>
+          <el-select v-model="projectForm.branchKey" filterable>
             <el-option
               v-for="branch in branches"
               :key="branch.branchKey"
@@ -1898,9 +1916,9 @@ interface KnowledgeEdgeFormInput {
 
     <el-dialog v-model="glossaryDialogOpen" title="Glossary Term" width="560px">
       <el-form label-position="top">
-        <el-form-item label="Group">
-          <el-select v-model="glossaryForm.groupKey" filterable>
-            <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+        <el-form-item label="Branch">
+          <el-select v-model="glossaryForm.branchKey" filterable>
+            <el-option v-for="branch in branches" :key="branch.branchKey" :label="branch.displayName" :value="branch.branchKey" />
           </el-select>
         </el-form-item>
         <el-form-item label="Project Key">
@@ -1934,14 +1952,14 @@ interface KnowledgeEdgeFormInput {
           <el-input :model-value="selectedPublishKnowledge?.title ?? ''" disabled />
         </el-form-item>
         <el-form-item label="From Branch">
-          <el-input :model-value="selectedPublishKnowledge ? knowledgeGroupKey(selectedPublishKnowledge) : ''" disabled />
+          <el-input :model-value="selectedPublishKnowledge ? knowledgeBranchKey(selectedPublishKnowledge) : ''" disabled />
         </el-form-item>
         <el-form-item label="Target Branch">
           <el-select v-model="knowledgePublishForm.targetBranchKey" filterable>
             <el-option
               v-for="branch in branches"
               :key="branch.branchKey"
-              :disabled="selectedPublishKnowledge !== null && branch.branchKey === knowledgeGroupKey(selectedPublishKnowledge)"
+              :disabled="selectedPublishKnowledge !== null && branch.branchKey === knowledgeBranchKey(selectedPublishKnowledge)"
               :label="branch.displayName"
               :value="branch.branchKey"
             />
@@ -1968,9 +1986,9 @@ interface KnowledgeEdgeFormInput {
             <el-radio-button label="contradicts">contradicts</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="Group">
-          <el-select v-model="edgeForm.groupKey" clearable filterable>
-            <el-option v-for="group in groups" :key="group.key" :label="group.displayName" :value="group.key" />
+        <el-form-item label="Branch">
+          <el-select v-model="edgeForm.branchKey" clearable filterable>
+            <el-option v-for="branch in branches" :key="branch.branchKey" :label="branch.displayName" :value="branch.branchKey" />
           </el-select>
         </el-form-item>
         <el-form-item label="From">

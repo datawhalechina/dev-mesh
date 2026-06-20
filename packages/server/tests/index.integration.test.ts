@@ -312,18 +312,19 @@ describe('hub server HTTP integration', () => {
       const audit = await requestJson(`${url}/api/v1/admin/audit?action=sync.crdt_exchange`);
       const materializedAudit = await requestJson(`${url}/api/v1/admin/audit?action=sync.crdt_materialized`);
       const adminKnowledge = await requestJson(
-        `${url}/api/v1/admin/knowledge?groupKey=frontend-team&query=${encodeURIComponent('V2 CRDT exchange')}`
+        `${url}/api/v1/admin/knowledge?branchKey=frontend-team&query=${encodeURIComponent('V2 CRDT exchange')}`
       );
       const globalProjection = await requestJson(`${url}/api/v1/admin/global-projection`);
       const crdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents`);
-      const frontendCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?groupKey=frontend-team`);
+      const frontendCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?branchKey=frontend-team`);
+      const legacyFrontendCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?groupKey=frontend-team`);
       const frontendProjectCrdtDocuments = await requestJson(
-        `${url}/api/v1/admin/crdt-documents?kind=project&groupKey=frontend-team&projectKey=frontend-dashboard`
+        `${url}/api/v1/admin/crdt-documents?kind=project&branchKey=frontend-team&projectKey=frontend-dashboard`
       );
       const serverGlobalCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?kind=server-global`);
       const branches = await requestJson(`${url}/api/v1/admin/branches`);
-      const frontendAdminProjection = await requestJson(`${url}/api/v1/admin/global-projection?groupKey=frontend-team`);
-      const backendAdminProjection = await requestJson(`${url}/api/v1/admin/global-projection?groupKey=backend-team`);
+      const frontendAdminProjection = await requestJson(`${url}/api/v1/admin/global-projection?branchKey=frontend-team`);
+      const backendAdminProjection = await requestJson(`${url}/api/v1/admin/global-projection?branchKey=backend-team`);
       const frontendScopedProjection = await requestJson(`${url}/api/v2/projections/global`, {
         headers: authHeaders(reader.body.accessToken)
       });
@@ -402,6 +403,7 @@ describe('hub server HTTP integration', () => {
           action: 'sync.crdt_exchange',
           targetType: 'crdt_document',
           groupKey: 'frontend-team',
+          branchKey: 'frontend-team',
           payload: expect.objectContaining({
             clientId: writer.body.clientId,
             acceptedChanges: changes.length,
@@ -417,6 +419,7 @@ describe('hub server HTTP integration', () => {
           action: 'sync.crdt_materialized',
           targetType: 'crdt_document',
           groupKey: 'frontend-team',
+          branchKey: 'frontend-team',
           payload: expect.objectContaining({
             materialized: 1,
             skipped: 0,
@@ -472,11 +475,13 @@ describe('hub server HTTP integration', () => {
           expect.objectContaining({
             document: expect.objectContaining({
               kind: 'project',
+              branchKey: 'frontend-team',
               groupKey: 'frontend-team',
               projectKey: 'frontend-dashboard',
               schemaVersion: 2
             }),
             kind: 'project',
+            branchKey: 'frontend-team',
             groupKey: 'frontend-team',
             projectKey: 'frontend-dashboard',
             heads,
@@ -485,6 +490,7 @@ describe('hub server HTTP integration', () => {
             latestChange: expect.objectContaining({
               id: expect.stringMatching(/^am_[a-f0-9]{32}$/),
               clientId: writer.body.clientId,
+              branchKey: 'frontend-team',
               groupKey: 'frontend-team',
               summary: 'Test CRDT change'
             })
@@ -497,6 +503,7 @@ describe('hub server HTTP integration', () => {
         expect.arrayContaining([
           expect.objectContaining({
             kind: 'project',
+            branchKey: 'frontend-team',
             groupKey: 'frontend-team',
             projectKey: 'frontend-dashboard'
           })
@@ -509,9 +516,11 @@ describe('hub server HTTP integration', () => {
           })
         ])
       );
+      expect(legacyFrontendCrdtDocuments.body.documents).toEqual(frontendCrdtDocuments.body.documents);
       expect(frontendProjectCrdtDocuments.body.documents).toEqual([
         expect.objectContaining({
           kind: 'project',
+          branchKey: 'frontend-team',
           groupKey: 'frontend-team',
           projectKey: 'frontend-dashboard'
         })
@@ -1104,8 +1113,8 @@ describe('hub server HTTP integration', () => {
       });
 
       const allKnowledge = await requestJson(`${url}/api/v1/admin/knowledge?layer=canonical&limit=10`);
-      const frontendKnowledge = await requestJson(`${url}/api/v1/admin/knowledge?groupKey=frontend-team&layer=canonical&limit=10`);
-      const backendKnowledge = await requestJson(`${url}/api/v1/admin/knowledge?groupKey=backend-team&layer=canonical&limit=10`);
+      const frontendKnowledge = await requestJson(`${url}/api/v1/admin/knowledge?branchKey=frontend-team&layer=canonical&limit=10`);
+      const backendKnowledge = await requestJson(`${url}/api/v1/admin/knowledge?branchKey=backend-team&layer=canonical&limit=10`);
       const mergePreviewBeforePublish = await requestJson(
         `${url}/api/v1/admin/branches/merge-preview?sourceBranchKey=frontend-team&targetBranchKey=backend-team`
       );
@@ -1125,7 +1134,7 @@ describe('hub server HTTP integration', () => {
         }
       });
       const backendAfterPublish = await requestJson(
-        `${url}/api/v1/admin/knowledge?groupKey=backend-team&query=${encodeURIComponent('Frontend group branch decision')}`
+        `${url}/api/v1/admin/knowledge?branchKey=backend-team&query=${encodeURIComponent('Frontend group branch decision')}`
       );
       const mergePreviewAfterPublish = await requestJson(
         `${url}/api/v1/admin/branches/merge-preview?sourceBranchKey=frontend-team&targetBranchKey=backend-team`
@@ -1264,6 +1273,7 @@ describe('hub server HTTP integration', () => {
         title: 'Frontend group branch decision',
         source: expect.objectContaining({
           metadata: expect.objectContaining({
+            branchKey: 'backend-team',
             groupKey: 'backend-team',
             publishedFromId: frontendItem.id,
             publishedFromBranch: 'frontend-team'
@@ -1292,6 +1302,7 @@ describe('hub server HTTP integration', () => {
             title: 'Frontend group branch decision',
             source: expect.objectContaining({
               metadata: expect.objectContaining({
+                branchKey: 'backend-team',
                 groupKey: 'backend-team',
                 publishedFromId: frontendItem.id
               })
@@ -1325,6 +1336,7 @@ describe('hub server HTTP integration', () => {
             title: 'Frontend bulk publish decision',
             source: expect.objectContaining({
               metadata: expect.objectContaining({
+                branchKey: 'backend-team',
                 groupKey: 'backend-team',
                 publishedFromId: frontendBulkItem.id,
                 publishedFromBranch: 'frontend-team'
@@ -1616,7 +1628,7 @@ describe('hub server HTTP integration', () => {
           ]
         }
       });
-      const edges = await requestJson(`${url}/api/v1/admin/knowledge-edges?kind=contradicts&groupKey=default`);
+      const edges = await requestJson(`${url}/api/v1/admin/knowledge-edges?kind=contradicts&branchKey=default`);
       const audit = await requestJson(`${url}/api/v1/admin/audit?action=sync.conflict_replayed`);
 
       expect(localPush.body).toMatchObject({
@@ -1640,6 +1652,7 @@ describe('hub server HTTP integration', () => {
           fromId: localRevision.id,
           toId: remoteRevision.id,
           createdBy: remoteJoin.body.memberId,
+          branchKey: 'default',
           groupKey: 'default',
           reason: 'Offline edits diverged'
         })
@@ -2254,7 +2267,7 @@ describe('hub server HTTP integration', () => {
       const globalProjection = await requestJson(`${url}/api/v1/admin/global-projection`);
       const crdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents`);
       const serverGlobalCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?kind=server-global`);
-      const researchCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?groupKey=research`);
+      const researchCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?branchKey=research`);
       const persistedState = await store.load();
       const adminOperationsDocument = getServerGlobalAdminOperationsDocument(persistedState);
       const adminOperations = getAdminCrdtOperations(persistedState);
@@ -2959,7 +2972,7 @@ describe('hub server HTTP integration', () => {
         `${url}/api/v1/admin/quality-review?layer=extract&maxRating=0.2&maxQualityScore=0.4`
       );
       const otherGroup = await requestJson(
-        `${url}/api/v1/admin/quality-review?groupKey=other-team&layer=canonical&maxQualityScore=0.6&staleDays=30`
+        `${url}/api/v1/admin/quality-review?branchKey=other-team&layer=canonical&maxQualityScore=0.6&staleDays=30`
       );
 
       expect(canonical.body.summary).toMatchObject({
@@ -3119,7 +3132,7 @@ describe('hub server HTTP integration', () => {
       const blockedOnly = await requestJson(`${url}/api/v1/admin/task-digest?status=blocked`);
       const doneIncluded = await requestJson(`${url}/api/v1/admin/task-digest?includeDone=true`);
       const taskKey = await requestJson(`${url}/api/v1/admin/task-digest?projectKey=TASK-123`);
-      const otherGroup = await requestJson(`${url}/api/v1/admin/task-digest?groupKey=other-team&includeDone=true`);
+      const otherGroup = await requestJson(`${url}/api/v1/admin/task-digest?branchKey=other-team&includeDone=true`);
 
       expect(digest.body.summary).toMatchObject({
         totalTasks: 2,

@@ -75,8 +75,10 @@ export async function fetchCrdtDocuments(input: CrdtDocumentFilters = {}): Promi
     params.set('kind', input.kind.trim());
   }
 
-  if (input.groupKey?.trim()) {
-    params.set('groupKey', input.groupKey.trim());
+  const branchKey = input.branchKey?.trim() ?? input.groupKey?.trim();
+
+  if (branchKey) {
+    params.set('branchKey', branchKey);
   }
 
   if (input.projectKey?.trim()) {
@@ -143,17 +145,20 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
 export async function createProject(input: ProjectInput): Promise<ProjectSummary> {
   return requestJson<ProjectSummary>('/api/v1/admin/projects', {
     method: 'POST',
-    body: input
+    body: {
+      ...input,
+      branchKey: input.branchKey
+    }
   });
 }
 
 export async function checkoutProjectBranch(
-  groupKey: string,
+  branchKey: string,
   projectId: string,
   input: ProjectBranchInput
 ): Promise<ProjectSummary> {
   return requestJson<ProjectSummary>(
-    `/api/v1/admin/projects/${encodeURIComponent(groupKey)}/${encodeURIComponent(projectId)}/branch`,
+    `/api/v1/admin/projects/${encodeURIComponent(branchKey)}/${encodeURIComponent(projectId)}/branch`,
     {
       method: 'PUT',
       body: input
@@ -192,15 +197,15 @@ export async function fetchKnowledge(layer = '', query = '', includeSuperseded =
   return response.items;
 }
 
-export async function fetchKnowledgeEdges(kind = '', groupKey = ''): Promise<KnowledgeEdge[]> {
+export async function fetchKnowledgeEdges(kind = '', branchKey = ''): Promise<KnowledgeEdge[]> {
   const params = new URLSearchParams();
 
   if (kind) {
     params.set('kind', kind);
   }
 
-  if (groupKey) {
-    params.set('groupKey', groupKey);
+  if (branchKey) {
+    params.set('branchKey', branchKey);
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
@@ -239,6 +244,12 @@ export async function fetchQualityReview(input: QualityReviewFilters = {}): Prom
     params.set('layer', input.layer);
   }
 
+  const branchKey = input.branchKey?.trim() ?? input.groupKey?.trim();
+
+  if (branchKey) {
+    params.set('branchKey', branchKey);
+  }
+
   if (input.includeSuperseded !== undefined) {
     params.set('includeSuperseded', String(input.includeSuperseded));
   }
@@ -257,6 +268,11 @@ export async function fetchQualityReview(input: QualityReviewFilters = {}): Prom
 
 export async function fetchTaskDigest(input: TaskDigestFilters = {}): Promise<TaskDigestResponse> {
   const params = new URLSearchParams();
+  const branchKey = input.branchKey?.trim() ?? input.groupKey?.trim();
+
+  if (branchKey) {
+    params.set('branchKey', branchKey);
+  }
 
   if (input.projectKey?.trim()) {
     params.set('projectKey', input.projectKey.trim());
@@ -281,15 +297,15 @@ export async function fetchTaskDigest(input: TaskDigestFilters = {}): Promise<Ta
   return requestJson<TaskDigestResponse>(`/api/v1/admin/task-digest${suffix}`);
 }
 
-export async function fetchGlossary(query = '', groupKey = '', projectKey = ''): Promise<KnowledgeItem[]> {
+export async function fetchGlossary(query = '', branchKey = '', projectKey = ''): Promise<KnowledgeItem[]> {
   const params = new URLSearchParams();
 
   if (query.trim()) {
     params.set('query', query.trim());
   }
 
-  if (groupKey) {
-    params.set('groupKey', groupKey);
+  if (branchKey) {
+    params.set('branchKey', branchKey);
   }
 
   if (projectKey.trim()) {
