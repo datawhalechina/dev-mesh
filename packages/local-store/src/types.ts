@@ -3,6 +3,7 @@ import type {
   DeleteKnowledgeInput,
   KnowledgeItem,
   KnowledgeLayer,
+  KnowledgeType,
   KnowledgeVisibility,
   MemberIdentity,
   ParaRef,
@@ -17,17 +18,33 @@ import type {
 } from '@devmesh/graph';
 
 export const DEV_MESH_DIR = '.dev-mesh';
-export const PROJECT_STORE_SCHEMA_VERSION = 1;
+export const PROJECT_STORE_SCHEMA_VERSION = 3;
+export const KNOWLEDGE_BRANCH_POLICY_PRESETS = [
+  'balanced',
+  'durable_only',
+  'frontend_design',
+  'backend_design'
+] as const;
+
+export type KnowledgeBranchPolicyPreset = (typeof KNOWLEDGE_BRANCH_POLICY_PRESETS)[number];
+
+export interface KnowledgeBranchDefinition {
+  name: string;
+  policy: KnowledgeBranchPolicyPreset;
+}
 
 export interface ProjectStorePaths {
   root: string;
   config: string;
+  stateDir: string;
   eventsDir: string;
+  crdtDir: string;
+  crdtSyncDir: string;
+  exportsDir: string;
   knowledgeDir: string;
   indexDir: string;
   visualizationsDir: string;
   queueDir: string;
-  syncDir: string;
   secretsDir: string;
 }
 
@@ -60,6 +77,15 @@ export interface ProjectConfig {
     autoReference: boolean;
     autoSync: boolean;
   };
+  knowledgeBranch: {
+    active: string;
+    base?: string;
+    branches: KnowledgeBranchDefinition[];
+  };
+  knowledge: {
+    autoCaptureTypes: KnowledgeType[];
+    includeVolatileInContext: boolean;
+  };
   privacy: {
     redactionEnabled: boolean;
     uploadRawTranscripts: boolean;
@@ -69,9 +95,12 @@ export interface ProjectConfig {
 
 export interface ProjectIndexDocument {
   id: string;
+  branch: string;
   entryKey: string;
   layer: KnowledgeLayer;
   type: string;
+  includeInDefaultContext: boolean;
+  expiresAt?: string;
   title: string;
   summary: string;
   text: string;
@@ -82,12 +111,92 @@ export interface ProjectIndexDocument {
 export interface RebuildProjectIndexResult {
   indexPath: string;
   sqlitePath: string;
+  knowledgePath: string;
+  searchPath: string;
   graphPath: string;
   documentCount: number;
   graphNodeCount: number;
   graphEdgeCount: number;
   rebuiltAt: string;
   schemaVersion: number;
+}
+
+export interface ProjectedKnowledgeQuality {
+  knowledgeId: string;
+  reliability: number;
+  usefulness: number;
+  freshness: number;
+  priority: number;
+  score: number;
+  signalCount: number;
+  updatedAt: string;
+}
+
+export interface ProjectQualityProjection {
+  schemaVersion: number;
+  algorithmVersion: number;
+  rebuiltAt: string;
+  sourceHeads: string[];
+  qualityCount: number;
+  qualities: Record<string, ProjectedKnowledgeQuality>;
+}
+
+export interface RebuildProjectProjectionResult extends RebuildProjectIndexResult {
+  qualityPath: string;
+  qualityCount: number;
+  qualityAlgorithmVersion: number;
+}
+
+export type ProjectProjectionStatusState =
+  | 'missing_crdt'
+  | 'missing'
+  | 'schema_mismatch'
+  | 'corrupt'
+  | 'dirty'
+  | 'ready';
+
+export interface ProjectProjectionFileStatus {
+  path: string;
+  role: 'manifest' | 'knowledge' | 'search' | 'sqlite' | 'graph' | 'quality' | 'metadata';
+  state: 'missing' | 'corrupt' | 'schema_mismatch' | 'ready';
+  schemaVersion?: number;
+  expectedSchemaVersion?: number;
+  message?: string;
+}
+
+export interface ProjectProjectionMetadata {
+  schemaVersion: number;
+  backend?: string;
+  source: string;
+  sourceHeads: string[];
+  rebuiltAt: string;
+  documentCount: number;
+  graphNodeCount: number;
+  graphEdgeCount: number;
+  qualityCount?: number;
+  qualityAlgorithmVersion?: number;
+  qualityPath?: string;
+  projectionFiles?: ProjectProjectionFileStatus[];
+}
+
+export interface ProjectProjectionStatus {
+  state: ProjectProjectionStatusState;
+  backend?: string;
+  schemaVersion?: number;
+  expectedSchemaVersion?: number;
+  metadataPath: string;
+  crdtPath: string;
+  currentHeads: string[];
+  sourceHeads: string[];
+  message: string;
+  projectionFiles?: ProjectProjectionFileStatus[];
+  rebuiltAt?: string;
+  documentCount?: number;
+  graphNodeCount?: number;
+  graphEdgeCount?: number;
+  qualityCount?: number;
+  qualityAlgorithmVersion?: number;
+  qualityPath?: string;
 }
 
 export interface RebuildProjectGraphResult {
@@ -112,6 +221,7 @@ export interface ProjectKnowledgeEdge {
   fromId: string;
   toId: string;
   projectKey: string;
+  branch?: string;
   createdAt: string;
   reason?: string;
   createdBy?: MemberIdentity;
@@ -121,6 +231,7 @@ export interface CreateProjectKnowledgeEdgeInput {
   kind: KnowledgeGraphSemanticEdgeKind;
   fromId: string;
   toId: string;
+  branch?: string;
   reason?: string;
   createdBy?: MemberIdentity;
 }
@@ -129,6 +240,7 @@ export interface ProjectKnowledgeEdgeQuery {
   kind?: KnowledgeGraphSemanticEdgeKind;
   fromId?: string;
   toId?: string;
+  branch?: string;
 }
 
 export interface CreateProjectKnowledgeEdgeResult {
@@ -147,6 +259,7 @@ export interface EnqueuePendingKnowledgeOptions {
   reason?: string;
   risk?: ReviewQueueRisk;
   projectKey?: string;
+  branch?: string;
 }
 
 export interface PendingKnowledgeReviewItem {
@@ -178,6 +291,13 @@ export interface RejectPendingKnowledgeResult {
 
 export interface ProjectCaptureOptions {
   projectKey?: string;
+  branch?: string;
+}
+
+export interface ProjectBranchScope {
+  active: string;
+  base?: string;
+  readable: string[];
 }
 
 export interface CaptureProjectKnowledgeResult {

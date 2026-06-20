@@ -31,12 +31,28 @@ export function getRejectedQueueFile(queueDir: string): string {
   return join(queueDir, 'rejected.jsonl');
 }
 
+export function getKnowledgeProjectionFile(indexDir: string): string {
+  return join(indexDir, 'knowledge.sqlite');
+}
+
+export function getSearchProjectionFile(indexDir: string): string {
+  return join(indexDir, 'search.sqlite');
+}
+
 export function getSqliteIndexFile(indexDir: string): string {
-  return join(indexDir, 'mesh.sqlite');
+  return getSearchProjectionFile(indexDir);
 }
 
 export function getKnowledgeGraphIndexFile(indexDir: string): string {
-  return join(indexDir, 'graph.json');
+  return join(indexDir, 'graph.sqlite');
+}
+
+export function getProjectQualityProjectionFile(indexDir: string): string {
+  return join(indexDir, 'quality.json');
+}
+
+export function getProjectionMetadataFile(indexDir: string): string {
+  return join(indexDir, 'projection-meta.json');
 }
 
 export function createKnowledgeIdForLayer(layer: KnowledgeLayer): string {

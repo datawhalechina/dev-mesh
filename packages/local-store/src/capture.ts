@@ -11,8 +11,13 @@ import {
 import { nowIso } from '@devmesh/shared';
 import { appendProjectEvent } from './events.js';
 import { appendJsonLine, getKnowledgeRatingFile } from './files.js';
-import { ensureProjectStore, projectKeyOptions, readProjectKey } from './project-store.js';
+import { ensureProjectStore, projectKeyOptions, readProjectBranchScope, readProjectKey } from './project-store.js';
 import { JsonlKnowledgeRepository } from './repository.js';
+import {
+  createProjectQualitySignalInCrdt,
+  upsertProjectKnowledgeToCrdt,
+  type CreateProjectQualitySignalInCrdtInput
+} from './crdt.js';
 import type {
   CaptureProjectKnowledgeResult,
   CaptureProjectTaskInput,
@@ -33,10 +38,12 @@ export async function captureProjectKnowledge(
   input: CaptureKnowledgeInput,
   options: ProjectCaptureOptions = {}
 ): Promise<CaptureProjectKnowledgeResult> {
-  const item = createKnowledgeItem(input);
+  const branch = await resolveCaptureBranch(projectRoot, options);
+  const item = createKnowledgeItem(withKnowledgeBranch(input, branch));
   const repository = new JsonlKnowledgeRepository(projectRoot);
 
   await repository.upsert(item);
+  await upsertProjectKnowledgeToCrdt(projectRoot, item, crdtWriteOptions(options.projectKey, `Capture knowledge ${item.id}`));
   const event = await appendProjectEvent(
     projectRoot,
     'knowledge.captured',
@@ -50,7 +57,8 @@ export async function captureProjectKnowledge(
       tags: item.tags,
       visibility: item.visibility,
       source: item.source,
-      createdBy: item.createdBy
+      createdBy: item.createdBy,
+      branch
     },
     options.projectKey
   );
@@ -66,12 +74,14 @@ export async function captureProjectTask(
   input: CaptureProjectTaskInput,
   options: ProjectCaptureOptions = {}
 ): Promise<CaptureProjectTaskResult> {
+  const branch = await resolveCaptureBranch(projectRoot, options);
   const status = input.status ?? 'in-progress';
   const capture = createTaskCaptureInput(input, status);
-  const item = createKnowledgeItem(capture);
+  const item = createKnowledgeItem(withKnowledgeBranch(capture, branch));
   const repository = new JsonlKnowledgeRepository(projectRoot);
 
   await repository.upsert(item);
+  await upsertProjectKnowledgeToCrdt(projectRoot, item, crdtWriteOptions(options.projectKey, `Capture task ${item.id}`));
   const event = await appendProjectEvent(
     projectRoot,
     'task.progress.captured',
@@ -84,7 +94,8 @@ export async function captureProjectTask(
       entryKey: item.entryKey,
       para: item.para,
       tags: item.tags,
-      createdBy: item.createdBy
+      createdBy: item.createdBy,
+      branch
     },
     options.projectKey
   );
@@ -96,6 +107,23 @@ export async function captureProjectTask(
   };
 }
 
+async function resolveCaptureBranch(projectRoot: string, options: ProjectCaptureOptions): Promise<string> {
+  return options.branch ?? (await readProjectBranchScope(projectRoot)).active;
+}
+
+function withKnowledgeBranch(input: CaptureKnowledgeInput, branch: string): CaptureKnowledgeInput {
+  return {
+    ...input,
+    source: {
+      ...(input.source ?? { kind: 'manual' }),
+      metadata: {
+        ...(input.source?.metadata ?? {}),
+        branch
+      }
+    }
+  };
+}
+
 export async function rateProjectKnowledge(
   projectRoot: string,
   core: DevMeshCore,
@@ -104,6 +132,8 @@ export async function rateProjectKnowledge(
 ): Promise<RateProjectKnowledgeResult> {
   const item = await core.rateKnowledge(input);
   const rating = await appendKnowledgeRating(projectRoot, input, item, options);
+  await upsertProjectKnowledgeToCrdt(projectRoot, item, crdtWriteOptions(options.projectKey, `Rate knowledge ${item.id}`));
+  await appendRatingSignalsToCrdt(projectRoot, input, rating, options);
   const event = await appendProjectEvent(
     projectRoot,
     'knowledge.rated',
@@ -135,6 +165,7 @@ export async function updateProjectKnowledge(
   options: UpdateProjectKnowledgeOptions = {}
 ): Promise<UpdateProjectKnowledgeResult> {
   const item = await core.updateKnowledge(input);
+  await upsertProjectKnowledgeToCrdt(projectRoot, item, crdtWriteOptions(options.projectKey, `Update knowledge ${item.id}`));
   const payload: Record<string, unknown> = {
     knowledgeId: item.id,
     changedFields: changedKnowledgeFields(input),
@@ -168,6 +199,7 @@ export async function deleteProjectKnowledge(
   options: DeleteProjectKnowledgeOptions = {}
 ): Promise<DeleteProjectKnowledgeResult> {
   const item = await core.deleteKnowledge(input);
+  await upsertProjectKnowledgeToCrdt(projectRoot, item, crdtWriteOptions(options.projectKey, `Delete knowledge ${item.id}`));
   const payload: Record<string, unknown> = {
     knowledgeId: item.id,
     tombstone: true,
@@ -238,6 +270,125 @@ export async function appendKnowledgeRating(
   await appendJsonLine(getKnowledgeRatingFile(store.paths.knowledgeDir, createdAt), rating);
 
   return rating;
+}
+
+async function appendRatingSignalsToCrdt(
+  projectRoot: string,
+  input: RateKnowledgeInput,
+  rating: KnowledgeRatingRecord,
+  options: RateProjectKnowledgeOptions
+): Promise<void> {
+  const actorId = options.createdBy?.clientId ?? options.createdBy?.memberId ?? options.createdBy?.handle ?? 'local';
+
+  if (input.rating !== undefined) {
+    const signalInput = baseCrdtQualitySignalInput(`${rating.id}_rate`, rating, 'rate', actorId);
+    signalInput.value = input.rating;
+
+    if (options.reason !== undefined) {
+      signalInput.reason = options.reason;
+    }
+
+    await createProjectQualitySignalInCrdt(
+      projectRoot,
+      crdtQualitySignalInput(signalInput),
+      crdtWriteOptions(options.projectKey, `Record rating signal ${rating.id}`)
+    );
+  }
+
+  if (input.confidenceDelta !== undefined && input.confidenceDelta > 0) {
+    const signalInput = baseCrdtQualitySignalInput(`${rating.id}_confirm`, rating, 'confirm', actorId);
+    signalInput.value = input.confidenceDelta;
+
+    if (options.reason !== undefined) {
+      signalInput.reason = options.reason;
+    }
+
+    await createProjectQualitySignalInCrdt(
+      projectRoot,
+      crdtQualitySignalInput(signalInput),
+      crdtWriteOptions(options.projectKey, `Record confirmation signal ${rating.id}`)
+    );
+  }
+
+  const demotionValue = input.weightDelta ?? input.confidenceDelta;
+
+  if (((input.confidenceDelta ?? 0) < 0 || (input.weightDelta ?? 0) < 0) && demotionValue !== undefined) {
+    const signalInput = baseCrdtQualitySignalInput(`${rating.id}_demote`, rating, 'demote', actorId);
+    signalInput.value = demotionValue;
+
+    if (options.reason !== undefined) {
+      signalInput.reason = options.reason;
+    }
+
+    await createProjectQualitySignalInCrdt(
+      projectRoot,
+      crdtQualitySignalInput(signalInput),
+      crdtWriteOptions(options.projectKey, `Record demotion signal ${rating.id}`)
+    );
+  }
+}
+
+function crdtWriteOptions(projectKey: string | undefined, summary: string): { projectKey?: string; summary: string } {
+  const options: { projectKey?: string; summary: string } = {
+    summary
+  };
+
+  if (projectKey !== undefined) {
+    options.projectKey = projectKey;
+  }
+
+  return options;
+}
+
+function crdtQualitySignalInput(input: {
+  id: string;
+  knowledgeId: string;
+  kind: CreateProjectQualitySignalInCrdtInput['kind'];
+  actorId: string;
+  value?: number;
+  reason?: string;
+  createdAt: string;
+}): CreateProjectQualitySignalInCrdtInput {
+  const signal: CreateProjectQualitySignalInCrdtInput = {
+    id: input.id,
+    knowledgeId: input.knowledgeId,
+    kind: input.kind,
+    actorId: input.actorId,
+    createdAt: input.createdAt
+  };
+
+  if (input.value !== undefined) {
+    signal.value = input.value;
+  }
+
+  if (input.reason !== undefined) {
+    signal.reason = input.reason;
+  }
+
+  return signal;
+}
+
+function baseCrdtQualitySignalInput(
+  id: string,
+  rating: KnowledgeRatingRecord,
+  kind: CreateProjectQualitySignalInCrdtInput['kind'],
+  actorId: string
+): {
+  id: string;
+  knowledgeId: string;
+  kind: CreateProjectQualitySignalInCrdtInput['kind'];
+  actorId: string;
+  value?: number;
+  reason?: string;
+  createdAt: string;
+} {
+  return {
+    id,
+    knowledgeId: rating.knowledgeId,
+    kind,
+    actorId,
+    createdAt: rating.createdAt
+  };
 }
 
 function changedKnowledgeFields(input: UpdateKnowledgeInput): string[] {

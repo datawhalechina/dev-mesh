@@ -143,6 +143,68 @@ export interface SyncPullResponse {
   events: SyncEvent[];
 }
 
+export type CrdtSyncDocumentKind = 'project' | 'server-global' | 'group' | (string & {});
+
+export interface CrdtSyncDocumentRef {
+  kind: CrdtSyncDocumentKind;
+  groupKey?: string;
+  projectKey?: string;
+  documentId?: string;
+  namespace?: string;
+  schemaVersion?: number;
+}
+
+export interface CrdtSyncChange {
+  id?: string;
+  engine: 'automerge';
+  encoding: 'base64';
+  bytes: string;
+  headsBefore: string[];
+  headsAfter: string[];
+  actorId?: string;
+  createdAt?: string;
+  summary?: string;
+}
+
+export interface CrdtSyncExchangeRequest {
+  clientId: string;
+  /**
+   * Transitional shortcut for project documents. New clients should prefer
+   * document.projectKey so all CRDT sync messages share one explicit scope.
+   */
+  projectKey?: string;
+  document?: CrdtSyncDocumentRef;
+  heads: string[];
+  changes: CrdtSyncChange[];
+  maxChanges?: number;
+}
+
+export interface CrdtSyncAcceptedChange {
+  id: string;
+  headsAfter: string[];
+}
+
+export interface CrdtSyncRejectedChange {
+  index: number;
+  reason: string;
+  id?: string;
+}
+
+export interface CrdtSyncProjectionCheckpoint {
+  materialized: boolean;
+  sourceHeads: string[];
+  updatedAt?: string;
+}
+
+export interface CrdtSyncExchangeResponse {
+  document: CrdtSyncDocumentRef;
+  acceptedChanges: CrdtSyncAcceptedChange[];
+  rejected: CrdtSyncRejectedChange[];
+  heads: string[];
+  changes: CrdtSyncChange[];
+  projection?: CrdtSyncProjectionCheckpoint;
+}
+
 export function createDefaultWellKnown(baseUrl = 'http://127.0.0.1:8721'): WellKnownDevMesh {
   return {
     serverName: 'DevMesh',

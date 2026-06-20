@@ -37,6 +37,7 @@ function registerExploreCommand(parent: Command): void {
     .command('explore')
     .description('Explore related knowledge items, PARA nodes, tags, authors, sources, and types')
     .option('--root <path>', 'project root', process.cwd())
+    .option('--branch <name>', 'read from a specific knowledge branch without switching checkout')
     .option('--query <query>', 'query used to select graph seed nodes')
     .option('--id <id>', 'knowledge item id used as a seed node', collectOption, [])
     .option('--depth <n>', 'relationship depth from seed nodes', parseIntOption, 2)
@@ -62,6 +63,7 @@ function registerVisualizeCommand(parent: Command, name: string): void {
     .command(name)
     .description('Generate an interactive local DevMesh knowledge graph visualization')
     .option('--root <path>', 'project root', process.cwd())
+    .option('--branch <name>', 'read from a specific knowledge branch without switching checkout')
     .option('--query <query>', 'query used to select graph seed nodes')
     .option('--id <id>', 'knowledge item id used as a seed node', collectOption, [])
     .option('--depth <n>', 'relationship depth from seed nodes', parseIntOption, 2)
@@ -156,6 +158,10 @@ function createGraphExploreInput(options: GraphExploreOptions): NonNullable<Para
     depth: options.depth,
     limit: options.limit
   };
+
+  if (options.branch !== undefined) {
+    input.branch = options.branch;
+  }
 
   if (options.query !== undefined) {
     input.query = options.query;
@@ -782,6 +788,7 @@ type GraphEdgeListResult = Awaited<ReturnType<DevMeshClientRuntime['listKnowledg
 
 interface GraphExploreOptions {
   root: string;
+  branch?: string;
   query?: string;
   id: string[];
   depth: number;

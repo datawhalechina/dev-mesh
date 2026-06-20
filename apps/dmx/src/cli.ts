@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
+import { registerBranchCommand } from './commands/branch.js';
 import { registerCaptureCommand } from './commands/capture.js';
 import { registerDoctorCommand } from './commands/doctor.js';
 import { registerGraphCommand } from './commands/graph.js';
@@ -23,6 +24,7 @@ export function createDmxProgram(): Command {
 
   registerInitCommand(program);
   registerJoinCommand(program);
+  registerBranchCommand(program);
   registerStatusCommand(program);
   registerCaptureCommand(program);
   registerSearchCommand(program);

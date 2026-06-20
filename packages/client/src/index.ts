@@ -44,18 +44,33 @@ export type {
   LocalMcpDaemonStatus
 } from './local-mcp-daemon.js';
 export {
-  DAEMON_SYNC_REMOTE_EVENTS_DIR,
+  DAEMON_SYNC_HEADS_FILENAME,
+  DAEMON_SYNC_PEERS_FILENAME,
   DAEMON_SYNC_STATUS_FILENAME,
   DEFAULT_DAEMON_SYNC_INTERVAL_MS,
+  readDaemonSyncHeads,
   readDaemonSyncStatus,
   runDaemonSyncOnce,
   startDaemonSyncWorker
 } from './daemon-sync.js';
-export type { DaemonSyncOptions, DaemonSyncRemoteStatus, DaemonSyncStatus, DaemonSyncWorker } from './daemon-sync.js';
+export type {
+  DaemonSyncHeadsStatus,
+  DaemonProjectionMaintenanceStatus,
+  DaemonSyncRemoteHeadsStatus,
+  DaemonSyncOptions,
+  DaemonSyncRemoteStatus,
+  DaemonSyncStatus,
+  DaemonSyncWorker
+} from './daemon-sync.js';
 export { createDevMeshClientRuntime } from './runtime.js';
 export type {
   DevMeshClientOptions,
   DevMeshClientRuntime,
+  ExportProjectKnowledgeInput,
+  ExportProjectKnowledgeResult,
+  KnowledgeBranchListResult,
+  KnowledgeBranchMutationInput,
+  KnowledgeBranchPolicyInput,
   ProjectKnowledgeScanInput,
   ProjectKnowledgeScanResult
 } from './runtime.js';

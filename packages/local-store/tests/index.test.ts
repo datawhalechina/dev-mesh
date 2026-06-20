@@ -11,18 +11,28 @@ import {
   deleteProjectKnowledge,
   enqueuePendingKnowledge,
   ensureProjectStore,
+  exportProjectCrdtKnowledgeJsonl,
+  importProjectJsonlToCrdt,
+  initializeProjectCrdtStore,
   JsonlKnowledgeRepository,
   listProjectKnowledgeEdges,
   listPendingKnowledge,
   migrateProjectStore,
   PROJECT_STORE_SCHEMA_VERSION,
+  QUALITY_PROJECTION_ALGORITHM_VERSION,
+  readProjectGraph,
   readProjectConfig,
+  readProjectQualityProjection,
+  readProjectProjectionStatus,
+  loadProjectKnowledgeItemsFromCrdt,
   recordKnowledgeUsage,
   rateProjectKnowledge,
   rebuildProjectIndex,
   rebuildProjectGraph,
+  rebuildProjectProjectionsFromCrdt,
   rejectPendingKnowledge,
   searchProjectIndex,
+  writeProjectConfig,
   updateProjectKnowledge
 } from '../src/index.js';
 
@@ -35,6 +45,11 @@ describe('local project store', () => {
       const config = await readFile(store.paths.config, 'utf8');
       expect(config).toContain('project_key = "org/repo"');
       expect(config).toContain('auto_reference = true');
+      expect(config).toContain('[knowledge_branch]');
+      expect(config).toContain('active = "main"');
+      expect(config).toContain('[knowledge]');
+      expect(config).toContain('auto_capture_types = [');
+      expect(config).toContain('include_volatile_in_context = false');
       await expect(readProjectConfig(projectRoot)).resolves.toMatchObject({
         schemaVersion: PROJECT_STORE_SCHEMA_VERSION,
         projectKey: 'org/repo',
@@ -42,6 +57,19 @@ describe('local project store', () => {
         automation: {
           autoInit: true,
           autoSync: true
+        },
+        knowledgeBranch: {
+          active: 'main',
+          branches: [
+            {
+              name: 'main',
+              policy: 'balanced'
+            }
+          ]
+        },
+        knowledge: {
+          autoCaptureTypes: expect.arrayContaining(['decision', 'design_principle', 'macro_experience']),
+          includeVolatileInContext: false
         },
         privacy: {
           redactionEnabled: true,
@@ -72,14 +100,26 @@ describe('local project store', () => {
       const second = await ensureProjectStore(projectRoot, { projectKey: 'org/repo' });
 
       expect(second.storeRoot).toBe(first.storeRoot);
+      await expect(stat(first.paths.stateDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
       await expect(stat(first.paths.indexDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
+      await expect(stat(first.paths.crdtDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
+      await expect(stat(first.paths.crdtSyncDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
+      await expect(stat(first.paths.exportsDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
       await expect(stat(first.paths.visualizationsDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
       await expect(stat(first.paths.queueDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
       await expect(stat(first.paths.secretsDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
+      await expect(readFile(join(first.paths.crdtSyncDir, 'peers.json'), 'utf8')).resolves.toContain(
+        '"schemaVersion": 2'
+      );
+      await expect(readFile(join(first.paths.crdtSyncDir, 'heads.json'), 'utf8')).resolves.toContain('"heads": []');
+      await expect(stat(join(first.storeRoot, 'sync', 'cursors.json'))).rejects.toMatchObject({
+        code: 'ENOENT'
+      });
 
       const gitignore = await readFile(join(first.storeRoot, '.gitignore'), 'utf8');
-      expect(gitignore).toContain('daemon.json');
-      expect(gitignore).toContain('daemon.pid');
+      expect(gitignore).toContain('state/');
+      expect(gitignore).toContain('crdt/sync/');
+      expect(gitignore).toContain('exports/');
       expect(gitignore).toContain('index/');
       expect(gitignore).toContain('visualizations/');
       expect(gitignore).toContain('secrets/');
@@ -92,6 +132,411 @@ describe('local project store', () => {
       const migratedGitignore = await readFile(join(first.storeRoot, '.gitignore'), 'utf8');
       expect(migratedGitignore).toContain('custom-local/');
       expect(migratedGitignore).toContain('visualizations/');
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('initializes the v2 project CRDT document from project config', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const store = await ensureProjectStore(projectRoot, {
+        projectKey: 'org/repo',
+        displayName: 'Repo'
+      });
+      await expect(readProjectProjectionStatus(projectRoot)).resolves.toMatchObject({
+        state: 'missing_crdt',
+        currentHeads: [],
+        sourceHeads: []
+      });
+      const initialized = await initializeProjectCrdtStore(projectRoot, {
+        actorId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      });
+
+      expect(initialized.path).toBe(join(store.storeRoot, 'crdt', 'project.automerge'));
+      await expect(stat(initialized.path)).resolves.toMatchObject({ isFile: expect.any(Function) });
+      expect(initialized.heads.length).toBeGreaterThan(0);
+      expect(initialized.doc).toMatchObject({
+        schemaVersion: 2,
+        groupKey: 'main',
+        project: {
+          id: 'org/repo',
+          key: 'org/repo',
+          name: 'Repo',
+          groupKey: 'main'
+        },
+        knowledge: {},
+        relations: {},
+        qualitySignals: {}
+      });
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('imports v1 JSONL project knowledge into the v2 CRDT document', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const store = await ensureProjectStore(projectRoot, {
+        projectKey: 'org/repo',
+        displayName: 'Repo'
+      });
+      const durable = await captureProjectKnowledge(projectRoot, {
+        id: 'ki_crdt_import',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Import through local-store',
+        summary: 'The local store can materialize JSONL history into Automerge.',
+        createdAt: '2026-06-15T00:00:00.000Z'
+      });
+      const obsolete = await captureProjectKnowledge(projectRoot, {
+        id: 'ki_crdt_obsolete',
+        type: 'note',
+        title: 'Obsolete JSONL note',
+        summary: 'This note should become a tombstone.',
+        createdAt: '2026-06-15T00:01:00.000Z'
+      });
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const core = createDevMeshCore({
+        projectRoot,
+        repository
+      });
+
+      await createProjectKnowledgeEdge(projectRoot, {
+        kind: 'supersedes',
+        fromId: durable.item.id,
+        toId: obsolete.item.id,
+        reason: 'CRDT import keeps semantic edges.'
+      });
+      await rateProjectKnowledge(
+        projectRoot,
+        core,
+        {
+          id: durable.item.id,
+          rating: 1,
+          confidenceDelta: 0.1
+        },
+        {
+          reason: 'Confirmed before import.'
+        }
+      );
+      await recordKnowledgeUsage(
+        projectRoot,
+        core,
+        {
+          knowledgeId: durable.item.id,
+          kind: 'context_pack.hit',
+          adoptionDelta: 0.1
+        },
+        {
+          reason: 'Used before import.'
+        }
+      );
+      await deleteProjectKnowledge(
+        projectRoot,
+        core,
+        {
+          id: obsolete.item.id
+        },
+        {
+          reason: 'Remove before import.'
+        }
+      );
+
+      const imported = await importProjectJsonlToCrdt(projectRoot, {
+        actorId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        overwrite: true
+      });
+      const second = await importProjectJsonlToCrdt(projectRoot, {
+        actorId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      });
+
+      expect(imported.path).toBe(join(store.storeRoot, 'crdt', 'project.automerge'));
+      await expect(stat(imported.path)).resolves.toMatchObject({ isFile: expect.any(Function) });
+      expect(imported).toMatchObject({
+        importedKnowledge: 6,
+        importedRelations: 1,
+        importedQualitySignals: 6
+      });
+      expect(imported.importedAuditEvents).toBeGreaterThanOrEqual(6);
+      expect(imported.doc.knowledge[durable.item.id]).toMatchObject({
+        title: 'Import through local-store',
+        groupKey: 'main',
+        sourceProjectId: 'org/repo'
+      });
+      expect(imported.doc.knowledge[obsolete.item.id]).toMatchObject({
+        status: 'tombstone'
+      });
+      expect(Object.values(imported.doc.relations)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'supersedes',
+            from: durable.item.id,
+            to: obsolete.item.id
+          })
+        ])
+      );
+      const qualitySignalKinds = Object.values(imported.doc.qualitySignals).map((signal) => signal.kind).sort();
+      expect(qualitySignalKinds).toEqual(['confirm', 'confirm', 'rate', 'rate', 'use', 'use']);
+      expect(qualitySignalKinds.filter((kind) => kind === 'use')).toHaveLength(2);
+      expect(second).toMatchObject({
+        importedKnowledge: 0,
+        importedRelations: 0,
+        importedQualitySignals: 0,
+        importedAuditEvents: 0,
+        skipped: 0
+      });
+      expect(second.doc.knowledge[durable.item.id]?.title).toBe('Import through local-store');
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('rebuilds local projections from the v2 CRDT document', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const first = await captureProjectKnowledge(projectRoot, {
+        id: 'ki_projection_source',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Rebuild projections from CRDT',
+        summary: 'Deleting local projections should not lose knowledge.',
+        tags: ['projection']
+      });
+      const second = await captureProjectKnowledge(projectRoot, {
+        id: 'ki_projection_target',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Keep CRDT as source',
+        summary: 'CRDT data should materialize graph semantic edges.'
+      });
+
+      await createProjectKnowledgeEdge(projectRoot, {
+        kind: 'supersedes',
+        fromId: first.item.id,
+        toId: second.item.id,
+        reason: 'Projection rebuild should include CRDT relations.'
+      });
+      const imported = await importProjectJsonlToCrdt(projectRoot, {
+        actorId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        overwrite: true
+      });
+
+      await rm(join(projectRoot, '.dev-mesh', 'index'), { recursive: true, force: true });
+
+      await expect(readProjectProjectionStatus(projectRoot)).resolves.toMatchObject({
+        state: 'missing',
+        currentHeads: imported.heads,
+        sourceHeads: []
+      });
+
+      const rebuilt = await rebuildProjectProjectionsFromCrdt(projectRoot, {
+        actorId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      });
+      const readyStatus = await readProjectProjectionStatus(projectRoot, {
+        actorId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      });
+      const manifest = JSON.parse(await readFile(rebuilt.indexPath, 'utf8')) as {
+        documentCount: number;
+        documents: Array<{ id: string; text: string; tags: string[] }>;
+      };
+      const graph = await readProjectGraph(projectRoot);
+      const hits = await searchProjectIndex(projectRoot, {
+        query: 'local projections',
+        limit: 5
+      });
+
+      expect(rebuilt.crdtPath).toBe(imported.path);
+      expect(rebuilt.metadataPath).toBe(join(projectRoot, '.dev-mesh', 'index', 'projection-meta.json'));
+      expect(rebuilt.sourceHeads).toEqual(imported.heads);
+      expect(readyStatus).toMatchObject({
+        state: 'ready',
+        crdtPath: imported.path,
+        metadataPath: rebuilt.metadataPath,
+        currentHeads: imported.heads,
+        sourceHeads: imported.heads,
+        documentCount: 2
+      });
+      expect(rebuilt.documentCount).toBe(2);
+      expect(manifest.documentCount).toBe(2);
+      expect(manifest.documents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: first.item.id,
+            tags: ['projection']
+          })
+        ])
+      );
+      expect(graph?.sourceItemCount).toBe(2);
+      expect(graph?.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'supersedes',
+            from: `knowledge:${first.item.id}`,
+            to: `knowledge:${second.item.id}`
+          })
+        ])
+      );
+      expect(hits[0]).toMatchObject({
+        id: first.item.id,
+        score: expect.any(Number)
+      });
+
+      await captureProjectKnowledge(projectRoot, {
+        id: 'ki_projection_dirty',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Dirty projection marker',
+        summary: 'A later CRDT write should make projection metadata stale.',
+        tags: ['projection']
+      });
+      await expect(readProjectProjectionStatus(projectRoot)).resolves.toMatchObject({
+        state: 'dirty',
+        sourceHeads: rebuilt.sourceHeads
+      });
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('reports projection backend health for stale schema and damaged files', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      await captureProjectKnowledge(projectRoot, {
+        id: 'ki_projection_health',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Projection health is diagnostic',
+        summary: 'Projection backends report schema and file health before rebuild.',
+        tags: ['projection', 'health']
+      });
+      const imported = await importProjectJsonlToCrdt(projectRoot, {
+        actorId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      });
+      const rebuilt = await rebuildProjectProjectionsFromCrdt(projectRoot);
+      const metadata = JSON.parse(await readFile(rebuilt.metadataPath, 'utf8')) as Record<string, unknown>;
+
+      expect(await readProjectProjectionStatus(projectRoot)).toMatchObject({
+        state: 'ready',
+        backend: 'local-sqlite-json',
+        schemaVersion: PROJECT_STORE_SCHEMA_VERSION,
+        expectedSchemaVersion: PROJECT_STORE_SCHEMA_VERSION,
+        projectionFiles: expect.arrayContaining([
+          expect.objectContaining({ role: 'manifest', state: 'ready' }),
+          expect.objectContaining({ role: 'knowledge', state: 'ready' }),
+          expect.objectContaining({ role: 'search', state: 'ready' }),
+          expect.objectContaining({ role: 'graph', state: 'ready' })
+        ])
+      });
+
+      await writeFile(
+        rebuilt.metadataPath,
+        `${JSON.stringify(
+          {
+            ...metadata,
+            schemaVersion: PROJECT_STORE_SCHEMA_VERSION - 1
+          },
+          null,
+          2
+        )}\n`,
+        'utf8'
+      );
+      await expect(readProjectProjectionStatus(projectRoot)).resolves.toMatchObject({
+        state: 'schema_mismatch',
+        sourceHeads: imported.heads,
+        projectionFiles: expect.arrayContaining([
+          expect.objectContaining({ role: 'metadata', state: 'schema_mismatch' })
+        ])
+      });
+
+      await rebuildProjectProjectionsFromCrdt(projectRoot);
+      await writeFile(rebuilt.graphPath, '{', 'utf8');
+      await expect(readProjectProjectionStatus(projectRoot)).resolves.toMatchObject({
+        state: 'corrupt',
+        projectionFiles: expect.arrayContaining([expect.objectContaining({ role: 'graph', state: 'corrupt' })])
+      });
+
+      await rebuildProjectProjectionsFromCrdt(projectRoot);
+      await rm(rebuilt.searchPath, { force: true });
+      await expect(readProjectProjectionStatus(projectRoot)).resolves.toMatchObject({
+        state: 'missing',
+        projectionFiles: expect.arrayContaining([expect.objectContaining({ role: 'search', state: 'missing' })])
+      });
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('materializes dynamic quality scores from CRDT quality signals', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const core = createDevMeshCore({
+        projectRoot,
+        repository
+      });
+      const captured = await captureProjectKnowledge(projectRoot, {
+        id: 'ki_projection_quality',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Project quality from CRDT signals',
+        summary: 'Dynamic quality should be projected from durable CRDT quality signals.',
+        confidence: 0.7
+      });
+
+      await rateProjectKnowledge(projectRoot, core, {
+        id: captured.item.id,
+        rating: 1,
+        confidenceDelta: 0.2
+      });
+      await recordKnowledgeUsage(projectRoot, core, {
+        knowledgeId: captured.item.id,
+        kind: 'context_pack.hit',
+        adoptionDelta: 0.3
+      });
+      const imported = await importProjectJsonlToCrdt(projectRoot, {
+        actorId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        overwrite: true
+      });
+      const rebuilt = await rebuildProjectProjectionsFromCrdt(projectRoot);
+      const status = await readProjectProjectionStatus(projectRoot);
+      const quality = await readProjectQualityProjection(rebuilt.qualityPath);
+      const projected = quality?.qualities[captured.item.id];
+
+      expect(rebuilt).toMatchObject({
+        qualityPath: join(projectRoot, '.dev-mesh', 'index', 'quality.json'),
+        qualityCount: 1,
+        qualityAlgorithmVersion: QUALITY_PROJECTION_ALGORITHM_VERSION
+      });
+      expect(status).toMatchObject({
+        state: 'ready',
+        qualityCount: 1,
+        qualityAlgorithmVersion: QUALITY_PROJECTION_ALGORITHM_VERSION,
+        qualityPath: rebuilt.qualityPath,
+        projectionFiles: expect.arrayContaining([expect.objectContaining({ role: 'quality', state: 'ready' })])
+      });
+      expect(quality).toMatchObject({
+        schemaVersion: PROJECT_STORE_SCHEMA_VERSION,
+        algorithmVersion: QUALITY_PROJECTION_ALGORITHM_VERSION,
+        sourceHeads: imported.heads,
+        qualityCount: 1
+      });
+      expect(projected).toMatchObject({
+        knowledgeId: captured.item.id,
+        reliability: expect.any(Number),
+        usefulness: expect.any(Number),
+        freshness: expect.any(Number),
+        priority: expect.any(Number),
+        score: expect.any(Number)
+      });
+      expect(projected?.signalCount).toBeGreaterThanOrEqual(3);
+      expect(projected?.usefulness).toBeGreaterThan(0.5);
+      expect(projected?.score).toBeGreaterThan(0.5);
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
@@ -119,6 +564,78 @@ describe('local project store', () => {
       const loaded = await repository.get(original.id);
       expect(loaded?.summary).toBe('Replacement summary.');
       expect(await repository.list({ includeSuperseded: true })).toHaveLength(1);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('scopes list and search to the active and base knowledge branches', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      await captureProjectKnowledge(projectRoot, {
+        type: 'decision',
+        title: 'Main branch decision',
+        summary: 'Main knowledge should stay visible on the default branch.'
+      });
+      const shared = await captureProjectKnowledge(
+        projectRoot,
+        {
+          type: 'decision',
+          title: 'Shared branch decision',
+          summary: 'Shared knowledge should be visible through base branch.'
+        },
+        {
+          branch: 'shared'
+        }
+      );
+      const frontend = await captureProjectKnowledge(
+        projectRoot,
+        {
+          type: 'decision',
+          title: 'Frontend branch decision',
+          summary: 'Frontend knowledge should stay in the frontend branch.'
+        },
+        {
+          branch: 'frontend'
+        }
+      );
+
+      await expect(new JsonlKnowledgeRepository(projectRoot).search({ query: 'branch decision', limit: 10 })).resolves
+        .toEqual([
+          expect.objectContaining({
+            title: 'Main branch decision'
+          })
+        ]);
+
+      const config = await readProjectConfig(projectRoot);
+      config.knowledgeBranch.active = 'frontend';
+      config.knowledgeBranch.base = 'shared';
+      config.knowledgeBranch.branches = [
+        ...config.knowledgeBranch.branches,
+        {
+          name: 'frontend',
+          policy: 'balanced'
+        },
+        {
+          name: 'shared',
+          policy: 'durable_only'
+        }
+      ];
+      await writeProjectConfig(projectRoot, config);
+
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const visible = await repository.search({ query: 'branch decision', limit: 10 });
+
+      expect(visible.map((item) => item.id)).toEqual(expect.arrayContaining([frontend.item.id, shared.item.id]));
+      expect(visible.map((item) => item.title)).not.toContain('Main branch decision');
+      await expect(repository.get(frontend.item.id)).resolves.toMatchObject({
+        source: {
+          metadata: {
+            branch: 'frontend'
+          }
+        }
+      });
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
@@ -212,6 +729,21 @@ describe('local project store', () => {
           'auto_reference = false',
           'auto_sync = true',
           '',
+          '[knowledge_branch]',
+          'active = "frontend"',
+          'base = "shared"',
+          'branches = ["frontend", "shared"]',
+          '',
+          '[knowledge_branch.policies.frontend]',
+          'preset = "frontend_design"',
+          '',
+          '[knowledge_branch.policies.shared]',
+          'preset = "durable_only"',
+          '',
+          '[knowledge]',
+          'auto_capture_types = ["decision", "project_fact"]',
+          'include_volatile_in_context = true',
+          '',
           '[privacy]',
           'redaction_enabled = true',
           'upload_raw_transcripts = false',
@@ -230,10 +762,35 @@ describe('local project store', () => {
         displayName: 'Xiaoyun',
         automation: {
           autoReference: false
+        },
+        knowledge: {
+          autoCaptureTypes: ['decision', 'project_fact'],
+          includeVolatileInContext: true
+        },
+        knowledgeBranch: {
+          active: 'frontend',
+          base: 'shared',
+          branches: [
+            {
+              name: 'frontend',
+              policy: 'frontend_design'
+            },
+            {
+              name: 'shared',
+              policy: 'durable_only'
+            }
+          ]
         }
       });
       expect(migratedToml).toContain(`schema_version = ${PROJECT_STORE_SCHEMA_VERSION}`);
       expect(migratedToml).toContain('auto_reference = false');
+      expect(migratedToml).toContain('[knowledge_branch]');
+      expect(migratedToml).toContain('active = "frontend"');
+      expect(migratedToml).toContain('base = "shared"');
+      expect(migratedToml).toContain('[knowledge_branch.policies.frontend]');
+      expect(migratedToml).toContain('[knowledge]');
+      expect(migratedToml).toContain('auto_capture_types = ["decision", "project_fact"]');
+      expect(migratedToml).toContain('include_volatile_in_context = true');
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
@@ -285,12 +842,7 @@ describe('local project store', () => {
         documentCount: number;
         documents: Array<{ id: string; text: string; tags: string[] }>;
       };
-      const graph = JSON.parse(await readFile(result.graphPath, 'utf8')) as {
-        schemaVersion: number;
-        sourceItemCount: number;
-        nodes: Array<{ id: string; kind: string }>;
-        edges: Array<{ kind: string }>;
-      };
+      const graph = await readProjectGraph(projectRoot);
       const indexHits = await searchProjectIndex(projectRoot, {
         query: 'derived index',
         limit: 5
@@ -304,6 +856,8 @@ describe('local project store', () => {
       expect(result.graphNodeCount).toBeGreaterThan(0);
       expect(result.graphEdgeCount).toBeGreaterThan(0);
       await expect(stat(result.sqlitePath)).resolves.toMatchObject({ isFile: expect.any(Function) });
+      await expect(stat(result.knowledgePath)).resolves.toMatchObject({ isFile: expect.any(Function) });
+      await expect(stat(result.searchPath)).resolves.toMatchObject({ isFile: expect.any(Function) });
       expect(manifest.schemaVersion).toBe(PROJECT_STORE_SCHEMA_VERSION);
       expect(manifest.documentCount).toBe(1);
       expect(manifest.documents[0]).toMatchObject({
@@ -312,10 +866,10 @@ describe('local project store', () => {
       });
       expect(manifest.documents[0]?.text).toContain('Rebuild local index');
       expect(manifest.documents[0]?.text).toContain(item.entryKey);
-      expect(graph.schemaVersion).toBe(PROJECT_STORE_SCHEMA_VERSION);
-      expect(graph.sourceItemCount).toBe(1);
-      expect(graph.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ id: `knowledge:${item.id}` })]));
-      expect(graph.edges.map((edge) => edge.kind)).toEqual(expect.arrayContaining(['belongs_to_para', 'tagged_with']));
+      expect(graph?.schemaVersion).toBe(PROJECT_STORE_SCHEMA_VERSION);
+      expect(graph?.sourceItemCount).toBe(1);
+      expect(graph?.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ id: `knowledge:${item.id}` })]));
+      expect(graph?.edges.map((edge) => edge.kind)).toEqual(expect.arrayContaining(['belongs_to_para', 'tagged_with']));
       expect(indexHits[0]).toMatchObject({
         id: item.id,
         score: expect.any(Number)
@@ -324,6 +878,40 @@ describe('local project store', () => {
         id: item.id,
         title: 'Rebuild local index'
       });
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to JSONL ranking when an existing SQLite index is stale', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const indexed = createKnowledgeItem({
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Indexed stale baseline',
+        summary: 'This entry exists before the index is rebuilt.',
+        tags: ['index']
+      });
+
+      await repository.upsert(indexed);
+      await rebuildProjectIndex(projectRoot);
+
+      const fresh = await captureProjectKnowledge(projectRoot, {
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Fresh local-first search token',
+        summary: 'Search should find fresh-stale-token even before projection maintenance rebuilds SQLite.',
+        tags: ['fresh']
+      });
+      const hits = await repository.search({
+        query: 'fresh-stale-token',
+        limit: 5
+      });
+
+      expect(hits.map((item) => item.id)).toContain(fresh.item.id);
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
@@ -358,10 +946,8 @@ describe('local project store', () => {
         }
       );
       const repository = new JsonlKnowledgeRepository(projectRoot);
-      const graph = await rebuildProjectGraph(projectRoot);
-      const graphJson = JSON.parse(await readFile(graph.graphPath, 'utf8')) as {
-        edges: Array<{ kind: string; from: string; to: string }>;
-      };
+      await rebuildProjectGraph(projectRoot);
+      const graphJson = await readProjectGraph(projectRoot);
 
       await expect(repository.get(oldDecision.item.id)).resolves.toMatchObject({
         status: 'superseded'
@@ -385,7 +971,7 @@ describe('local project store', () => {
           toId: oldDecision.item.id
         }
       });
-      expect(graphJson.edges).toEqual(
+      expect(graphJson?.edges).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             kind: 'supersedes',
@@ -435,6 +1021,166 @@ describe('local project store', () => {
       });
       expect(eventJsonl).toContain('"kind":"knowledge.captured"');
       expect(eventJsonl).toContain(`"knowledgeId":"${captured.item.id}"`);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('dual-writes local knowledge mutations to the v2 CRDT document', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const core = createDevMeshCore({
+        projectRoot,
+        repository
+      });
+      const captured = await captureProjectKnowledge(projectRoot, {
+        id: 'kn_crdt_write_path',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Dual write knowledge to CRDT',
+        summary: 'The transitional local write path should keep the CRDT source in sync.',
+        createdBy: {
+          displayName: 'Xiaoyun',
+          clientId: 'feedface'
+        }
+      });
+
+      const updated = await updateProjectKnowledge(projectRoot, core, {
+        id: captured.item.id,
+        summary: 'The JSONL path and CRDT source should converge on the latest item state.',
+        tags: ['crdt', 'write-path']
+      });
+      const rated = await rateProjectKnowledge(projectRoot, core, {
+        id: captured.item.id,
+        rating: 1,
+        confidenceDelta: 0.1
+      });
+      const used = await recordKnowledgeUsage(projectRoot, core, {
+        knowledgeId: captured.item.id,
+        kind: 'context_pack.hit',
+        adoptionDelta: 0.02
+      });
+      const deleted = await deleteProjectKnowledge(projectRoot, core, {
+        id: captured.item.id
+      });
+      const crdt = await initializeProjectCrdtStore(projectRoot);
+      const items = await loadProjectKnowledgeItemsFromCrdt(projectRoot);
+
+      expect(updated.item.tags).toEqual(['crdt', 'write-path']);
+      expect(rated.item.quality.rating).toBe(1);
+      expect(used.item.quality.adoptionScore).toBeCloseTo(0.02);
+      expect(deleted.item.status).toBe('tombstone');
+      expect(crdt.doc.knowledge[captured.item.id]).toMatchObject({
+        id: captured.item.id,
+        status: 'tombstone',
+        summary: 'The JSONL path and CRDT source should converge on the latest item state.',
+        tags: ['crdt', 'write-path'],
+        quality: {
+          rating: 1
+        }
+      });
+      expect(crdt.doc.knowledge[captured.item.id]?.quality.adoptionScore).toBeCloseTo(0.02);
+      expect(Object.values(crdt.doc.qualitySignals).map((signal) => signal.kind).sort()).toEqual([
+        'confirm',
+        'rate',
+        'use'
+      ]);
+      expect(items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: captured.item.id,
+            status: 'tombstone'
+          })
+        ])
+      );
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('exports on-demand knowledge JSONL from the v2 CRDT document', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
+
+    try {
+      const store = await ensureProjectStore(projectRoot, { projectKey: 'org/repo' });
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const core = createDevMeshCore({
+        projectRoot,
+        repository
+      });
+      const kept = await captureProjectKnowledge(projectRoot, {
+        id: 'kn_export_kept',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Export kept item',
+        summary: 'This knowledge should remain active.',
+        createdBy: {
+          displayName: 'Xiaoyun',
+          clientId: 'feedface'
+        }
+      });
+      const removed = await captureProjectKnowledge(projectRoot, {
+        id: 'kn_export_removed',
+        type: 'pitfall_record',
+        layer: 'extract',
+        title: 'Export removed item',
+        summary: 'This knowledge should be exported as a tombstone.',
+        createdBy: {
+          displayName: 'Xiaoyun',
+          clientId: 'feedface'
+        }
+      });
+
+      await updateProjectKnowledge(projectRoot, core, {
+        id: kept.item.id,
+        summary: 'The exported JSONL should contain the latest CRDT state.',
+        tags: ['crdt', 'export']
+      });
+      await deleteProjectKnowledge(projectRoot, core, {
+        id: removed.item.id
+      });
+
+      const exported = await exportProjectCrdtKnowledgeJsonl(projectRoot);
+      const records = parseJsonlRecords(await readFile(exported.path, 'utf8'));
+
+      expect(exported).toMatchObject({
+        path: join(store.paths.exportsDir, 'knowledge.jsonl'),
+        crdtPath: join(store.paths.crdtDir, 'project.automerge'),
+        exportedKnowledge: 2,
+        skippedTombstones: 0
+      });
+      expect(exported.heads.length).toBeGreaterThan(0);
+      expect(records.map((record) => record.id).sort()).toEqual(['kn_export_kept', 'kn_export_removed']);
+      expect(records.find((record) => record.id === 'kn_export_kept')).toMatchObject({
+        status: 'active',
+        summary: 'The exported JSONL should contain the latest CRDT state.',
+        tags: ['crdt', 'export']
+      });
+      expect(records.find((record) => record.id === 'kn_export_removed')).toMatchObject({
+        status: 'tombstone',
+        summary: 'This knowledge should be exported as a tombstone.'
+      });
+
+      const activeExportPath = join(store.paths.exportsDir, 'knowledge-active.jsonl');
+      const activeExported = await exportProjectCrdtKnowledgeJsonl(projectRoot, {
+        path: activeExportPath,
+        includeTombstones: false
+      });
+      const activeRecords = parseJsonlRecords(await readFile(activeExported.path, 'utf8'));
+
+      expect(activeExported).toMatchObject({
+        path: activeExportPath,
+        exportedKnowledge: 1,
+        skippedTombstones: 1
+      });
+      expect(activeRecords).toEqual([
+        expect.objectContaining({
+          id: 'kn_export_kept',
+          status: 'active'
+        })
+      ]);
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
@@ -704,3 +1450,11 @@ describe('local project store', () => {
     }
   });
 });
+
+function parseJsonlRecords(content: string): Array<Record<string, unknown>> {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
+}

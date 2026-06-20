@@ -83,7 +83,9 @@ async function checkDaemonSyncStatus(context: DoctorContext): Promise<DevMeshDoc
   }
 
   const remoteCount = status.remotes.length;
-  const queued = status.remotes.reduce((sum, remote) => sum + Math.max(0, remote.queuedLocalEvents), 0);
+  const queued = status.remotes.reduce((sum, remote) => sum + Math.max(0, remote.queuedLocalChanges), 0);
+  const baseRemotes = status.remotes.filter((remote) => remote.branchRole === 'base');
+  const baseHeadCount = baseRemotes.reduce((sum, remote) => sum + remote.cacheHeadCount, 0);
   const errors = status.remotes.filter((remote) => remote.lastError !== undefined);
 
   if (errors.length > 0) {
@@ -91,8 +93,8 @@ async function checkDaemonSyncStatus(context: DoctorContext): Promise<DevMeshDoc
       id: 'sync.daemon',
       category: 'sync',
       status: 'warn',
-      message: `Daemon sync checked ${remoteCount} remote(s), queued ${queued} local event(s), and reported ${errors.length} error(s).`,
-      fixHint: 'Check .dev-mesh/sync/status.json for the latest remote sync error.'
+      message: `Daemon sync checked ${remoteCount} remote(s), queued ${queued} local CRDT change(s), and reported ${errors.length} error(s).`,
+      fixHint: 'Check .dev-mesh/state/sync.json for the latest remote sync error.'
     };
   }
 
@@ -109,6 +111,9 @@ async function checkDaemonSyncStatus(context: DoctorContext): Promise<DevMeshDoc
     id: 'sync.daemon',
     category: 'sync',
     status: 'ok',
-    message: `Daemon sync checked ${remoteCount} remote(s) and has ${queued} queued local event(s).`
+    message:
+      baseRemotes.length === 0
+        ? `Daemon sync checked ${remoteCount} remote(s) and has ${queued} queued local CRDT change(s).`
+        : `Daemon sync checked ${remoteCount} remote(s), has ${queued} queued local CRDT change(s), and tracks ${baseRemotes.length} read-only base branch cache(s) with ${baseHeadCount} head(s).`
   };
 }

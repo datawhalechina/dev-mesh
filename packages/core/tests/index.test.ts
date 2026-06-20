@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createDevMeshCore, createKnowledgeItem, InMemoryKnowledgeRepository } from '../src/index.js';
+import {
+  DEFAULT_AUTO_CAPTURE_KNOWLEDGE_TYPES,
+  createDevMeshCore,
+  createKnowledgeItem,
+  getKnowledgeTypeProfile,
+  InMemoryKnowledgeRepository,
+  isKnowledgeItemExpired,
+  isKnowledgeTypeAllowedForAutoCapture
+} from '../src/index.js';
 
 describe('createDevMeshCore', () => {
   it('captures and searches knowledge', async () => {
@@ -102,6 +110,43 @@ describe('createDevMeshCore', () => {
     expect(canonical.para).toEqual({ category: 'areas', key: 'general' });
     expect(task.para).toEqual({ category: 'projects', key: 'current' });
     expect(command.para).toEqual({ category: 'resources', key: 'developer-workflow' });
+  });
+
+  it('describes durable and volatile knowledge type profiles', () => {
+    expect(getKnowledgeTypeProfile('project_fact')).toMatchObject({
+      volatility: 'volatile',
+      retention: 'ephemeral',
+      allowAutoCapture: false,
+      includeInDefaultContext: false,
+      defaultTtlDays: 30
+    });
+    expect(getKnowledgeTypeProfile('macro_experience')).toMatchObject({
+      volatility: 'stable',
+      retention: 'durable',
+      allowAutoCapture: true,
+      includeInDefaultContext: true
+    });
+    expect(DEFAULT_AUTO_CAPTURE_KNOWLEDGE_TYPES).toContain('design_principle');
+    expect(DEFAULT_AUTO_CAPTURE_KNOWLEDGE_TYPES).not.toContain('project_fact');
+    expect(isKnowledgeTypeAllowedForAutoCapture('project_fact', DEFAULT_AUTO_CAPTURE_KNOWLEDGE_TYPES)).toBe(false);
+  });
+
+  it('keeps volatile project facts out of default context unless explicitly requested', async () => {
+    const repository = new InMemoryKnowledgeRepository();
+    const fact = createKnowledgeItem({
+      type: 'project_fact',
+      title: 'Node version is 22 today',
+      summary: 'The current repo is temporarily tested with Node 22.',
+      createdAt: '2026-01-01T00:00:00.000Z'
+    });
+
+    await repository.upsert(fact);
+    const core = createDevMeshCore({ repository });
+
+    await expect(core.searchKnowledge({ query: 'Node 22' })).resolves.toHaveLength(0);
+    await expect(core.searchKnowledge({ query: 'Node 22', includeVolatile: true })).resolves.toHaveLength(1);
+    await expect(core.searchKnowledge({ query: 'Node 22', types: ['project_fact'] })).resolves.toHaveLength(1);
+    expect(isKnowledgeItemExpired(fact, new Date('2026-02-15T00:00:00.000Z'))).toBe(true);
   });
 
   it('filters superseded knowledge unless explicitly included', async () => {

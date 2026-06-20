@@ -44,6 +44,9 @@ importers:
 
   apps/dmx:
     dependencies:
+      '@automerge/automerge':
+        specifier: ^3.2.6
+        version: 3.2.6
       '@clack/prompts':
         specifier: ^1.5.1
         version: 1.5.1
@@ -224,6 +227,18 @@ importers:
         specifier: workspace:*
         version: link:../shared
 
+  packages/crdt-store:
+    dependencies:
+      '@automerge/automerge':
+        specifier: ^3.2.6
+        version: 3.2.6
+      '@devmesh/core':
+        specifier: workspace:*
+        version: link:../core
+      '@devmesh/shared':
+        specifier: workspace:*
+        version: link:../shared
+
   packages/extension-api: {}
 
   packages/graph:
@@ -237,6 +252,9 @@ importers:
       '@devmesh/core':
         specifier: workspace:*
         version: link:../core
+      '@devmesh/crdt-store':
+        specifier: workspace:*
+        version: link:../crdt-store
       '@devmesh/graph':
         specifier: workspace:*
         version: link:../graph
@@ -287,6 +305,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@automerge/automerge':
+        specifier: ^3.2.6
+        version: 3.2.6
       '@devmesh/agent':
         specifier: workspace:*
         version: link:../agent
@@ -447,6 +468,9 @@ packages:
 
   '@asamuzakjp/nwsapi@2.3.9':
     resolution: {integrity: sha512-n8GuYSrI9bF7FFZ/SjhwevlHc8xaVlb/7HmHelnc/PZXBD2ZR49NnN9sMMuDdEGPeeRQ5d0hqlSlEpgCX3Wl0Q==}
+
+  '@automerge/automerge@3.2.6':
+    resolution: {integrity: sha512-9/GXXfYYWNVGpnbRrGQzTNU4fWZ3XaEMeEg0OrpK4pvlQSpkmUBoirEb/4TMK6BwMysZGV5Yeneq3wwc7RNGfg==}
 
   '@babel/helper-string-parser@7.29.7':
     resolution: {integrity: sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw==}
@@ -3316,6 +3340,8 @@ snapshots:
   '@asamuzakjp/generational-cache@1.0.1': {}
 
   '@asamuzakjp/nwsapi@2.3.9': {}
+
+  '@automerge/automerge@3.2.6': {}
 
   '@babel/helper-string-parser@7.29.7': {}
 

@@ -12,12 +12,14 @@ export async function checkProjectStore(context: DoctorContext): Promise<DevMesh
     const missing = await listMissingPaths([
       store.paths.root,
       store.paths.config,
+      store.paths.stateDir,
       store.paths.eventsDir,
+      store.paths.crdtDir,
+      store.paths.crdtSyncDir,
       store.paths.knowledgeDir,
       store.paths.indexDir,
       store.paths.visualizationsDir,
       store.paths.queueDir,
-      store.paths.syncDir,
       store.paths.secretsDir
     ]);
 

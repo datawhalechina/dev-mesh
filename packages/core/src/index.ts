@@ -12,12 +12,142 @@ export type KnowledgeType =
   | 'convention'
   | 'task'
   | 'pitfall'
+  | 'project_fact'
+  | 'macro_experience'
+  | 'design_principle'
+  | 'pitfall_record'
   | 'command'
   | 'glossary'
   | 'runbook'
   | 'adr'
   | 'note'
   | string;
+export type KnowledgeVolatility = 'stable' | 'evolving' | 'volatile';
+export type KnowledgeRetention = 'durable' | 'review' | 'ephemeral';
+
+export interface KnowledgeTypeProfile {
+  type: KnowledgeType;
+  label: string;
+  volatility: KnowledgeVolatility;
+  retention: KnowledgeRetention;
+  allowAutoCapture: boolean;
+  includeInDefaultContext: boolean;
+  defaultTtlDays?: number;
+}
+
+export const DEFAULT_PROJECT_FACT_TTL_DAYS = 30;
+
+export const BUILT_IN_KNOWLEDGE_TYPE_PROFILES: Record<string, KnowledgeTypeProfile> = {
+  decision: {
+    type: 'decision',
+    label: 'Decision',
+    volatility: 'evolving',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  convention: {
+    type: 'convention',
+    label: 'Convention',
+    volatility: 'stable',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  task: {
+    type: 'task',
+    label: 'Task handoff',
+    volatility: 'evolving',
+    retention: 'review',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  pitfall: {
+    type: 'pitfall',
+    label: 'Pitfall',
+    volatility: 'evolving',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  project_fact: {
+    type: 'project_fact',
+    label: 'Project fact',
+    volatility: 'volatile',
+    retention: 'ephemeral',
+    allowAutoCapture: false,
+    includeInDefaultContext: false,
+    defaultTtlDays: DEFAULT_PROJECT_FACT_TTL_DAYS
+  },
+  macro_experience: {
+    type: 'macro_experience',
+    label: 'Macro experience',
+    volatility: 'stable',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  design_principle: {
+    type: 'design_principle',
+    label: 'Design principle',
+    volatility: 'stable',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  pitfall_record: {
+    type: 'pitfall_record',
+    label: 'Pitfall record',
+    volatility: 'evolving',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  command: {
+    type: 'command',
+    label: 'Command',
+    volatility: 'evolving',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  glossary: {
+    type: 'glossary',
+    label: 'Glossary',
+    volatility: 'stable',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  runbook: {
+    type: 'runbook',
+    label: 'Runbook',
+    volatility: 'evolving',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  adr: {
+    type: 'adr',
+    label: 'ADR',
+    volatility: 'stable',
+    retention: 'durable',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  },
+  note: {
+    type: 'note',
+    label: 'Note',
+    volatility: 'evolving',
+    retention: 'review',
+    allowAutoCapture: true,
+    includeInDefaultContext: true
+  }
+};
+
+export const DEFAULT_AUTO_CAPTURE_KNOWLEDGE_TYPES: KnowledgeType[] = Object.values(BUILT_IN_KNOWLEDGE_TYPE_PROFILES)
+  .filter((profile) => profile.allowAutoCapture)
+  .map((profile) => profile.type);
 
 export interface ParaRef {
   category: ParaCategory;
@@ -95,6 +225,7 @@ export interface KnowledgeFilter {
   authorName?: string | null;
   tags?: string[];
   includeSuperseded?: boolean;
+  includeVolatile?: boolean;
   recencyDays?: number;
 }
 
@@ -383,12 +514,28 @@ export function matchesKnowledgeFilter(item: KnowledgeItem, filter: KnowledgeFil
     return false;
   }
 
+  const hasExplicitTypeFilter = Boolean(filter.types?.length);
+
   if (filter.layers?.length && !filter.layers.includes(item.layer)) {
     return false;
   }
 
   if (filter.types?.length && !filter.types.includes(item.type)) {
     return false;
+  }
+
+  if (!hasExplicitTypeFilter) {
+    const profile = getKnowledgeTypeProfile(item.type);
+
+    if (filter.includeVolatile !== true) {
+      if (!profile.includeInDefaultContext) {
+        return false;
+      }
+
+      if (isKnowledgeItemExpired(item)) {
+        return false;
+      }
+    }
   }
 
   if (filter.para?.category && filter.para.category !== item.para.category) {
@@ -417,6 +564,42 @@ export function matchesKnowledgeFilter(item: KnowledgeItem, filter: KnowledgeFil
   }
 
   return true;
+}
+
+export function getKnowledgeTypeProfile(type: KnowledgeType): KnowledgeTypeProfile {
+  return (
+    BUILT_IN_KNOWLEDGE_TYPE_PROFILES[type] ?? {
+      type,
+      label: type,
+      volatility: 'evolving',
+      retention: 'review',
+      allowAutoCapture: false,
+      includeInDefaultContext: true
+    }
+  );
+}
+
+export function isKnowledgeTypeAllowedForAutoCapture(
+  type: KnowledgeType,
+  allowedTypes: readonly KnowledgeType[]
+): boolean {
+  return allowedTypes.includes(type);
+}
+
+export function isKnowledgeItemExpired(item: KnowledgeItem, now = new Date()): boolean {
+  const ttlDays = getKnowledgeTypeProfile(item.type).defaultTtlDays;
+
+  if (ttlDays === undefined) {
+    return false;
+  }
+
+  const updatedAt = Date.parse(item.updatedAt);
+
+  if (Number.isNaN(updatedAt)) {
+    return false;
+  }
+
+  return now.getTime() - updatedAt > ttlDays * 24 * 60 * 60 * 1000;
 }
 
 export function rankKnowledgeItem(item: KnowledgeItem, input: SearchKnowledgeInput): number {
@@ -451,7 +634,7 @@ function defaultConfidence(layer: KnowledgeLayer): number {
 }
 
 function inferParaRef(type: KnowledgeType): ParaRef {
-  if (type === 'task') {
+  if (type === 'task' || type === 'project_fact') {
     return { category: 'projects', key: 'current' };
   }
 

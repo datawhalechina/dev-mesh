@@ -69,6 +69,12 @@ describe('local-store SQLite repository integration', () => {
       await expect(stat(rebuilt.sqlitePath)).resolves.toMatchObject({
         isFile: expect.any(Function)
       });
+      await expect(stat(rebuilt.knowledgePath)).resolves.toMatchObject({
+        isFile: expect.any(Function)
+      });
+      await expect(stat(rebuilt.searchPath)).resolves.toMatchObject({
+        isFile: expect.any(Function)
+      });
       expect(rebuilt.documentCount).toBe(2);
       expect(manifest.documentCount).toBe(2);
       expect(manifest.documents.map((document) => document.id).sort()).toEqual(
@@ -132,6 +138,53 @@ describe('local-store SQLite repository integration', () => {
 
       expect(ranked.map((item) => item.id)).toEqual([highWeight.item.id, lowWeight.item.id]);
       expect(memberSpecific.map((item) => item.id)).toEqual([highWeight.item.id]);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps volatile and expired project facts out of SQLite projection recall by default', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-sqlite-volatile-recall-'));
+
+    try {
+      await captureProjectKnowledge(projectRoot, {
+        id: 'kn_sqlite_durable_recall',
+        type: 'decision',
+        layer: 'canonical',
+        title: 'Durable recall policy',
+        summary: 'The recall-token durable item should stay in default projection search.'
+      });
+      await captureProjectKnowledge(projectRoot, {
+        id: 'kn_sqlite_project_fact_recall',
+        type: 'project_fact',
+        layer: 'extract',
+        title: 'Temporary recall policy',
+        summary: 'The recall-token volatile project fact should require explicit projection recall.',
+        createdAt: '2026-01-01T00:00:00.000Z'
+      });
+
+      await rebuildProjectIndex(projectRoot);
+
+      const defaultHits = await searchProjectIndex(projectRoot, {
+        query: 'recall-token',
+        limit: 10
+      });
+      const volatileHits = await searchProjectIndex(projectRoot, {
+        query: 'recall-token',
+        includeVolatile: true,
+        limit: 10
+      });
+      const typedHits = await searchProjectIndex(projectRoot, {
+        query: 'recall-token',
+        types: ['project_fact'],
+        limit: 10
+      });
+
+      expect(defaultHits.map((hit) => hit.id)).toEqual(['kn_sqlite_durable_recall']);
+      expect(volatileHits.map((hit) => hit.id)).toEqual(
+        expect.arrayContaining(['kn_sqlite_durable_recall', 'kn_sqlite_project_fact_recall'])
+      );
+      expect(typedHits.map((hit) => hit.id)).toEqual(['kn_sqlite_project_fact_recall']);
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }

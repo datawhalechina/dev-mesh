@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { open, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -8,6 +8,10 @@ import { DEV_MESH_DIR, ensureProjectStore } from '@devmesh/local-store';
 import { DEV_MESH_VERSION } from '@devmesh/shared';
 import { formatMeshToolOutput } from '@devmesh/mcp-contracts';
 import type {
+  MeshBranchCreateInput,
+  MeshBranchListInput,
+  MeshBranchPolicyInput,
+  MeshBranchSwitchInput,
   MeshCaptureKnowledgeInput,
   MeshCaptureTaskInput,
   MeshDeleteKnowledgeInput,
@@ -16,6 +20,8 @@ import type {
   MeshGetStatusInput,
   MeshLinkKnowledgeInput,
   MeshListKnowledgeInput,
+  MeshProjectionRebuildInput,
+  MeshProjectionStatusInput,
   MeshToolName,
   MeshScanProjectKnowledgeInput,
   MeshRateKnowledgeInput,
@@ -247,6 +253,42 @@ function createDaemonAwareHandlers(
 
       return formatMeshToolOutput('mesh_get_status', withProxyRuntimeStatus(status, daemon));
     },
+    async listBranches(input) {
+      return formatMeshToolOutput(
+        'mesh_branch_list',
+        await callDaemonOrLocal('mesh_branch_list', input, () => localHandlers.listBranches(input), options)
+      );
+    },
+    async getProjectionStatus(input) {
+      return formatMeshToolOutput(
+        'mesh_projection_status',
+        await callDaemonOrLocal('mesh_projection_status', input, () => localHandlers.getProjectionStatus(input), options)
+      );
+    },
+    async rebuildProjection(input) {
+      return formatMeshToolOutput(
+        'mesh_projection_rebuild',
+        await callDaemonOrLocal('mesh_projection_rebuild', input, () => localHandlers.rebuildProjection(input), options)
+      );
+    },
+    async createBranch(input) {
+      return formatMeshToolOutput(
+        'mesh_branch_create',
+        await callDaemonOrLocal('mesh_branch_create', input, () => localHandlers.createBranch(input), options)
+      );
+    },
+    async switchBranch(input) {
+      return formatMeshToolOutput(
+        'mesh_branch_switch',
+        await callDaemonOrLocal('mesh_branch_switch', input, () => localHandlers.switchBranch(input), options)
+      );
+    },
+    async setBranchPolicy(input) {
+      return formatMeshToolOutput(
+        'mesh_branch_policy',
+        await callDaemonOrLocal('mesh_branch_policy', input, () => localHandlers.setBranchPolicy(input), options)
+      );
+    },
     async searchContext(input) {
       return formatMeshToolOutput(
         'mesh_search_context',
@@ -348,8 +390,14 @@ async function callDaemonOrLocal(
   input:
     | MeshSearchContextInput
     | MeshGetStatusInput
+    | MeshBranchListInput
+    | MeshBranchCreateInput
+    | MeshBranchSwitchInput
+    | MeshBranchPolicyInput
     | MeshGetKnowledgeInput
     | MeshListKnowledgeInput
+    | MeshProjectionStatusInput
+    | MeshProjectionRebuildInput
     | MeshCaptureKnowledgeInput
     | MeshUpdateKnowledgeInput
     | MeshDeleteKnowledgeInput
@@ -450,6 +498,7 @@ async function claimDaemonPid(projectRoot: string): Promise<'claimed' | LocalMcp
   await ensureProjectStore(projectRoot);
 
   const paths = daemonPaths(projectRoot);
+  await mkdir(paths.stateDir, { recursive: true });
 
   try {
     const handle = await open(paths.pidPath, 'wx');
@@ -549,14 +598,22 @@ async function releaseDaemonFiles(projectRoot: string): Promise<void> {
   await rm(paths.statePath, { force: true });
 }
 
-function daemonPaths(projectRoot: string): { root: string; pidPath: string; statePath: string; syncStatusPath: string } {
+function daemonPaths(projectRoot: string): {
+  root: string;
+  stateDir: string;
+  pidPath: string;
+  statePath: string;
+  syncStatusPath: string;
+} {
   const root = join(projectRoot, DEV_MESH_DIR);
+  const stateDir = join(root, 'state');
 
   return {
     root,
-    pidPath: join(root, DAEMON_PID_FILENAME),
-    statePath: join(root, DAEMON_STATE_FILENAME),
-    syncStatusPath: join(root, 'sync', 'status.json')
+    stateDir,
+    pidPath: join(stateDir, DAEMON_PID_FILENAME),
+    statePath: join(stateDir, DAEMON_STATE_FILENAME),
+    syncStatusPath: join(stateDir, 'sync.json')
   };
 }
 

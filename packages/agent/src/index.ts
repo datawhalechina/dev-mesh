@@ -9,6 +9,7 @@ import type {
 
 export interface BuildContextPackInput {
   query: string;
+  branch?: string;
   para?: Partial<ParaRef>;
   layers?: KnowledgeLayer[];
   types?: KnowledgeType[];
@@ -16,6 +17,7 @@ export interface BuildContextPackInput {
   limit?: number;
   recencyDays?: number;
   includeSuperseded?: boolean;
+  includeVolatile?: boolean;
   maxContentChars?: number;
 }
 
@@ -33,6 +35,7 @@ export interface ContextPackItem {
     kind: string;
     ref?: string;
     storageRef?: string;
+    branch?: string;
   };
   quality: {
     confidence: number;
@@ -91,6 +94,10 @@ export function createAgentContextService(options: AgentContextServiceOptions): 
         searchInput.includeSuperseded = input.includeSuperseded;
       }
 
+      if (input.includeVolatile !== undefined) {
+        searchInput.includeVolatile = input.includeVolatile;
+      }
+
       const items = await options.core.searchKnowledge(searchInput);
 
       return {
@@ -138,6 +145,10 @@ function toContextPackItem(item: KnowledgeItem, maxContentChars: number): Contex
 
   if (item.source.storageRef !== undefined) {
     result.source.storageRef = item.source.storageRef;
+  }
+
+  if (typeof item.source.metadata?.branch === 'string') {
+    result.source.branch = item.source.metadata.branch;
   }
 
   if (item.createdBy.handle !== undefined) {

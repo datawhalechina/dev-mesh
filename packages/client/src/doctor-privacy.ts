@@ -65,12 +65,12 @@ async function checkStoreGitignore(projectRoot: string): Promise<DevMeshDoctorCh
   try {
     const content = await readFile(gitignorePath, 'utf8');
     const requiredPatterns = [
-      'daemon.json',
-      'daemon.pid',
+      'state/',
       'index/',
       'visualizations/',
       'queue/',
-      'sync/',
+      'crdt/sync/',
+      'exports/',
       'secrets/',
       'events/',
       'knowledge/raw/',

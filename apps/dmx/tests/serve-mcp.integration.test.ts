@@ -57,7 +57,7 @@ describe('dmx serve --mcp', () => {
         }
       });
       const captureText = readTextToolResult(captureResult);
-      const daemon = await waitForJson(join(projectRoot, '.dev-mesh', 'daemon.json'));
+      const daemon = await waitForJson(join(projectRoot, '.dev-mesh', 'state', 'daemon.json'));
       const knowledgeJsonl = await readFile(
         join(projectRoot, '.dev-mesh', 'knowledge', 'canonical', 'entries.jsonl'),
         'utf8'
@@ -103,7 +103,9 @@ async function waitForJson(path: string): Promise<Record<string, unknown>> {
 
 async function stopDaemon(projectRoot: string): Promise<void> {
   try {
-    const state = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'daemon.json'), 'utf8')) as { pid?: number };
+    const state = JSON.parse(await readFile(join(projectRoot, '.dev-mesh', 'state', 'daemon.json'), 'utf8')) as {
+      pid?: number;
+    };
 
     if (typeof state.pid === 'number') {
       process.kill(state.pid, 'SIGTERM');

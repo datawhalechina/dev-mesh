@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { initGlobalConfig } from '../src/index.js';
+import { createDevMeshClientRuntime, initGlobalConfig } from '../src/index.js';
 
 describe('initGlobalConfig', () => {
   afterEach(() => {
@@ -149,6 +149,34 @@ describe('initGlobalConfig', () => {
       ).rejects.toThrow('Unknown tool "vim"');
     } finally {
       await rm(globalRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('client runtime status', () => {
+  it('includes CRDT projection health', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-client-status-'));
+
+    try {
+      const runtime = createDevMeshClientRuntime({
+        projectRoot
+      });
+      const status = await runtime.status();
+
+      expect(status).toMatchObject({
+        service: 'devmesh',
+        projection: {
+          state: 'missing_crdt',
+          currentHeads: [],
+          sourceHeads: []
+        },
+        sync: {
+          daemon: undefined,
+          heads: undefined
+        }
+      });
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
     }
   });
 });

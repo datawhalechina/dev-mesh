@@ -1,5 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
+import * as z from 'zod';
 
 export const paraSchema = z.object({
   category: z.enum(['projects', 'areas', 'resources', 'archives']).optional(),
@@ -14,6 +14,7 @@ const paraRefSchema = z.object({
 const knowledgeLayerSchema = z.enum(['raw', 'extract', 'canonical']);
 const knowledgeVisibilitySchema = z.enum(['private', 'project', 'team', 'org']);
 const knowledgeStatusSchema = z.enum(['active', 'superseded', 'tombstone']);
+const knowledgeBranchPolicySchema = z.enum(['balanced', 'durable_only', 'frontend_design', 'backend_design']);
 
 const knowledgeSourceSchema = z.object({
   kind: z.string().min(1),
@@ -34,17 +35,50 @@ const memberIdentitySchema = z.object({
 export const meshSearchContextInputSchema = z.object({
   query: z.string().min(1),
   project: z.string().default('auto'),
+  branch: z.string().min(1).optional(),
   authorName: z.string().nullable().optional(),
   para: paraSchema.nullable().optional(),
   layers: z.array(z.enum(['raw', 'extract', 'canonical'])).default(['canonical', 'extract']),
   types: z.array(z.string()).optional(),
   limit: z.number().int().min(1).max(20).default(8),
   recencyDays: z.number().int().positive().optional(),
-  includeSuperseded: z.boolean().default(false)
+  includeSuperseded: z.boolean().default(false),
+  includeVolatile: z.boolean().optional()
 });
 
 export const meshGetStatusInputSchema = z.object({
   project: z.string().default('auto')
+});
+
+export const meshProjectionStatusInputSchema = z.object({
+  project: z.string().default('auto')
+});
+
+export const meshProjectionRebuildInputSchema = z.object({
+  project: z.string().default('auto')
+});
+
+export const meshBranchListInputSchema = z.object({
+  project: z.string().default('auto')
+});
+
+export const meshBranchCreateInputSchema = z.object({
+  name: z.string().min(1),
+  policy: knowledgeBranchPolicySchema.optional(),
+  base: z.string().min(1).optional(),
+  project: z.string().default('auto')
+});
+
+export const meshBranchSwitchInputSchema = z.object({
+  name: z.string().min(1),
+  policy: knowledgeBranchPolicySchema.optional(),
+  base: z.string().min(1).optional(),
+  project: z.string().default('auto')
+});
+
+export const meshBranchPolicyInputSchema = z.object({
+  branch: z.string().min(1).optional(),
+  policy: knowledgeBranchPolicySchema
 });
 
 export const meshGetKnowledgeInputSchema = z.object({
@@ -52,12 +86,14 @@ export const meshGetKnowledgeInputSchema = z.object({
 });
 
 export const meshListKnowledgeInputSchema = z.object({
+  branch: z.string().min(1).optional(),
   layers: z.array(knowledgeLayerSchema).optional(),
   types: z.array(z.string().min(1)).optional(),
   para: paraSchema.nullable().optional(),
   authorName: z.string().nullable().optional(),
   tags: z.array(z.string().min(1)).optional(),
   includeSuperseded: z.boolean().default(false),
+  includeVolatile: z.boolean().optional(),
   recencyDays: z.number().int().positive().optional(),
   limit: z.number().int().min(1).max(50).default(20)
 });
@@ -166,6 +202,7 @@ const knowledgeGraphEdgeKinds = [
 ] as const;
 
 export const meshExploreKnowledgeGraphInputSchema = z.object({
+  branch: z.string().min(1).optional(),
   query: z.string().min(1).optional(),
   ids: z.array(z.string().min(1)).optional(),
   depth: z.number().int().min(0).max(4).default(2),
@@ -176,6 +213,12 @@ export const meshExploreKnowledgeGraphInputSchema = z.object({
 
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
 export type MeshGetStatusInput = z.infer<typeof meshGetStatusInputSchema>;
+export type MeshProjectionStatusInput = z.infer<typeof meshProjectionStatusInputSchema>;
+export type MeshProjectionRebuildInput = z.infer<typeof meshProjectionRebuildInputSchema>;
+export type MeshBranchListInput = z.infer<typeof meshBranchListInputSchema>;
+export type MeshBranchCreateInput = z.infer<typeof meshBranchCreateInputSchema>;
+export type MeshBranchSwitchInput = z.infer<typeof meshBranchSwitchInputSchema>;
+export type MeshBranchPolicyInput = z.infer<typeof meshBranchPolicyInputSchema>;
 export type MeshGetKnowledgeInput = z.infer<typeof meshGetKnowledgeInputSchema>;
 export type MeshListKnowledgeInput = z.infer<typeof meshListKnowledgeInputSchema>;
 export type MeshCaptureKnowledgeInput = z.infer<typeof meshCaptureKnowledgeInputSchema>;
@@ -192,8 +235,11 @@ export type MeshExploreKnowledgeGraphInput = z.infer<typeof meshExploreKnowledge
 export const DEV_MESH_MCP_INSTRUCTIONS = [
   'DevMesh is an assistant-led project knowledge memory. Treat knowledge capture as part of normal coding work, not as an optional user-requested step.',
   'Use mesh_get_status when you need to confirm the running DevMesh version, project store, or automation state.',
+  'Use mesh_projection_status and mesh_projection_rebuild for CRDT projection diagnostics and repair when local read models are stale, missing, or dirty.',
+  'Use mesh_branch_list, mesh_branch_switch, mesh_branch_create, and mesh_branch_policy when a project needs a different Git-like knowledge branch or capture policy.',
   'Before final responses after meaningful coding, debugging, review, design, setup, release, deployment, or documentation work, decide whether you learned durable project knowledge.',
   'Capture durable decisions, conventions, commands, architecture notes, debugging lessons, pitfalls, setup/deployment steps, release notes, and handoffs with mesh_capture_knowledge.',
+  'Treat project_fact as volatile: do not auto-capture short-lived project facts unless the project policy explicitly allows that type, and prefer durable macro_experience, design_principle, or pitfall_record entries when the lesson should survive code churn.',
   'Capture task state, blockers, verification status, and next actions with mesh_capture_task when work starts, changes state, finishes, or needs handoff.',
   'Use mesh_get_knowledge, mesh_list_knowledge, mesh_update_knowledge, and mesh_delete_knowledge to inspect, correct, merge, or tombstone existing entries instead of creating duplicates.',
   'When new or existing knowledge clearly supersedes, duplicates, or contradicts another item, link the items with mesh_link_knowledge so the graph stays navigable.',
@@ -206,6 +252,12 @@ const assistantLedCaptureReminder =
 
 export interface MeshToolHandlers {
   getStatus(input: MeshGetStatusInput): Promise<unknown>;
+  getProjectionStatus(input: MeshProjectionStatusInput): Promise<unknown>;
+  rebuildProjection(input: MeshProjectionRebuildInput): Promise<unknown>;
+  listBranches(input: MeshBranchListInput): Promise<unknown>;
+  createBranch(input: MeshBranchCreateInput): Promise<unknown>;
+  switchBranch(input: MeshBranchSwitchInput): Promise<unknown>;
+  setBranchPolicy(input: MeshBranchPolicyInput): Promise<unknown>;
   searchContext(input: MeshSearchContextInput): Promise<unknown>;
   getKnowledge(input: MeshGetKnowledgeInput): Promise<unknown>;
   listKnowledge(input: MeshListKnowledgeInput): Promise<unknown>;
@@ -224,6 +276,12 @@ export interface MeshToolHandlers {
 export type MeshToolName =
   | 'mesh_search_context'
   | 'mesh_get_status'
+  | 'mesh_projection_status'
+  | 'mesh_projection_rebuild'
+  | 'mesh_branch_list'
+  | 'mesh_branch_create'
+  | 'mesh_branch_switch'
+  | 'mesh_branch_policy'
   | 'mesh_get_knowledge'
   | 'mesh_list_knowledge'
   | 'mesh_capture_knowledge'
@@ -250,11 +308,89 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
   );
 
   server.registerTool(
+    'mesh_projection_status',
+    {
+      title: 'Get projection status',
+      description:
+        'Inspect CRDT projection health for the current project, including current CRDT heads, last materialized source heads, metadata path, and dirty/missing/ready state.',
+      inputSchema: meshProjectionStatusInputSchema.shape
+    },
+    async (args) =>
+      textToolResult(
+        'mesh_projection_status',
+        await handlers.getProjectionStatus(meshProjectionStatusInputSchema.parse(args))
+      )
+  );
+
+  server.registerTool(
+    'mesh_projection_rebuild',
+    {
+      title: 'Rebuild projections',
+      description:
+        'Rebuild local search and graph projections from the v2 CRDT document. Use this for diagnostics or repair when projection status is missing or dirty.',
+      inputSchema: meshProjectionRebuildInputSchema.shape
+    },
+    async (args) =>
+      textToolResult(
+        'mesh_projection_rebuild',
+        await handlers.rebuildProjection(meshProjectionRebuildInputSchema.parse(args))
+      )
+  );
+
+  server.registerTool(
+    'mesh_branch_list',
+    {
+      title: 'List knowledge branches',
+      description:
+        'List Git-like DevMesh knowledge branches for the current project, including the active branch, optional base branch, and capture policy presets.',
+      inputSchema: meshBranchListInputSchema.shape
+    },
+    async (args) =>
+      textToolResult('mesh_branch_list', await handlers.listBranches(meshBranchListInputSchema.parse(args)))
+  );
+
+  server.registerTool(
+    'mesh_branch_create',
+    {
+      title: 'Create knowledge branch',
+      description:
+        'Create a Git-like DevMesh knowledge branch and optionally set its capture policy preset and base branch.',
+      inputSchema: meshBranchCreateInputSchema.shape
+    },
+    async (args) =>
+      textToolResult('mesh_branch_create', await handlers.createBranch(meshBranchCreateInputSchema.parse(args)))
+  );
+
+  server.registerTool(
+    'mesh_branch_switch',
+    {
+      title: 'Switch knowledge branch',
+      description:
+        'Switch the current project to a Git-like DevMesh knowledge branch, similar to git checkout, and optionally set policy or base branch.',
+      inputSchema: meshBranchSwitchInputSchema.shape
+    },
+    async (args) =>
+      textToolResult('mesh_branch_switch', await handlers.switchBranch(meshBranchSwitchInputSchema.parse(args)))
+  );
+
+  server.registerTool(
+    'mesh_branch_policy',
+    {
+      title: 'Set knowledge branch policy',
+      description:
+        'Set the capture policy preset for the active or named knowledge branch, such as balanced, durable_only, frontend_design, or backend_design.',
+      inputSchema: meshBranchPolicyInputSchema.shape
+    },
+    async (args) =>
+      textToolResult('mesh_branch_policy', await handlers.setBranchPolicy(meshBranchPolicyInputSchema.parse(args)))
+  );
+
+  server.registerTool(
     'mesh_search_context',
     {
       title: 'Search project context',
       description:
-        'IMPORTANT: For non-trivial project work, search DevMesh knowledge before starting or continuing so you can reuse prior decisions, conventions, pitfalls, commands, and handoffs. After using the returned context, keep watching for new durable knowledge to capture before your final response.',
+        'IMPORTANT: For non-trivial project work, search DevMesh knowledge before starting or continuing so you can reuse prior decisions, conventions, pitfalls, commands, and handoffs. Optionally pass branch to read a specific Git-like knowledge branch without switching checkout. After using the returned context, keep watching for new durable knowledge to capture before your final response.',
       inputSchema: meshSearchContextInputSchema.shape
     },
     async (args) =>
@@ -278,7 +414,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'List knowledge items',
       description:
-        'List DevMesh knowledge items with filters such as layer, type, PARA, tags, author, recency, and superseded/tombstone inclusion.',
+        'List DevMesh knowledge items with filters such as branch, layer, type, PARA, tags, author, recency, and superseded/tombstone inclusion.',
       inputSchema: meshListKnowledgeInputSchema.shape
     },
     async (args) =>
@@ -413,7 +549,7 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
     {
       title: 'Explore knowledge graph',
       description:
-        'Explore the derived DevMesh knowledge graph around matching knowledge items, PARA areas, tags, authors, sources, types, and semantic edges such as supersedes, duplicates, and contradicts. Use this when relationships matter, such as finding related decisions, pits, owners, areas, or follow-up knowledge before answering or capturing a new item.',
+        'Explore the derived DevMesh knowledge graph around matching knowledge items, PARA areas, tags, authors, sources, types, and semantic edges such as supersedes, duplicates, and contradicts. Optionally pass branch to explore one Git-like knowledge branch without switching checkout. Use this when relationships matter, such as finding related decisions, pits, owners, areas, or follow-up knowledge before answering or capturing a new item.',
       inputSchema: meshExploreKnowledgeGraphInputSchema.shape
     },
     async (args) =>
@@ -432,6 +568,15 @@ export function formatMeshToolOutput(toolName: MeshToolName, value: unknown): st
   switch (toolName) {
     case 'mesh_get_status':
       return formatStatus(value);
+    case 'mesh_projection_status':
+      return formatProjectionStatus(value);
+    case 'mesh_projection_rebuild':
+      return formatProjectionRebuild(value);
+    case 'mesh_branch_list':
+    case 'mesh_branch_create':
+    case 'mesh_branch_switch':
+    case 'mesh_branch_policy':
+      return formatBranchList(value);
     case 'mesh_search_context':
     case 'mesh_search_member_experience':
       return formatContextPack(value);
@@ -488,6 +633,13 @@ function formatStatus(value: unknown): string {
   pushBoolean(lines, 'autoInit', value.autoInit);
   pushBoolean(lines, 'autoReference', value.autoReference);
   pushBoolean(lines, 'autoSync', value.autoSync);
+  pushField(lines, 'activeBranch', value.activeBranch);
+  pushField(lines, 'baseBranch', value.baseBranch);
+  pushField(lines, 'autoCaptureTypes', Array.isArray(value.autoCaptureTypes) ? value.autoCaptureTypes.join(', ') : undefined);
+  pushBoolean(lines, 'includeVolatileInContext', value.includeVolatileInContext);
+  if (isRecord(value.projection)) {
+    lines.push(`projection: ${formatRecordInline(value.projection, ['state', 'documentCount', 'graphNodeCount', 'graphEdgeCount'])}`);
+  }
   pushField(lines, 'result', value.result);
 
   if (isRecord(value.mcp)) {
@@ -510,9 +662,90 @@ function formatStatus(value: unknown): string {
     'autoInit',
     'autoReference',
     'autoSync',
+    'activeBranch',
+    'baseBranch',
+    'branches',
+    'autoCaptureTypes',
+    'includeVolatileInContext',
+    'projection',
     'result',
     'mcp'
   ]);
+
+  return lines.join('\n');
+}
+
+function formatProjectionStatus(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = ['Projection status'];
+  pushField(lines, 'state', value.state);
+  pushField(lines, 'message', value.message);
+  pushField(lines, 'crdtPath', value.crdtPath);
+  pushField(lines, 'metadataPath', value.metadataPath);
+  pushField(lines, 'currentHeads', Array.isArray(value.currentHeads) ? value.currentHeads.length : undefined);
+  pushField(lines, 'sourceHeads', Array.isArray(value.sourceHeads) ? value.sourceHeads.length : undefined);
+  pushField(lines, 'rebuiltAt', value.rebuiltAt);
+  pushField(lines, 'documentCount', value.documentCount);
+  pushField(lines, 'graphNodeCount', value.graphNodeCount);
+  pushField(lines, 'graphEdgeCount', value.graphEdgeCount);
+  pushField(lines, 'qualityCount', value.qualityCount);
+  pushField(lines, 'qualityAlgorithmVersion', value.qualityAlgorithmVersion);
+  pushField(lines, 'qualityPath', value.qualityPath);
+
+  return lines.join('\n');
+}
+
+function formatProjectionRebuild(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = ['Projection rebuilt'];
+  pushField(lines, 'documents', value.documentCount);
+  pushField(lines, 'graphNodes', value.graphNodeCount);
+  pushField(lines, 'graphEdges', value.graphEdgeCount);
+  pushField(lines, 'schemaVersion', value.schemaVersion);
+  pushField(lines, 'crdtPath', value.crdtPath);
+  pushField(lines, 'metadataPath', value.metadataPath);
+  pushField(lines, 'sourceHeads', Array.isArray(value.sourceHeads) ? value.sourceHeads.length : undefined);
+  pushField(lines, 'indexPath', value.indexPath);
+  pushField(lines, 'sqlitePath', value.sqlitePath);
+  pushField(lines, 'knowledgePath', value.knowledgePath);
+  pushField(lines, 'searchPath', value.searchPath);
+  pushField(lines, 'graphPath', value.graphPath);
+  pushField(lines, 'qualityPath', value.qualityPath);
+  pushField(lines, 'qualityCount', value.qualityCount);
+  pushField(lines, 'qualityAlgorithmVersion', value.qualityAlgorithmVersion);
+  pushField(lines, 'rebuiltAt', value.rebuiltAt);
+
+  return lines.join('\n');
+}
+
+function formatBranchList(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const branches = toRecordArray(value.branches);
+  const lines = ['Knowledge branches'];
+  pushField(lines, 'active', value.active);
+  pushField(lines, 'base', value.base);
+  lines.push(`branches: ${branches.length}`);
+
+  if (branches.length === 0) {
+    lines.push('No knowledge branches configured.');
+    return lines.join('\n');
+  }
+
+  for (const branch of branches) {
+    const marker = branch.active === true ? '*' : ' ';
+    const name = scalarToString(branch.name) ?? 'unknown';
+    const details = formatRecordInline(branch, ['policy', 'base']);
+    lines.push(`${marker} ${name} ${details}`);
+  }
 
   return lines.join('\n');
 }
@@ -600,6 +833,13 @@ function formatKnowledgeMutation(title: string, value: unknown): string {
 function formatKnowledgeLink(value: unknown): string {
   if (!isRecord(value)) {
     return formatGeneric(value);
+  }
+
+  if (isRecord(value.error)) {
+    const lines = ['Knowledge link failed'];
+    pushField(lines, 'code', value.error.code);
+    pushField(lines, 'message', value.error.message);
+    return lines.join('\n');
   }
 
   const edge = isRecord(value.edge) ? value.edge : value;

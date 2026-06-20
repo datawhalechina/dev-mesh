@@ -9,6 +9,7 @@ export const devMeshAliases: AliasOptions = {
   '@devmesh/agent': resolve(root, 'packages/agent/src/index.ts'),
   '@devmesh/client': resolve(root, 'packages/client/src/index.ts'),
   '@devmesh/core': resolve(root, 'packages/core/src/index.ts'),
+  '@devmesh/crdt-store': resolve(root, 'packages/crdt-store/src/index.ts'),
   '@devmesh/extension-api': resolve(root, 'packages/extension-api/src/index.ts'),
   '@devmesh/graph': resolve(root, 'packages/graph/src/index.ts'),
   '@devmesh/local-store': resolve(root, 'packages/local-store/src/index.ts'),

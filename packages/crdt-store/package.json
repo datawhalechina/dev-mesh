@@ -1,5 +1,5 @@
 {
-  "name": "@devmesh/local-store",
+  "name": "@devmesh/crdt-store",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,9 +16,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@automerge/automerge": "^3.2.6",
     "@devmesh/core": "workspace:*",
-    "@devmesh/crdt-store": "workspace:*",
-    "@devmesh/graph": "workspace:*",
     "@devmesh/shared": "workspace:*"
   }
 }

@@ -7,6 +7,7 @@ import {
 } from '@devmesh/agent';
 import {
   createDevMeshCore,
+  isKnowledgeTypeAllowedForAutoCapture,
   type CaptureKnowledgeInput,
   type DeleteKnowledgeInput,
   type DevMeshCore,
@@ -27,12 +28,17 @@ import {
   createProjectKnowledgeEdge,
   deleteProjectKnowledge,
   enqueuePendingKnowledge,
+  exportProjectCrdtKnowledgeJsonl,
   readProjectConfig,
+  readProjectBranchScope,
+  writeProjectConfig,
   listProjectKnowledgeEdges,
   rateProjectKnowledge,
+  readProjectProjectionStatus,
   recordKnowledgeUsage,
   exploreProjectGraph,
   rebuildProjectIndex,
+  rebuildProjectProjectionsFromCrdt,
   rejectPendingKnowledge,
   listPendingKnowledge,
   type AcceptPendingKnowledgeResult,
@@ -41,6 +47,7 @@ import {
   type CaptureProjectTaskInput,
   type DeleteProjectKnowledgeOptions,
   type EnqueuePendingKnowledgeOptions,
+  type ExportProjectCrdtKnowledgeJsonlResult,
   type KnowledgeUsageOptions,
   type PendingKnowledgeReviewItem,
   type ProjectKnowledgeEdge,
@@ -51,9 +58,11 @@ import {
   type RateProjectKnowledgeOptions,
   type RejectPendingKnowledgeResult,
   type RebuildProjectIndexResult,
+  type RebuildProjectProjectionsFromCrdtResult,
   type UpdateProjectKnowledgeOptions,
   updateProjectKnowledge
 } from '@devmesh/local-store';
+import type { KnowledgeBranchPolicyPreset, ProjectBranchScope, ProjectConfig } from '@devmesh/local-store';
 import {
   redactCaptureKnowledgeInput,
   redactCaptureProjectTaskInput,
@@ -71,6 +80,7 @@ import {
   withDefaultTaskMember,
   withDefaultUpdateMember
 } from './runtime-redaction.js';
+import { readDaemonSyncHeads, readDaemonSyncStatus } from './daemon-sync.js';
 
 export interface DevMeshClientOptions {
   projectRoot?: string;
@@ -100,9 +110,43 @@ export interface ProjectKnowledgeScanResult {
   };
 }
 
+export interface ExportProjectKnowledgeInput {
+  path?: string;
+  includeTombstones?: boolean;
+}
+
+export type ExportProjectKnowledgeResult = ExportProjectCrdtKnowledgeJsonlResult;
+
 export interface ListProjectKnowledgeInput extends KnowledgeFilter {
   limit?: number;
+  branch?: string;
 }
+
+export interface KnowledgeBranchListResult {
+  active: string;
+  base?: string;
+  branches: Array<{
+    name: string;
+    active: boolean;
+    base: boolean;
+    policy: KnowledgeBranchPolicyPreset;
+  }>;
+}
+
+export interface KnowledgeBranchMutationInput {
+  name: string;
+  policy?: KnowledgeBranchPolicyPreset;
+  base?: string;
+}
+
+export interface KnowledgeBranchPolicyInput {
+  name?: string;
+  policy: KnowledgeBranchPolicyPreset;
+}
+
+type BranchScopedGraphExploreInput = ProjectKnowledgeGraphExploreInput & {
+  branch?: string;
+};
 
 export interface DevMeshClientRuntime {
   projectRoot: string;
@@ -125,10 +169,17 @@ export interface DevMeshClientRuntime {
   listInbox(): Promise<PendingKnowledgeReviewItem[]>;
   acceptInboxItem(id: string): Promise<AcceptPendingKnowledgeResult>;
   rejectInboxItem(id: string, reason?: string): Promise<RejectPendingKnowledgeResult>;
+  listBranches(): Promise<KnowledgeBranchListResult>;
+  createBranch(input: KnowledgeBranchMutationInput): Promise<KnowledgeBranchListResult>;
+  switchBranch(input: KnowledgeBranchMutationInput): Promise<KnowledgeBranchListResult>;
+  setBranchPolicy(input: KnowledgeBranchPolicyInput): Promise<KnowledgeBranchListResult>;
   searchContext(input: BuildContextPackInput): Promise<unknown>;
   scanProjectKnowledge(input?: ProjectKnowledgeScanInput): Promise<unknown>;
-  exploreKnowledgeGraph(input?: ProjectKnowledgeGraphExploreInput): Promise<ProjectKnowledgeGraphExploreResult>;
+  exportKnowledge(input?: ExportProjectKnowledgeInput): Promise<ExportProjectKnowledgeResult>;
+  exploreKnowledgeGraph(input?: BranchScopedGraphExploreInput): Promise<ProjectKnowledgeGraphExploreResult>;
   rebuildIndex(): Promise<RebuildProjectIndexResult>;
+  projectionStatus(): Promise<unknown>;
+  rebuildProjectionsFromCrdt(): Promise<RebuildProjectProjectionsFromCrdtResult>;
   status(): Promise<Record<string, unknown>>;
 }
 
@@ -149,7 +200,29 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
     ensureProjectStore: () => ensureProjectStore(projectRoot, storeOptions(options.memberName)),
     async captureKnowledge(input) {
       const redacted = await redactCaptureKnowledgeInput(withDefaultMember(input, options.memberName), redactor);
-      const result = await captureProjectKnowledge(projectRoot, redacted);
+      const config = await readProjectConfig(projectRoot);
+
+      if (!isKnowledgeTypeAllowedForAutoCapture(redacted.type, config.knowledge.autoCaptureTypes)) {
+        const queued = await enqueuePendingKnowledge(projectRoot, redacted, {
+          risk: 'medium',
+          reason: `Knowledge type "${redacted.type}" is not enabled for automatic capture. Review it before publishing.`,
+          branch: config.knowledgeBranch.active
+        });
+
+        return {
+          status: 'pending_review',
+          queueId: queued.id,
+          risk: queued.risk,
+          reason: queued.reason,
+          type: queued.input.type,
+          title: queued.input.title,
+          summary: queued.input.summary
+        };
+      }
+
+      const result = await captureProjectKnowledge(projectRoot, redacted, {
+        branch: config.knowledgeBranch.active
+      });
 
       return {
         ...result.item,
@@ -158,7 +231,10 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
     },
     async captureTask(input) {
       const redacted = await redactCaptureProjectTaskInput(withDefaultTaskMember(input, options.memberName), redactor);
-      const result = await captureProjectTask(projectRoot, redacted);
+      const config = await readProjectConfig(projectRoot);
+      const result = await captureProjectTask(projectRoot, redacted, {
+        branch: config.knowledgeBranch.active
+      });
 
       return {
         ...result.item,
@@ -180,8 +256,9 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
       return item;
     },
     async listKnowledge(input = {}) {
-      const { limit = 20, ...filter } = input;
-      const items = await core.listKnowledge(filter);
+      const { limit = 20, branch, ...filter } = input;
+      const repository = branch === undefined ? repositoryForActiveScope(projectRoot) : repositoryForBranch(projectRoot, branch);
+      const items = await repository.list(filter);
 
       return {
         total: items.length,
@@ -275,10 +352,92 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
 
       return rejectPendingKnowledge(projectRoot, id, safeReason);
     },
-    async searchContext(input) {
-      const contextPack = await agent.buildContextPack(input);
+    async listBranches() {
+      return toBranchListResult(await readProjectConfig(projectRoot));
+    },
+    async createBranch(input) {
+      const config = await readProjectConfig(projectRoot);
+      const name = normalizeBranchName(input.name);
+      const policy = input.policy ?? 'balanced';
+      const next = ensureBranch(config, name, policy);
 
-      await recordContextPackUsage(projectRoot, core, redactor, contextPack, input, options.memberName).catch(
+      if (input.base !== undefined) {
+        next.knowledgeBranch.base = normalizeBranchName(input.base);
+        ensureBranch(next, next.knowledgeBranch.base, 'durable_only');
+      }
+
+      const saved = await writeProjectConfig(projectRoot, next);
+      return toBranchListResult(saved);
+    },
+    async switchBranch(input) {
+      const config = await readProjectConfig(projectRoot);
+      const name = normalizeBranchName(input.name);
+      const next = ensureBranch(config, name, input.policy ?? 'balanced');
+
+      next.knowledgeBranch.active = name;
+
+      if (input.policy !== undefined) {
+        const branch = next.knowledgeBranch.branches.find((branch) => branch.name === name);
+
+        if (branch !== undefined) {
+          branch.policy = input.policy;
+        }
+      }
+
+      if (input.base !== undefined) {
+        next.knowledgeBranch.base = normalizeBranchName(input.base);
+        ensureBranch(next, next.knowledgeBranch.base, 'durable_only');
+      }
+
+      const activeBranch = next.knowledgeBranch.branches.find((branch) => branch.name === name);
+
+      if (activeBranch !== undefined) {
+        next.knowledge.autoCaptureTypes = autoCaptureTypesForBranchPolicy(activeBranch.policy);
+        next.knowledge.includeVolatileInContext = includeVolatileForBranchPolicy(activeBranch.policy);
+      }
+
+      const saved = await writeProjectConfig(projectRoot, next);
+      return toBranchListResult(saved);
+    },
+    async setBranchPolicy(input) {
+      const config = await readProjectConfig(projectRoot);
+      const name = normalizeBranchName(input.name ?? config.knowledgeBranch.active);
+      const next = ensureBranch(config, name, input.policy);
+      const branch = next.knowledgeBranch.branches.find((branch) => branch.name === name);
+
+      if (branch !== undefined) {
+        branch.policy = input.policy;
+      }
+
+      if (name === next.knowledgeBranch.active) {
+        next.knowledge.autoCaptureTypes = autoCaptureTypesForBranchPolicy(input.policy);
+        next.knowledge.includeVolatileInContext = includeVolatileForBranchPolicy(input.policy);
+      }
+
+      const saved = await writeProjectConfig(projectRoot, next);
+      return toBranchListResult(saved);
+    },
+    async searchContext(input) {
+      const config = await readProjectConfig(projectRoot);
+      const contextInput: BuildContextPackInput = {
+        ...input,
+        includeVolatile: input.includeVolatile ?? config.knowledge.includeVolatileInContext
+      };
+      const scopedAgent = input.branch === undefined ? agent : createAgentContextService({
+        core: createDevMeshCore({
+          projectRoot,
+          repository: repositoryForBranch(projectRoot, input.branch)
+        })
+      });
+      const usageCore = input.branch === undefined
+        ? core
+        : createDevMeshCore({
+            projectRoot,
+            repository: repositoryForBranch(projectRoot, input.branch)
+          });
+      const contextPack = await scopedAgent.buildContextPack(contextInput);
+
+      await recordContextPackUsage(projectRoot, usageCore, redactor, contextPack, contextInput, options.memberName).catch(
         () => undefined
       );
 
@@ -287,12 +446,27 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
     async scanProjectKnowledge(input = {}) {
       return readProjectKnowledgeScan(projectRoot, input);
     },
-    exploreKnowledgeGraph: (input = {}) => exploreProjectGraph(projectRoot, input),
+    exportKnowledge: (input = {}) => exportProjectCrdtKnowledgeJsonl(projectRoot, input),
+    async exploreKnowledgeGraph(input = {}) {
+      return exploreProjectGraph(
+        projectRoot,
+        input,
+        input.branch === undefined ? await readProjectBranchScope(projectRoot) : createSingleBranchScope(input.branch)
+      );
+    },
     rebuildIndex: () => rebuildProjectIndex(projectRoot),
+    projectionStatus: () => readProjectProjectionStatus(projectRoot),
+    rebuildProjectionsFromCrdt: () => rebuildProjectProjectionsFromCrdt(projectRoot),
     async status() {
       const store = await ensureProjectStore(projectRoot, storeOptions(options.memberName));
       const config = await readProjectConfig(projectRoot);
-      const items = await core.listKnowledge({ includeSuperseded: true });
+      const unscopedRepository = new JsonlKnowledgeRepository(projectRoot, { branchScope: false });
+      const items = await unscopedRepository.list({ includeSuperseded: true });
+      const projection = await readProjectProjectionStatus(projectRoot);
+      const [daemonSync, daemonHeads] = await Promise.all([
+        readDaemonSyncStatus(projectRoot),
+        readDaemonSyncHeads(projectRoot)
+      ]);
 
       return {
         service: 'devmesh',
@@ -304,10 +478,119 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
         knowledgeItems: items.length,
         autoInit: config.automation.autoInit,
         autoReference: config.automation.autoReference,
-        autoSync: config.automation.autoSync
+        autoSync: config.automation.autoSync,
+        activeBranch: config.knowledgeBranch.active,
+        baseBranch: config.knowledgeBranch.base,
+        branches: config.knowledgeBranch.branches,
+        autoCaptureTypes: config.knowledge.autoCaptureTypes,
+        includeVolatileInContext: config.knowledge.includeVolatileInContext,
+        projection,
+        sync: {
+          daemon: daemonSync,
+          heads: daemonHeads
+        }
       };
     }
   };
+}
+
+function toBranchListResult(config: ProjectConfig): KnowledgeBranchListResult {
+  const result: KnowledgeBranchListResult = {
+    active: config.knowledgeBranch.active,
+    branches: config.knowledgeBranch.branches.map((branch) => ({
+      name: branch.name,
+      active: branch.name === config.knowledgeBranch.active,
+      base: branch.name === config.knowledgeBranch.base,
+      policy: branch.policy
+    }))
+  };
+
+  if (config.knowledgeBranch.base !== undefined) {
+    result.base = config.knowledgeBranch.base;
+  }
+
+  return result;
+}
+
+function ensureBranch(
+  config: ProjectConfig,
+  name: string,
+  policy: KnowledgeBranchPolicyPreset
+): ProjectConfig {
+  const next = cloneProjectConfig(config);
+  const existing = next.knowledgeBranch.branches.find((branch) => branch.name === name);
+
+  if (existing === undefined) {
+    next.knowledgeBranch.branches.push({
+      name,
+      policy
+    });
+  }
+
+  return next;
+}
+
+function cloneProjectConfig(config: ProjectConfig): ProjectConfig {
+  return JSON.parse(JSON.stringify(config)) as ProjectConfig;
+}
+
+function normalizeBranchName(value: string): string {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    throw new Error('Knowledge branch name cannot be empty.');
+  }
+
+  return normalized;
+}
+
+function repositoryForActiveScope(projectRoot: string): JsonlKnowledgeRepository {
+  return new JsonlKnowledgeRepository(projectRoot);
+}
+
+function repositoryForBranch(projectRoot: string, branch: string): JsonlKnowledgeRepository {
+  return new JsonlKnowledgeRepository(projectRoot, {
+    branchScope: createSingleBranchScope(branch)
+  });
+}
+
+function createSingleBranchScope(branch: string): ProjectBranchScope {
+  const active = normalizeBranchName(branch);
+
+  return {
+    active,
+    readable: [active]
+  };
+}
+
+function autoCaptureTypesForBranchPolicy(policy: KnowledgeBranchPolicyPreset): string[] {
+  switch (policy) {
+    case 'durable_only':
+      return ['decision', 'adr', 'macro_experience', 'design_principle', 'pitfall_record'];
+    case 'frontend_design':
+      return ['decision', 'convention', 'pitfall_record', 'macro_experience', 'design_principle', 'adr', 'note'];
+    case 'backend_design':
+      return ['decision', 'convention', 'pitfall_record', 'macro_experience', 'design_principle', 'adr', 'runbook', 'note'];
+    case 'balanced':
+      return [
+        'decision',
+        'convention',
+        'task',
+        'pitfall',
+        'pitfall_record',
+        'command',
+        'glossary',
+        'runbook',
+        'adr',
+        'note',
+        'macro_experience',
+        'design_principle'
+      ];
+  }
+}
+
+function includeVolatileForBranchPolicy(_policy: KnowledgeBranchPolicyPreset): boolean {
+  return false;
 }
 
 async function recordContextPackUsage(
@@ -363,12 +646,20 @@ function createContextPackUsageContext(
     context.authorName = input.authorName;
   }
 
+  if (input.branch !== undefined) {
+    context.branch = input.branch;
+  }
+
   if (input.para !== undefined) {
     context.para = input.para;
   }
 
   if (input.recencyDays !== undefined) {
     context.recencyDays = input.recencyDays;
+  }
+
+  if (input.includeVolatile !== undefined) {
+    context.includeVolatile = input.includeVolatile;
   }
 
   return context;

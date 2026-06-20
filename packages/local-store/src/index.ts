@@ -15,12 +15,15 @@ export type {
   DevMeshEvent,
   EnqueuePendingKnowledgeOptions,
   EnsureProjectStoreOptions,
+  KnowledgeBranchDefinition,
+  KnowledgeBranchPolicyPreset,
   KnowledgeRatingRecord,
   KnowledgeUsageInput,
   KnowledgeUsageKind,
   KnowledgeUsageOptions,
   KnowledgeUsageRecord,
   PendingKnowledgeReviewItem,
+  ProjectBranchScope,
   ProjectCaptureOptions,
   ProjectConfig,
   ProjectIndexDocument,
@@ -30,6 +33,12 @@ export type {
   ProjectKnowledgeGraph,
   ProjectKnowledgeGraphExploreInput,
   ProjectKnowledgeGraphExploreResult,
+  ProjectedKnowledgeQuality,
+  ProjectQualityProjection,
+  ProjectProjectionFileStatus,
+  ProjectProjectionMetadata,
+  ProjectProjectionStatus,
+  ProjectProjectionStatusState,
   ProjectStore,
   ProjectStorePaths,
   ProjectTaskStatus,
@@ -38,6 +47,7 @@ export type {
   RateProjectKnowledgeResult,
   RecordKnowledgeUsageResult,
   RebuildProjectIndexResult,
+  RebuildProjectProjectionResult,
   RejectedKnowledgeReviewItem,
   RejectPendingKnowledgeResult,
   ReviewQueueRisk,
@@ -47,10 +57,65 @@ export type {
 } from './types.js';
 export {
   createProjectStorePaths,
+  createProjectBranchScope,
   ensureProjectStore,
   migrateProjectStore,
-  readProjectConfig
+  readProjectBranchScope,
+  readProjectConfig,
+  writeProjectConfig
 } from './project-store.js';
+export {
+  applyBranchCrdtChanges,
+  applyProjectCrdtChanges,
+  createProjectQualitySignalInCrdt,
+  createProjectRelationInCrdt,
+  exportProjectCrdtKnowledgeJsonl,
+  importProjectJsonlToCrdt,
+  initializeProjectCrdtStore,
+  loadBranchKnowledgeEdgesFromCrdt,
+  loadBranchKnowledgeItemsFromCrdt,
+  loadProjectKnowledgeItemsFromCrdt,
+  readBranchCrdtSyncState,
+  readProjectCrdtChangesSince,
+  readProjectCrdtSyncState,
+  readProjectProjectionStatus,
+  rebuildProjectProjectionsFromCrdt,
+  upsertProjectKnowledgeToCrdt
+} from './crdt.js';
+export type {
+  ApplyBranchCrdtChangesResult,
+  ApplyProjectCrdtChangesResult,
+  BranchCrdtSyncState,
+  CreateProjectQualitySignalInCrdtInput,
+  CreateProjectQualitySignalInCrdtOptions,
+  CreateProjectQualitySignalInCrdtResult,
+  CreateProjectRelationInCrdtInput,
+  CreateProjectRelationInCrdtOptions,
+  CreateProjectRelationInCrdtResult,
+  ExportProjectCrdtKnowledgeJsonlOptions,
+  ExportProjectCrdtKnowledgeJsonlResult,
+  ImportProjectJsonlToCrdtOptions,
+  ImportProjectJsonlToCrdtResult,
+  ProjectCrdtStoreResult,
+  ProjectCrdtSyncState,
+  ReadProjectCrdtChangesSinceResult,
+  RebuildProjectProjectionsFromCrdtOptions,
+  RebuildProjectProjectionsFromCrdtResult,
+  UpsertProjectKnowledgeToCrdtOptions,
+  UpsertProjectKnowledgeToCrdtResult
+} from './crdt.js';
+export {
+  LocalProjectionBackend,
+  QUALITY_PROJECTION_ALGORITHM_VERSION,
+  readProjectQualityProjection,
+  readProjectProjectionMetadata
+} from './projection-backend.js';
+export type {
+  LocalProjectionBackendOptions,
+  ProjectionBackend,
+  ProjectionChangeInput,
+  ProjectionRebuildInput
+} from './projection-backend.js';
 export { JsonlKnowledgeRepository } from './repository.js';
 export { rebuildProjectIndex, searchProjectIndex } from './indexer.js';
 export {
@@ -60,6 +125,7 @@ export {
 } from './graph-indexer.js';
 export {
   createProjectKnowledgeEdge,
+  filterProjectKnowledgeEdgesByBranchScope,
   listProjectKnowledgeEdges
 } from './knowledge-edges.js';
 export {

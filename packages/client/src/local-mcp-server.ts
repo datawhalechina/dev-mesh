@@ -15,6 +15,9 @@ import {
   DEV_MESH_MCP_INSTRUCTIONS,
   registerMeshTools,
   type MeshToolHandlers,
+  type MeshBranchCreateInput,
+  type MeshBranchPolicyInput,
+  type MeshBranchSwitchInput,
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
   type MeshDeleteKnowledgeInput,
@@ -51,6 +54,10 @@ export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers)
 export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): MeshToolHandlers {
   return {
     searchContext: (input) => runtime.searchContext(toContextPackInput(input)),
+    listBranches: () => runtime.listBranches(),
+    createBranch: (input) => runtime.createBranch(toBranchMutationInput(input)),
+    switchBranch: (input) => runtime.switchBranch(toBranchMutationInput(input)),
+    setBranchPolicy: (input) => runtime.setBranchPolicy(toBranchPolicyInput(input)),
     getKnowledge: (input) => runtime.getKnowledge(input.id),
     listKnowledge: (input) => runtime.listKnowledge(toListKnowledgeInput(input)),
     captureKnowledge: (input) => runtime.captureKnowledge(toCaptureInput(input)),
@@ -60,6 +67,8 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
     rateKnowledge: (input) => runtime.rateKnowledge(toRateInput(input)),
     linkKnowledge: (input) => runtime.linkKnowledge(toLinkKnowledgeInput(input)),
     getStatus: () => runtime.status(),
+    getProjectionStatus: () => runtime.projectionStatus(),
+    rebuildProjection: () => runtime.rebuildProjectionsFromCrdt(),
     scanProjectKnowledge: (input) => runtime.scanProjectKnowledge(toScanProjectKnowledgeInput(input)),
     exploreKnowledgeGraph: (input) => runtime.exploreKnowledgeGraph(toExploreKnowledgeGraphInput(input)),
     searchMemberExperience(input) {
@@ -78,11 +87,32 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
   };
 }
 
+function toBranchMutationInput(
+  input: MeshBranchCreateInput | MeshBranchSwitchInput
+): Parameters<DevMeshClientRuntime['createBranch']>[0] {
+  return {
+    name: input.name,
+    ...(input.policy === undefined ? {} : { policy: input.policy }),
+    ...(input.base === undefined ? {} : { base: input.base })
+  };
+}
+
+function toBranchPolicyInput(input: MeshBranchPolicyInput): Parameters<DevMeshClientRuntime['setBranchPolicy']>[0] {
+  return {
+    policy: input.policy,
+    ...(input.branch === undefined ? {} : { name: input.branch })
+  };
+}
+
 function toListKnowledgeInput(input: MeshListKnowledgeInput): Parameters<DevMeshClientRuntime['listKnowledge']>[0] {
   const filter: NonNullable<Parameters<DevMeshClientRuntime['listKnowledge']>[0]> = {
     includeSuperseded: input.includeSuperseded,
     limit: input.limit
   };
+
+  if (input.branch !== undefined) {
+    filter.branch = input.branch;
+  }
 
   if (input.layers !== undefined) {
     filter.layers = input.layers as KnowledgeLayer[];
@@ -108,6 +138,10 @@ function toListKnowledgeInput(input: MeshListKnowledgeInput): Parameters<DevMesh
     filter.recencyDays = input.recencyDays;
   }
 
+  if (input.includeVolatile !== undefined) {
+    filter.includeVolatile = input.includeVolatile;
+  }
+
   return filter;
 }
 
@@ -118,6 +152,10 @@ function toContextPackInput(input: MeshSearchContextInput): BuildContextPackInpu
     limit: input.limit,
     includeSuperseded: input.includeSuperseded
   };
+
+  if (input.branch !== undefined) {
+    search.branch = input.branch;
+  }
 
   if (input.authorName !== undefined) {
     search.authorName = input.authorName;
@@ -133,6 +171,10 @@ function toContextPackInput(input: MeshSearchContextInput): BuildContextPackInpu
 
   if (input.recencyDays !== undefined) {
     search.recencyDays = input.recencyDays;
+  }
+
+  if (input.includeVolatile !== undefined) {
+    search.includeVolatile = input.includeVolatile;
   }
 
   return search;
@@ -383,8 +425,33 @@ function toScanProjectKnowledgeInput(input: MeshScanProjectKnowledgeInput): Mesh
   };
 }
 
-function toExploreKnowledgeGraphInput(input: MeshExploreKnowledgeGraphInput): MeshExploreKnowledgeGraphInput {
-  return {
-    ...input
+function toExploreKnowledgeGraphInput(
+  input: MeshExploreKnowledgeGraphInput
+): NonNullable<Parameters<DevMeshClientRuntime['exploreKnowledgeGraph']>[0]> {
+  const graphInput: NonNullable<Parameters<DevMeshClientRuntime['exploreKnowledgeGraph']>[0]> = {
+    depth: input.depth,
+    limit: input.limit
   };
+
+  if (input.branch !== undefined) {
+    graphInput.branch = input.branch;
+  }
+
+  if (input.query !== undefined) {
+    graphInput.query = input.query;
+  }
+
+  if (input.ids !== undefined) {
+    graphInput.ids = input.ids;
+  }
+
+  if (input.nodeKinds !== undefined) {
+    graphInput.nodeKinds = input.nodeKinds;
+  }
+
+  if (input.edgeKinds !== undefined) {
+    graphInput.edgeKinds = input.edgeKinds;
+  }
+
+  return graphInput;
 }

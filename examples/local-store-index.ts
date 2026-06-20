@@ -12,7 +12,7 @@ try {
     type: 'runbook',
     layer: 'canonical',
     title: 'Rebuild local search before release',
-    summary: 'Run dmx index rebuild so mesh.sqlite and manifest.json match JSONL knowledge.',
+    summary: 'Run dmx index rebuild so knowledge.sqlite and search.sqlite match JSONL knowledge.',
     tags: ['release', 'search']
   });
 
@@ -28,7 +28,9 @@ try {
   console.log(
     JSON.stringify(
       {
-        sqlitePath: index.sqlitePath,
+        knowledgePath: index.knowledgePath,
+        searchPath: index.searchPath,
+        graphPath: index.graphPath,
         documentCount: index.documentCount,
         hits
       },

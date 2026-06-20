@@ -1,4 +1,5 @@
 import type { Command } from 'commander';
+import type { ExportProjectKnowledgeResult } from '@devmesh/client';
 import type {
   KnowledgeLayer,
   KnowledgeStatus,
@@ -7,7 +8,7 @@ import type {
   UpdateKnowledgeInput
 } from '@devmesh/core';
 import { createDevMeshClientRuntime } from '@devmesh/client';
-import { printJsonOrText } from './output.js';
+import { formatFields, printJsonOrCustomText, printJsonOrText } from './output.js';
 import { parseIntOption, parseNumberOption, parsePara } from './shared.js';
 
 export function registerKnowledgeCommand(program: Command): void {
@@ -15,6 +16,7 @@ export function registerKnowledgeCommand(program: Command): void {
 
   registerGetCommand(knowledge);
   registerListCommand(knowledge);
+  registerExportCommand(knowledge);
   registerUpdateCommand(knowledge);
   registerDeleteCommand(knowledge);
 }
@@ -44,6 +46,7 @@ function registerListCommand(parent: Command): void {
     .option('--tag <tag>', 'tag filter', collectOption, [])
     .option('--para <category:key>', 'PARA ref prefix, for example areas:frontend')
     .option('--author <name>', 'author display name, handle, or member id filter')
+    .option('--branch <name>', 'read from a specific knowledge branch without switching checkout')
     .option('--include-superseded', 'include superseded and tombstone items')
     .option('--recency-days <n>', 'only include items updated within this many days', parseIntOption)
     .option('--limit <n>', 'maximum number of items', parseIntOption, 20)
@@ -55,6 +58,24 @@ function registerListCommand(parent: Command): void {
       });
 
       printJsonOrText('mesh_list_knowledge', await runtime.listKnowledge(createListInput(options)), options.json);
+    });
+}
+
+function registerExportCommand(parent: Command): void {
+  parent
+    .command('export')
+    .description('Export knowledge JSONL from the v2 CRDT document')
+    .option('--path <path>', 'output JSONL path')
+    .option('--no-tombstones', 'exclude tombstone items from the export')
+    .option('--root <path>', 'project root', process.cwd())
+    .option('--json', 'print structured JSON')
+    .action(async (options: KnowledgeExportOptions) => {
+      const runtime = createDevMeshClientRuntime({
+        projectRoot: options.root
+      });
+      const result = await runtime.exportKnowledge(createExportInput(options));
+
+      printJsonOrCustomText(result, options.json, formatKnowledgeExportResult);
     });
 }
 
@@ -124,6 +145,10 @@ function createListInput(options: KnowledgeListOptions): Parameters<ReturnType<t
   };
   const layers = options.layer.map(parseLayer);
 
+  if (options.branch !== undefined) {
+    input.branch = options.branch;
+  }
+
   if (layers.length > 0) {
     input.layers = layers;
   }
@@ -150,6 +175,20 @@ function createListInput(options: KnowledgeListOptions): Parameters<ReturnType<t
 
   if (options.recencyDays !== undefined) {
     input.recencyDays = options.recencyDays;
+  }
+
+  return input;
+}
+
+function createExportInput(options: KnowledgeExportOptions): Parameters<ReturnType<typeof createDevMeshClientRuntime>['exportKnowledge']>[0] {
+  const input: NonNullable<Parameters<ReturnType<typeof createDevMeshClientRuntime>['exportKnowledge']>[0]> = {};
+
+  if (options.path !== undefined) {
+    input.path = options.path;
+  }
+
+  if (options.tombstones === false) {
+    input.includeTombstones = false;
   }
 
   return input;
@@ -223,6 +262,16 @@ function createUpdateInput(id: string, options: KnowledgeUpdateOptions): UpdateK
   return input;
 }
 
+function formatKnowledgeExportResult(result: ExportProjectKnowledgeResult): string {
+  return formatFields('DevMesh knowledge exported', [
+    ['knowledge', result.exportedKnowledge],
+    ['skippedTombstones', result.skippedTombstones],
+    ['heads', result.heads.length],
+    ['path', result.path],
+    ['crdtPath', result.crdtPath]
+  ]);
+}
+
 function createMutationOptions(reason?: string): { reason?: string } {
   if (reason === undefined) {
     return {};
@@ -279,9 +328,15 @@ interface KnowledgeListOptions extends JsonOutputOptions {
   tag: string[];
   para?: string;
   author?: string;
+  branch?: string;
   includeSuperseded?: boolean;
   recencyDays?: number;
   limit: number;
+}
+
+interface KnowledgeExportOptions extends JsonOutputOptions {
+  path?: string;
+  tombstones?: boolean;
 }
 
 interface KnowledgeUpdateOptions extends JsonOutputOptions {

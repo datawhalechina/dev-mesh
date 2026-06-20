@@ -7,6 +7,9 @@ import {
 } from '@devmesh/core';
 import { ensureProjectStore } from './project-store.js';
 import { readJsonl, walkKnowledgeItemFiles } from './files.js';
+import type { ProjectBranchScope } from './types.js';
+
+export const DEFAULT_KNOWLEDGE_BRANCH = 'main';
 
 export async function loadProjectKnowledgeItems(projectRoot: string): Promise<KnowledgeItem[]> {
   const store = await ensureProjectStore(projectRoot);
@@ -46,4 +49,23 @@ export function filterAndRankKnowledgeItems(
 
 export function filterKnowledgeItems(items: KnowledgeItem[], filter: KnowledgeFilter): KnowledgeItem[] {
   return items.filter((item) => matchesKnowledgeFilter(item, filter));
+}
+
+export function filterKnowledgeItemsByBranchScope(
+  items: KnowledgeItem[],
+  scope: ProjectBranchScope | undefined
+): KnowledgeItem[] {
+  if (scope === undefined) {
+    return items;
+  }
+
+  const readable = new Set(scope.readable);
+
+  return items.filter((item) => readable.has(readKnowledgeItemBranch(item)));
+}
+
+export function readKnowledgeItemBranch(item: KnowledgeItem): string {
+  const value = item.source.metadata?.branch;
+
+  return typeof value === 'string' && value.length > 0 ? value : DEFAULT_KNOWLEDGE_BRANCH;
 }

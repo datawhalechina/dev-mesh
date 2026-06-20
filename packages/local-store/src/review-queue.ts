@@ -20,10 +20,18 @@ export async function enqueuePendingKnowledge(
   const store = await ensureProjectStore(projectRoot);
   const config = await readProjectConfigFile(store.paths.config);
   const createdAt = nowIso();
+  const branch = options.branch ?? config.knowledgeBranch.active;
   const queuedInput: CaptureKnowledgeInput = {
     ...input,
     id: input.id ?? createKnowledgeIdForLayer(input.layer ?? 'extract'),
-    createdAt: input.createdAt ?? createdAt
+    createdAt: input.createdAt ?? createdAt,
+    source: {
+      ...(input.source ?? { kind: 'manual' }),
+      metadata: {
+        ...(input.source?.metadata ?? {}),
+        branch
+      }
+    }
   };
   const item: PendingKnowledgeReviewItem = {
     id: createKnowledgeId('q'),
@@ -68,7 +76,8 @@ export async function acceptPendingKnowledge(projectRoot: string, id: string): P
       queueId: queueItem.id,
       knowledgeId: item.id,
       risk: queueItem.risk,
-      reason: queueItem.reason
+      reason: queueItem.reason,
+      branch: readKnowledgeBranch(queueItem.input)
     },
     queueItem.projectKey
   );
@@ -113,7 +122,8 @@ export async function rejectPendingKnowledge(
       queueId: queueItem.id,
       candidateId: queueItem.input.id,
       risk: queueItem.risk,
-      reason
+      reason,
+      branch: readKnowledgeBranch(queueItem.input)
     },
     queueItem.projectKey
   );
@@ -126,4 +136,10 @@ export async function rejectPendingKnowledge(
     queueItem: rejected,
     event
   };
+}
+
+function readKnowledgeBranch(input: CaptureKnowledgeInput): string | undefined {
+  const value = input.source?.metadata?.branch;
+
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

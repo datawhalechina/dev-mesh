@@ -10,6 +10,7 @@
       "@devmesh/agent": ["packages/agent/src/index.ts"],
       "@devmesh/client": ["packages/client/src/index.ts"],
       "@devmesh/core": ["packages/core/src/index.ts"],
+      "@devmesh/crdt-store": ["packages/crdt-store/src/index.ts"],
       "@devmesh/extension-api": ["packages/extension-api/src/index.ts"],
       "@devmesh/graph": ["packages/graph/src/index.ts"],
       "@devmesh/local-store": ["packages/local-store/src/index.ts"],

@@ -34,6 +34,33 @@ describe('local MCP proxy', () => {
         arguments: {}
       });
       const statusText = readTextToolResult(statusResult);
+      const projectionStatusResult = await client.callTool({
+        name: 'mesh_projection_status',
+        arguments: {}
+      });
+      const projectionStatusText = readTextToolResult(projectionStatusResult);
+      const branchListResult = await client.callTool({
+        name: 'mesh_branch_list',
+        arguments: {}
+      });
+      const branchListText = readTextToolResult(branchListResult);
+      const branchCreateResult = await client.callTool({
+        name: 'mesh_branch_create',
+        arguments: {
+          name: 'frontend',
+          policy: 'frontend_design',
+          base: 'shared'
+        }
+      });
+      const branchCreateText = readTextToolResult(branchCreateResult);
+      const branchSwitchResult = await client.callTool({
+        name: 'mesh_branch_switch',
+        arguments: {
+          name: 'frontend',
+          policy: 'balanced'
+        }
+      });
+      const branchSwitchText = readTextToolResult(branchSwitchResult);
       const captureResult = await client.callTool({
         name: 'mesh_capture_knowledge',
         arguments: {
@@ -61,6 +88,24 @@ describe('local MCP proxy', () => {
         }
       });
       const listedText = readTextToolResult(listResult);
+      const mainBranchListResult = await client.callTool({
+        name: 'mesh_list_knowledge',
+        arguments: {
+          branch: 'main',
+          layers: ['canonical'],
+          limit: 5
+        }
+      });
+      const mainBranchListText = readTextToolResult(mainBranchListResult);
+      const frontendBranchListResult = await client.callTool({
+        name: 'mesh_list_knowledge',
+        arguments: {
+          branch: 'frontend',
+          layers: ['canonical'],
+          limit: 5
+        }
+      });
+      const frontendBranchListText = readTextToolResult(frontendBranchListResult);
       const previousCaptureResult = await client.callTool({
         name: 'mesh_capture_knowledge',
         arguments: {
@@ -73,6 +118,13 @@ describe('local MCP proxy', () => {
       });
       const previousText = readTextToolResult(previousCaptureResult);
       const previousId = readRequiredField(previousText, 'id');
+      const branchPolicyResult = await client.callTool({
+        name: 'mesh_branch_policy',
+        arguments: {
+          policy: 'durable_only'
+        }
+      });
+      const branchPolicyText = readTextToolResult(branchPolicyResult);
       const linkResult = await client.callTool({
         name: 'mesh_link_knowledge',
         arguments: {
@@ -92,6 +144,24 @@ describe('local MCP proxy', () => {
       });
       const contextText = readTextToolResult(searchResult);
       const contextGeneratedAt = readRequiredField(contextText, 'generatedAt');
+      const mainBranchSearchResult = await client.callTool({
+        name: 'mesh_search_context',
+        arguments: {
+          branch: 'main',
+          query: 'local proxy',
+          layers: ['canonical']
+        }
+      });
+      const mainBranchContextText = readTextToolResult(mainBranchSearchResult);
+      const frontendBranchSearchResult = await client.callTool({
+        name: 'mesh_search_context',
+        arguments: {
+          branch: 'frontend',
+          query: 'local proxy',
+          layers: ['canonical']
+        }
+      });
+      const frontendBranchContextText = readTextToolResult(frontendBranchSearchResult);
       const graphResult = await client.callTool({
         name: 'mesh_explore_knowledge_graph',
         arguments: {
@@ -101,6 +171,24 @@ describe('local MCP proxy', () => {
         }
       });
       const graphText = readTextToolResult(graphResult);
+      const mainBranchGraphResult = await client.callTool({
+        name: 'mesh_explore_knowledge_graph',
+        arguments: {
+          branch: 'main',
+          query: 'local proxy',
+          depth: 1
+        }
+      });
+      const mainBranchGraphText = readTextToolResult(mainBranchGraphResult);
+      const frontendBranchGraphResult = await client.callTool({
+        name: 'mesh_explore_knowledge_graph',
+        arguments: {
+          branch: 'frontend',
+          query: 'local proxy',
+          depth: 1
+        }
+      });
+      const frontendBranchGraphText = readTextToolResult(frontendBranchGraphResult);
       const updateResult = await client.callTool({
         name: 'mesh_update_knowledge',
         arguments: {
@@ -119,6 +207,11 @@ describe('local MCP proxy', () => {
         }
       });
       const deletedText = readTextToolResult(deleteResult);
+      const projectionRebuildResult = await client.callTool({
+        name: 'mesh_projection_rebuild',
+        arguments: {}
+      });
+      const projectionRebuildText = readTextToolResult(projectionRebuildResult);
       const knowledgeJsonl = await readFile(
         join(projectRoot, '.dev-mesh', 'knowledge', 'canonical', 'entries.jsonl'),
         'utf8'
@@ -140,6 +233,12 @@ describe('local MCP proxy', () => {
         expect.arrayContaining([
           'mesh_search_context',
           'mesh_get_status',
+          'mesh_projection_status',
+          'mesh_projection_rebuild',
+          'mesh_branch_list',
+          'mesh_branch_create',
+          'mesh_branch_switch',
+          'mesh_branch_policy',
           'mesh_get_knowledge',
           'mesh_list_knowledge',
           'mesh_capture_knowledge',
@@ -161,14 +260,34 @@ describe('local MCP proxy', () => {
       expect(fetchedText).toContain(`id: ${capturedId}`);
       expect(fetchedText).toContain('title: Local proxy captures knowledge');
       expect(listedText).toContain(`id=${capturedId}`);
+      expect(mainBranchListText).toContain('items: 0');
+      expect(mainBranchListText).not.toContain(capturedId);
+      expect(frontendBranchListText).toContain(`id=${capturedId}`);
       expect(statusText).toContain('service: devmesh');
       expect(statusText).toContain(`version: ${DEV_MESH_VERSION}`);
       expect(statusText).toContain('mode: local-only');
+      expect(statusText).toContain('activeBranch: main');
       expect(statusText).toContain(`projectRoot: ${projectRoot}`);
       expect(statusText).toContain(`storeRoot: ${join(projectRoot, '.dev-mesh')}`);
+      expect(projectionStatusText).toContain('Projection status');
+      expect(projectionStatusText).toContain('state:');
+      expect(branchListText).toContain('Knowledge branches');
+      expect(branchListText).toContain('* main');
+      expect(branchListText).toContain('policy=balanced');
+      expect(branchCreateText).toContain('frontend');
+      expect(branchCreateText).toContain('policy=frontend_design');
+      expect(branchCreateText).toContain('shared');
+      expect(branchCreateText).toContain('base=true');
+      expect(branchSwitchText).toContain('active: frontend');
+      expect(branchSwitchText).toContain('* frontend');
+      expect(branchPolicyText).toContain('* frontend');
+      expect(branchPolicyText).toContain('policy=durable_only');
       expect(contextText).toContain('query: local proxy');
       expect(contextText).toContain(`id=${capturedId}`);
       expect(contextText).toContain('Local proxy captures knowledge');
+      expect(mainBranchContextText).toContain('items: 0');
+      expect(mainBranchContextText).not.toContain(capturedId);
+      expect(frontendBranchContextText).toContain(`id=${capturedId}`);
       expect(linkedText).toContain('Linked knowledge');
       expect(linkedText).toContain('kind: supersedes');
       expect(linkedText).toContain(`fromId: ${capturedId}`);
@@ -177,6 +296,9 @@ describe('local MCP proxy', () => {
       expect(graphText).toContain(`node id=knowledge:${capturedId}`);
       expect(graphText).toContain(`node id=knowledge:${previousId}`);
       expect(graphText).toContain('edge kind=supersedes');
+      expect(mainBranchGraphText).toContain('nodes: 0');
+      expect(mainBranchGraphText).not.toContain(capturedId);
+      expect(frontendBranchGraphText).toContain(`node id=knowledge:${capturedId}`);
       expect(updatedText).toContain(`id: ${capturedId}`);
       expect(updatedText).toContain('summary: The local proxy should persist and update MCP knowledge calls.');
       expect(updatedText).toContain('tags: mcp, proxy, crud');
@@ -184,7 +306,10 @@ describe('local MCP proxy', () => {
       expect(deletedText).toContain(`id: ${previousId}`);
       expect(deletedText).toContain('status: tombstone');
       expect(deletedText).toContain('event: kind=knowledge.deleted');
+      expect(projectionRebuildText).toContain('Projection rebuilt');
+      expect(projectionRebuildText).toContain('documents:');
       expect(knowledgeJsonl).toContain('"title":"Local proxy captures knowledge"');
+      expect(knowledgeJsonl).toContain('"branch":"frontend"');
       expect(knowledgeJsonl).toContain('"status":"tombstone"');
       expect(edgesJsonl).toContain('"kind":"supersedes"');
       expect(edgesJsonl).toContain(`"fromId":"${capturedId}"`);

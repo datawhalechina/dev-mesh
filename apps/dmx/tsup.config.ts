@@ -6,6 +6,7 @@ export default defineConfig({
   clean: true,
   dts: false,
   splitting: false,
+  external: ['@automerge/automerge'],
   noExternal: [
     '@devmesh/adapters',
     '@devmesh/agent',
