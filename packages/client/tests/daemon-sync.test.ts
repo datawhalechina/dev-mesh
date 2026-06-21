@@ -519,6 +519,296 @@ describe('daemon sync', () => {
     }
   });
 
+  it('recovers offline active and base branch sync after reconnecting without duplicating changes', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-daemon-recovery-project-'));
+    const remoteRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-daemon-recovery-remote-'));
+    const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-daemon-recovery-global-'));
+    const checkedAt = '2026-06-09T00:04:30.000Z';
+    const projectKey = 'recovery-app';
+    const joinedServers = [
+      createJoinedServerRecord('frontend', 'frontend-team'),
+      createJoinedServerRecord('shared', 'shared')
+    ];
+    const requests: TestCrdtSyncRequest[] = [];
+    let online = true;
+
+    try {
+      await ensureProjectStore(projectRoot, {
+        projectKey
+      });
+      await ensureProjectStore(remoteRoot, {
+        projectKey
+      });
+      const config = await readProjectConfig(projectRoot);
+      const remoteConfig = await readProjectConfig(remoteRoot);
+      config.knowledgeBranch.active = 'frontend-team';
+      config.knowledgeBranch.base = 'shared';
+      config.knowledgeBranch.branches = [
+        {
+          name: 'frontend-team',
+          policy: 'frontend_design'
+        },
+        {
+          name: 'shared',
+          policy: 'durable_only'
+        }
+      ];
+      remoteConfig.knowledgeBranch.active = 'shared';
+      remoteConfig.knowledgeBranch.branches = [
+        {
+          name: 'shared',
+          policy: 'durable_only'
+        }
+      ];
+      await writeProjectConfig(projectRoot, config);
+      await writeProjectConfig(remoteRoot, remoteConfig);
+      const activeSeed = await captureProjectKnowledge(
+        projectRoot,
+        {
+          id: 'kn_recovery_active_seed',
+          type: 'decision',
+          title: 'Offline recovery active seed',
+          summary: 'The active branch should keep syncing after reconnecting from offline.',
+          layer: 'canonical',
+          tags: ['sync', 'recovery']
+        },
+        {
+          projectKey,
+          branch: 'frontend-team'
+        }
+      );
+      const sharedSeed = await captureProjectKnowledge(
+        remoteRoot,
+        {
+          id: 'kn_recovery_shared_seed',
+          type: 'decision',
+          title: 'Offline recovery shared seed',
+          summary: 'The shared branch should resume from the last accepted base heads.',
+          layer: 'canonical',
+          tags: ['sync', 'recovery']
+        },
+        {
+          projectKey,
+          branch: 'shared'
+        }
+      );
+      const sharedProjectChanges = await readProjectCrdtChangesSince(remoteRoot, [], {
+        projectKey
+      });
+      await applyBranchCrdtChanges(remoteRoot, 'shared', sharedProjectChanges.changes, {
+        projectKey
+      });
+      await writeFile(
+        join(globalRoot, 'identity.json'),
+        `${JSON.stringify({ joinedServers }, null, 2)}\n`,
+        'utf8'
+      );
+
+      const fetchStub = async (_input: string | URL, init?: RequestInit): Promise<Response> => {
+        if (!online) {
+          throw new Error('offline');
+        }
+
+        const body =
+          typeof init?.body === 'string' ? (JSON.parse(init.body) as TestCrdtSyncRequest) : undefined;
+
+        if (body === undefined) {
+          throw new Error('Expected CRDT exchange body.');
+        }
+
+        requests.push(body);
+
+        const responseChanges =
+          body.document.groupKey === 'shared'
+            ? (await readBranchCrdtChangesSince(remoteRoot, 'shared', body.heads, {
+                projectKey
+              })).changes.map(toTestCrdtSyncChange)
+            : [];
+
+        return jsonResponse({
+          document: body.document,
+          acceptedChanges: body.changes.map((change) => ({
+            id: change.id,
+            headsAfter: body.heads
+          })),
+          rejected: [],
+          heads: body.heads,
+          changes: responseChanges,
+          projection: {
+            materialized: true,
+            sourceHeads: body.heads,
+            updatedAt: checkedAt
+          }
+        });
+      };
+
+      const firstStatus = await runDaemonSyncOnce({
+        projectRoot,
+        globalRoot,
+        now: () => new Date(checkedAt),
+        fetch: fetchStub
+      });
+
+      const activeOfflineChange = await captureProjectKnowledge(
+        projectRoot,
+        {
+          id: 'kn_recovery_active_live',
+          type: 'decision',
+          title: 'Offline recovery active live',
+          summary: 'A new active branch change appears while the daemon is offline.',
+          layer: 'canonical',
+          tags: ['sync', 'recovery']
+        },
+        {
+          projectKey,
+          branch: 'frontend-team'
+        }
+      );
+      const sharedOfflineChange = await captureProjectKnowledge(
+        remoteRoot,
+        {
+          id: 'kn_recovery_shared_live',
+          type: 'decision',
+          title: 'Offline recovery shared live',
+          summary: 'A new shared branch change appears while the daemon is offline.',
+          layer: 'canonical',
+          tags: ['sync', 'recovery']
+        },
+        {
+          projectKey,
+          branch: 'shared'
+        }
+      );
+      const sharedLiveProjectChanges = await readProjectCrdtChangesSince(remoteRoot, sharedProjectChanges.heads, {
+        projectKey
+      });
+      await applyBranchCrdtChanges(remoteRoot, 'shared', sharedLiveProjectChanges.changes, {
+        projectKey
+      });
+
+      online = false;
+      const offlineStatus = await runDaemonSyncOnce({
+        projectRoot,
+        globalRoot,
+        now: () => new Date(checkedAt),
+        fetch: fetchStub
+      });
+
+      online = true;
+      const recoveredStatus = await runDaemonSyncOnce({
+        projectRoot,
+        globalRoot,
+        now: () => new Date(checkedAt),
+        fetch: fetchStub
+      });
+      const repeatStatus = await runDaemonSyncOnce({
+        projectRoot,
+        globalRoot,
+        now: () => new Date(checkedAt),
+        fetch: fetchStub
+      });
+      const heads = await readDaemonSyncHeads(projectRoot);
+      const activeItems = await loadProjectKnowledgeItemsFromCrdt(projectRoot, {
+        projectKey
+      });
+      const baseItems = await loadBranchKnowledgeItemsFromCrdt(projectRoot, 'shared', {
+        projectKey
+      });
+      const remoteState = await readBranchCrdtSyncState(remoteRoot, 'shared', {
+        projectKey
+      });
+
+      expect(firstStatus.remotes).toEqual([
+        expect.objectContaining({
+          branchRole: 'active',
+          groupKey: 'frontend-team',
+          pushedChanges: expect.any(Number),
+          pulledChanges: 0,
+          exchangeComplete: true
+        }),
+        expect.objectContaining({
+          branchRole: 'base',
+          groupKey: 'shared',
+          pulledChanges: expect.any(Number),
+          appliedChanges: expect.any(Number),
+          exchangeComplete: true
+        })
+      ]);
+      expect(offlineStatus.remotes).toEqual([
+        expect.objectContaining({
+          branchRole: 'active',
+          groupKey: 'frontend-team',
+          lastError: expect.stringContaining('offline')
+        }),
+        expect.objectContaining({
+          branchRole: 'base',
+          groupKey: 'shared',
+          lastError: expect.stringContaining('offline')
+        })
+      ]);
+      expect(recoveredStatus.remotes).toEqual([
+        expect.objectContaining({
+          branchRole: 'active',
+          groupKey: 'frontend-team',
+          queuedLocalChanges: 0,
+          pushedChanges: expect.any(Number),
+          pulledChanges: 0,
+          exchangeComplete: true
+        }),
+        expect.objectContaining({
+          branchRole: 'base',
+          groupKey: 'shared',
+          queuedLocalChanges: 0,
+          pushedChanges: 0,
+          pulledChanges: expect.any(Number),
+          appliedChanges: expect.any(Number),
+          exchangeComplete: true
+        })
+      ]);
+      expect(repeatStatus.remotes).toEqual([
+        expect.objectContaining({
+          branchRole: 'active',
+          groupKey: 'frontend-team',
+          queuedLocalChanges: 0,
+          pushedChanges: 0,
+          pulledChanges: 0,
+          appliedChanges: 0
+        }),
+        expect.objectContaining({
+          branchRole: 'base',
+          groupKey: 'shared',
+          queuedLocalChanges: 0,
+          pushedChanges: 0,
+          pulledChanges: 0,
+          appliedChanges: 0
+        })
+      ]);
+      expect(requests.map((request) => request.document.groupKey)).toEqual([
+        'frontend-team',
+        'shared',
+        'frontend-team',
+        'shared',
+        'frontend-team',
+        'shared'
+      ]);
+      expect(activeItems.map((item) => item.id)).toEqual(
+        expect.arrayContaining([activeSeed.item.id, activeOfflineChange.item.id])
+      );
+      expect(baseItems.map((item) => item.id)).toEqual(
+        expect.arrayContaining([sharedSeed.item.id, sharedOfflineChange.item.id])
+      );
+      expect(remoteState.initialized).toBe(true);
+      expect(heads).toMatchObject({
+        schemaVersion: 2,
+        materialized: true
+      });
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+      await rm(remoteRoot, { recursive: true, force: true });
+      await rm(globalRoot, { recursive: true, force: true });
+    }
+  });
+
   it('negotiates the base knowledge branch as read-only', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-daemon-base-branch-project-'));
     const remoteRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-daemon-base-branch-remote-'));
