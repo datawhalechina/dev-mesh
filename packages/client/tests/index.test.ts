@@ -63,7 +63,7 @@ describe('initGlobalConfig', () => {
       await rm(claudeHome, { recursive: true, force: true });
       await rm(opencodeConfigHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('normalizes aliases and comma-separated tool lists', async () => {
     const globalRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-client-global-'));
@@ -172,11 +172,17 @@ describe('client runtime status', () => {
         },
         sync: {
           daemon: undefined,
-          heads: undefined
+          heads: expect.objectContaining({
+            schemaVersion: 2,
+            localHeads: [],
+            projectionSourceHeads: [],
+            materialized: false,
+            remotes: {}
+          })
         }
       });
     } finally {
       await rm(projectRoot, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 });

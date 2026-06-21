@@ -25,6 +25,7 @@ import { nowIso } from '@devmesh/shared';
 export const CRDT_STORE_SCHEMA_VERSION = 2;
 export const PROJECT_AUTOMERGE_RELATIVE_PATH = join('crdt', 'project.automerge');
 export const AUTOMERGE_GENESIS_ACTOR_ID = '00000000000000000000000000000000';
+export const AUTOMERGE_GENESIS_MESSAGE = 'DevMesh deterministic genesis';
 
 export type EntityKind =
   | 'project'
@@ -828,7 +829,16 @@ function createSeededAutomergeDoc<TDoc extends Record<string, unknown>>(
   doc: TDoc,
   actorId: string | undefined
 ): AutomergeDoc<TDoc> {
-  const seeded = Automerge.from(cloneJson(doc), AUTOMERGE_GENESIS_ACTOR_ID);
+  const seeded = Automerge.change(
+    Automerge.init<TDoc>(AUTOMERGE_GENESIS_ACTOR_ID),
+    {
+      message: AUTOMERGE_GENESIS_MESSAGE,
+      time: 0
+    },
+    (draft) => {
+      replaceDocumentContents(draft as TDoc, doc);
+    }
+  );
 
   return Automerge.load<TDoc>(Automerge.save(seeded), actorId);
 }

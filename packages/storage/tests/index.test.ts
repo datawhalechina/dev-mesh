@@ -70,7 +70,7 @@ describe('PostgreSQL Hub state store', () => {
     const restored = await store.load();
 
     expect(db.queries.some((query) => query.includes('CREATE TABLE IF NOT EXISTS "dev_mesh_hub_state_test"'))).toBe(true);
-    expect(db.savedState).toContain('"version":1');
+    expect(db.savedState).toContain('"version":2');
     expect(restored.groups.get('design')).toMatchObject({
       key: 'design',
       displayName: 'Design'

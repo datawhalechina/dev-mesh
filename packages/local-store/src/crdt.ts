@@ -49,6 +49,11 @@ export interface ReadProjectCrdtChangesSinceResult extends ProjectCrdtSyncState 
   changes: Uint8Array[];
 }
 
+export interface ReadBranchCrdtChangesSinceResult extends BranchCrdtSyncState {
+  sinceHeads: string[];
+  changes: Uint8Array[];
+}
+
 export interface ApplyProjectCrdtChangesResult extends ProjectCrdtStoreResult {
   headsBefore: string[];
   headsAfter: string[];
@@ -235,6 +240,48 @@ export async function readProjectCrdtChangesSince(
   };
 }
 
+export async function readBranchCrdtChangesSince(
+  projectRoot: string,
+  branchKey: string,
+  heads: string[],
+  options: ImportProjectJsonlToCrdtOptions = {}
+): Promise<ReadBranchCrdtChangesSinceResult> {
+  const store = await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey));
+  const path = getBranchAutomergePath(store.storeRoot, branchKey);
+  const sinceHeads = [...heads];
+
+  if (!(await pathExists(path))) {
+    return {
+      branchKey,
+      path,
+      initialized: false,
+      heads: [],
+      changeCount: 0,
+      sinceHeads,
+      changes: []
+    };
+  }
+
+  const backend = await createBranchCrdtBackend(projectRoot, branchKey, options);
+  let changes: Uint8Array[];
+
+  try {
+    changes = await backend.getChangesSince(sinceHeads);
+  } catch {
+    changes = await backend.getAllChanges();
+  }
+
+  return {
+    branchKey,
+    path,
+    initialized: true,
+    heads: await backend.getHeads(),
+    changeCount: (await backend.getAllChanges()).length,
+    sinceHeads,
+    changes
+  };
+}
+
 export async function applyProjectCrdtChanges(
   projectRoot: string,
   changes: Uint8Array[],
@@ -291,7 +338,6 @@ export async function applyBranchCrdtChanges(
 ): Promise<ApplyBranchCrdtChangesResult> {
   const store = await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey));
   const backend = await createBranchCrdtBackend(projectRoot, branchKey, options);
-  await backend.load();
   const result = await backend.applyAutomergeChanges(changes);
 
   return {

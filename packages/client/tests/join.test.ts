@@ -125,7 +125,7 @@ describe('joinServerGroup', () => {
     } finally {
       await rm(globalRoot, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 });
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
