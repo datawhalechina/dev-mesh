@@ -185,4 +185,54 @@ describe('client runtime status', () => {
       await rm(projectRoot, { recursive: true, force: true });
     }
   }, 15000);
+
+  it('finds a knowledge path through the local project graph', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-client-graph-path-'));
+
+    try {
+      const runtime = createDevMeshClientRuntime({
+        projectRoot
+      });
+      const source = await runtime.captureKnowledge({
+        type: 'decision',
+        title: 'Graph path source',
+        summary: 'Source knowledge item for path search.'
+      });
+      const mid = await runtime.captureKnowledge({
+        type: 'decision',
+        title: 'Graph path middle',
+        summary: 'Intermediate knowledge item for path search.'
+      });
+      const target = await runtime.captureKnowledge({
+        type: 'decision',
+        title: 'Graph path target',
+        summary: 'Target knowledge item for path search.'
+      });
+
+      await runtime.linkKnowledge({
+        kind: 'supersedes',
+        fromId: (source as { id: string }).id,
+        toId: (mid as { id: string }).id
+      });
+      await runtime.linkKnowledge({
+        kind: 'supersedes',
+        fromId: (mid as { id: string }).id,
+        toId: (target as { id: string }).id
+      });
+
+      const graphPath = await runtime.findKnowledgeGraphPath({
+        sourceId: (source as { id: string }).id,
+        targetId: (target as { id: string }).id,
+        depth: 2
+      });
+
+      expect(graphPath.sourceNodeId).toBe(`knowledge:${(source as { id: string }).id}`);
+      expect(graphPath.targetNodeId).toBe(`knowledge:${(target as { id: string }).id}`);
+      expect(graphPath.pathFound).toBe(true);
+      expect(graphPath.nodeIds[0]).toBe(`knowledge:${(source as { id: string }).id}`);
+      expect(graphPath.nodeIds.at(-1)).toBe(`knowledge:${(target as { id: string }).id}`);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  }, 15000);
 });

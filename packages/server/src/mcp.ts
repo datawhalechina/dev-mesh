@@ -13,7 +13,7 @@ import type {
   UpdateKnowledgeInput
 } from '@devmesh/core';
 import { createDevMeshCore } from '@devmesh/core';
-import { buildKnowledgeGraph, exploreKnowledgeGraph, type KnowledgeGraphSemanticEdge } from '@devmesh/graph';
+import { buildKnowledgeGraph, exploreKnowledgeGraph, findKnowledgeGraphPath, type KnowledgeGraphSemanticEdge } from '@devmesh/graph';
 import { DEV_MESH_VERSION } from '@devmesh/shared';
 import {
   DEV_MESH_MCP_INSTRUCTIONS,
@@ -21,6 +21,7 @@ import {
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
   type MeshDeleteKnowledgeInput,
+  type MeshGraphPathInput,
   type MeshExploreKnowledgeGraphInput,
   type MeshLinkKnowledgeInput,
   type MeshListKnowledgeInput,
@@ -281,6 +282,23 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
         }
       };
     },
+    async graphPath(input: MeshGraphPathInput) {
+      const branchCore = coreForBranch(input.branch, core);
+      const items = filterKnowledgeForMcpScope(await branchCore.listKnowledge({
+        includeSuperseded: true
+      }), input.branch, core);
+      const semanticEdges = filterSemanticEdgesByGroup(await options.knowledgeEdges?.(), input.branch);
+      const graph = buildKnowledgeGraph(
+        items,
+        semanticEdges === undefined
+          ? {}
+          : {
+              semanticEdges
+            }
+      );
+
+      return findKnowledgeGraphPath(graph, input);
+    },
     async exploreKnowledgeGraph(input: MeshExploreKnowledgeGraphInput) {
       const branchCore = coreForBranch(input.branch, core);
       const items = filterKnowledgeForMcpScope(await branchCore.listKnowledge({
@@ -297,6 +315,10 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
       );
 
       return exploreKnowledgeGraph(graph, input);
+    }
+  }, {
+    capabilities: {
+      power: true
     }
   });
 

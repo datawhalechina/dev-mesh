@@ -250,6 +250,7 @@ describe('local MCP proxy', () => {
           'mesh_search_member_experience',
           'mesh_resolve_term',
           'mesh_scan_project_knowledge',
+          'mesh_graph_path',
           'mesh_explore_knowledge_graph'
         ])
       );

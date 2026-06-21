@@ -15,6 +15,7 @@ import type {
   MeshCaptureKnowledgeInput,
   MeshCaptureTaskInput,
   MeshDeleteKnowledgeInput,
+  MeshGraphPathInput,
   MeshExploreKnowledgeGraphInput,
   MeshGetKnowledgeInput,
   MeshGetStatusInput,
@@ -354,6 +355,12 @@ function createDaemonAwareHandlers(
         )
       );
     },
+    async graphPath(input) {
+      return formatMeshToolOutput(
+        'mesh_graph_path',
+        await callDaemonOrLocal('mesh_graph_path', input, () => localHandlers.graphPath(input), options)
+      );
+    },
     async exploreKnowledgeGraph(input) {
       return formatMeshToolOutput(
         'mesh_explore_knowledge_graph',
@@ -402,6 +409,7 @@ async function callDaemonOrLocal(
     | MeshUpdateKnowledgeInput
     | MeshDeleteKnowledgeInput
     | MeshCaptureTaskInput
+    | MeshGraphPathInput
     | MeshExploreKnowledgeGraphInput
     | MeshLinkKnowledgeInput
     | MeshScanProjectKnowledgeInput

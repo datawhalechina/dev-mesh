@@ -3396,7 +3396,13 @@ describe('hub server HTTP integration', () => {
 
       const tools = await client.listTools();
       expect(tools.tools.map((tool) => tool.name)).toEqual(
-        expect.arrayContaining(['mesh_get_status', 'mesh_search_context', 'mesh_capture_knowledge', 'mesh_link_knowledge'])
+        expect.arrayContaining([
+          'mesh_get_status',
+          'mesh_search_context',
+          'mesh_capture_knowledge',
+          'mesh_link_knowledge',
+          'mesh_graph_path'
+        ])
       );
       const statusResult = await client.callTool({
         name: 'mesh_get_status',

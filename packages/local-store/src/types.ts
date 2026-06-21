@@ -13,6 +13,8 @@ import type {
 import type {
   ExploreKnowledgeGraphInput,
   ExploreKnowledgeGraphResult,
+  FindKnowledgeGraphPathInput,
+  KnowledgeGraphPathResult,
   KnowledgeGraph,
   KnowledgeGraphSemanticEdgeKind
 } from '@devmesh/graph';
@@ -214,6 +216,8 @@ export type ProjectKnowledgeGraph = KnowledgeGraph & {
 
 export type ProjectKnowledgeGraphExploreResult = ExploreKnowledgeGraphResult;
 export type ProjectKnowledgeGraphExploreInput = ExploreKnowledgeGraphInput;
+export type ProjectKnowledgeGraphPathResult = KnowledgeGraphPathResult;
+export type ProjectKnowledgeGraphPathInput = FindKnowledgeGraphPathInput;
 
 export interface ProjectKnowledgeEdge {
   id: string;

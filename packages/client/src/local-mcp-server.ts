@@ -21,6 +21,7 @@ import {
   type MeshCaptureKnowledgeInput,
   type MeshCaptureTaskInput,
   type MeshDeleteKnowledgeInput,
+  type MeshGraphPathInput,
   type MeshExploreKnowledgeGraphInput,
   type MeshLinkKnowledgeInput,
   type MeshListKnowledgeInput,
@@ -46,7 +47,11 @@ export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers)
     }
   );
 
-  registerMeshTools(mcp, handlers);
+  registerMeshTools(mcp, handlers, {
+    capabilities: {
+      power: true
+    }
+  });
 
   return mcp;
 }
@@ -83,6 +88,9 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
         types: ['glossary'],
         limit: input.limit
       });
+    },
+    graphPath(input: MeshGraphPathInput) {
+      return runtime.findKnowledgeGraphPath(toGraphPathInput(input));
     }
   };
 }
@@ -423,6 +431,45 @@ function toScanProjectKnowledgeInput(input: MeshScanProjectKnowledgeInput): Mesh
   return {
     limit: input.limit
   };
+}
+
+function toGraphPathInput(
+  input: MeshGraphPathInput
+): NonNullable<Parameters<DevMeshClientRuntime['findKnowledgeGraphPath']>[0]> {
+  const graphPath: NonNullable<Parameters<DevMeshClientRuntime['findKnowledgeGraphPath']>[0]> = {
+    depth: input.depth,
+    limit: input.limit
+  };
+
+  if (input.branch !== undefined) {
+    graphPath.branch = input.branch;
+  }
+
+  if (input.sourceId !== undefined) {
+    graphPath.sourceId = input.sourceId;
+  }
+
+  if (input.sourceQuery !== undefined) {
+    graphPath.sourceQuery = input.sourceQuery;
+  }
+
+  if (input.targetId !== undefined) {
+    graphPath.targetId = input.targetId;
+  }
+
+  if (input.targetQuery !== undefined) {
+    graphPath.targetQuery = input.targetQuery;
+  }
+
+  if (input.nodeKinds !== undefined) {
+    graphPath.nodeKinds = input.nodeKinds;
+  }
+
+  if (input.edgeKinds !== undefined) {
+    graphPath.edgeKinds = input.edgeKinds;
+  }
+
+  return graphPath;
 }
 
 function toExploreKnowledgeGraphInput(

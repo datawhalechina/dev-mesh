@@ -33,6 +33,8 @@ export type {
   ProjectKnowledgeGraph,
   ProjectKnowledgeGraphExploreInput,
   ProjectKnowledgeGraphExploreResult,
+  ProjectKnowledgeGraphPathInput,
+  ProjectKnowledgeGraphPathResult,
   ProjectedKnowledgeQuality,
   ProjectQualityProjection,
   ProjectProjectionFileStatus,
@@ -122,6 +124,7 @@ export { JsonlKnowledgeRepository } from './repository.js';
 export { rebuildProjectIndex, searchProjectIndex } from './indexer.js';
 export {
   exploreProjectGraph,
+  findProjectGraphPath,
   readProjectGraph,
   rebuildProjectGraph
 } from './graph-indexer.js';

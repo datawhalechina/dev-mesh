@@ -5,8 +5,10 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { KnowledgeItem } from '@devmesh/core';
 import {
   buildKnowledgeGraph,
+  findKnowledgeGraphPath,
   exploreKnowledgeGraph,
   type ExploreKnowledgeGraphInput,
+  type FindKnowledgeGraphPathInput,
   type KnowledgeGraphEdge,
   type KnowledgeGraphNode,
   type KnowledgeGraphSemanticEdge
@@ -22,6 +24,7 @@ import {
   type ProjectBranchScope,
   type ProjectKnowledgeGraph,
   type ProjectKnowledgeGraphExploreResult,
+  type ProjectKnowledgeGraphPathResult,
   type RebuildProjectGraphResult
 } from './types.js';
 
@@ -83,6 +86,19 @@ export async function exploreProjectGraph(
   });
 
   return exploreKnowledgeGraph(graph, input);
+}
+
+export async function findProjectGraphPath(
+  projectRoot: string,
+  input: FindKnowledgeGraphPathInput = {},
+  branchScope?: ProjectBranchScope
+): Promise<ProjectKnowledgeGraphPathResult> {
+  const graphInput = await loadProjectGraphInput(projectRoot, branchScope ?? (await readProjectBranchScope(projectRoot)));
+  const graph = buildKnowledgeGraph(graphInput.items, {
+    semanticEdges: graphInput.semanticEdges
+  });
+
+  return findKnowledgeGraphPath(graph, input);
 }
 
 async function loadProjectGraphInput(

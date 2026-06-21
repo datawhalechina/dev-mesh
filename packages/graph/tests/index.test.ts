@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createKnowledgeItem } from '@devmesh/core';
-import { buildKnowledgeGraph, exploreKnowledgeGraph, knowledgeNodeId } from '../src/index.js';
+import { buildKnowledgeGraph, exploreKnowledgeGraph, findKnowledgeGraphPath, knowledgeNodeId } from '../src/index.js';
 
 describe('knowledge graph', () => {
   it('builds graph nodes and edges from knowledge items', () => {
@@ -182,5 +182,105 @@ describe('knowledge graph', () => {
       expect.arrayContaining([knowledgeNodeId('ki_new'), knowledgeNodeId('ki_old')])
     );
     expect(explored.edges.map((edge) => edge.kind)).toEqual(['supersedes']);
+  });
+
+  it('finds an explanatory path between related knowledge items', () => {
+    const currentTask = createKnowledgeItem({
+      id: 'ki_task',
+      type: 'task',
+      title: 'Implement graph.path',
+      summary: 'The current task needs a graph path to a prior decision.',
+      tags: ['graph', 'path'],
+      createdAt: '2026-06-09T10:00:00.000Z'
+    });
+    const packageEntity = createKnowledgeItem({
+      id: 'ki_package',
+      type: 'design_principle',
+      title: 'Local-store exposes graph traversal helpers',
+      summary: 'The local store reuses graph building and traversal primitives.',
+      para: {
+        category: 'projects',
+        key: 'mcp-context-mesh'
+      },
+      createdAt: '2026-06-09T10:01:00.000Z'
+    });
+    const apiEntity = createKnowledgeItem({
+      id: 'ki_api',
+      type: 'decision',
+      title: 'Expose graph path through runtime',
+      summary: 'Runtime should surface graph path as a first-class operation.',
+      createdAt: '2026-06-09T10:02:00.000Z'
+    });
+    const historicalPitfall = createKnowledgeItem({
+      id: 'ki_pitfall',
+      type: 'pitfall',
+      title: 'Avoid text-hit-only graph tools',
+      summary: 'Graph tools that only return text hits are hard to explain.',
+      createdAt: '2026-06-09T10:03:00.000Z'
+    });
+    const canonicalDecision = createKnowledgeItem({
+      id: 'ki_decision',
+      type: 'decision',
+      title: 'Use graph paths for explanation',
+      summary: 'Return knowledge paths instead of only text matches.',
+      createdAt: '2026-06-09T10:04:00.000Z'
+    });
+    const graph = buildKnowledgeGraph([currentTask, packageEntity, apiEntity, historicalPitfall, canonicalDecision], {
+      semanticEdges: [
+        {
+          kind: 'supersedes',
+          fromId: 'ki_task',
+          toId: 'ki_package'
+        },
+        {
+          kind: 'supersedes',
+          fromId: 'ki_package',
+          toId: 'ki_api'
+        },
+        {
+          kind: 'contradicts',
+          fromId: 'ki_api',
+          toId: 'ki_pitfall'
+        },
+        {
+          kind: 'supersedes',
+          fromId: 'ki_pitfall',
+          toId: 'ki_decision'
+        }
+      ]
+    });
+
+    const path = findKnowledgeGraphPath(graph, {
+      sourceId: 'ki_task',
+      targetId: 'ki_decision',
+      depth: 4
+    });
+
+    expect(path.pathFound).toBe(true);
+    expect(path.nodeIds).toEqual([
+      knowledgeNodeId('ki_task'),
+      knowledgeNodeId('ki_package'),
+      knowledgeNodeId('ki_api'),
+      knowledgeNodeId('ki_pitfall'),
+      knowledgeNodeId('ki_decision')
+    ]);
+    expect(path.steps.map((step) => step.kind)).toEqual([
+      'supersedes',
+      'supersedes',
+      'contradicts',
+      'supersedes'
+    ]);
+    expect(path.explanation).toContain('supersedes');
+  });
+
+  it('reports when a path endpoint cannot be resolved', () => {
+    const graph = buildKnowledgeGraph([]);
+    const path = findKnowledgeGraphPath(graph, {
+      sourceId: 'missing',
+      targetId: 'also-missing'
+    });
+
+    expect(path.pathFound).toBe(false);
+    expect(path.message).toContain('Unable to resolve');
   });
 });

@@ -27,9 +27,34 @@ export function registerGraphCommand(program: Command): void {
   const graph = program.command('graph').description('Explore the local DevMesh knowledge graph');
 
   registerExploreCommand(graph);
+  registerPathCommand(graph);
   registerEdgeCommand(graph);
   registerVisualizeCommand(graph, 'visualize');
   registerVisualizeCommand(program, 'visualize');
+}
+
+function registerPathCommand(parent: Command): void {
+  parent
+    .command('path')
+    .description('Find a relation path between two knowledge nodes or queries')
+    .option('--root <path>', 'project root', process.cwd())
+    .option('--branch <name>', 'read from a specific knowledge branch without switching checkout')
+    .option('--source-id <id>', 'source knowledge item id')
+    .option('--source-query <query>', 'source selector query')
+    .option('--target-id <id>', 'target knowledge item id')
+    .option('--target-query <query>', 'target selector query')
+    .option('--depth <n>', 'maximum path depth', parseIntOption, 4)
+    .option('--limit <n>', 'maximum number of nodes explored while searching', parseIntOption, 120)
+    .option('--node-kind <kind>', 'node kind filter', collectOption, [])
+    .option('--edge-kind <kind>', 'edge kind filter', collectOption, [])
+    .option('--json', 'print structured JSON')
+    .action(async (options: GraphPathOptions) => {
+      const runtime = createDevMeshClientRuntime({
+        projectRoot: options.root
+      });
+
+      printJsonOrText('mesh_graph_path', await runtime.findKnowledgeGraphPath(createGraphPathInput(options)), options.json);
+    });
 }
 
 function registerExploreCommand(parent: Command): void {
@@ -169,6 +194,43 @@ function createGraphExploreInput(options: GraphExploreOptions): NonNullable<Para
 
   if (options.id.length > 0) {
     input.ids = options.id;
+  }
+
+  if (options.nodeKind.length > 0) {
+    input.nodeKinds = options.nodeKind.map(parseNodeKind);
+  }
+
+  if (options.edgeKind.length > 0) {
+    input.edgeKinds = options.edgeKind.map(parseEdgeKind);
+  }
+
+  return input;
+}
+
+function createGraphPathInput(options: GraphPathOptions): NonNullable<Parameters<DevMeshClientRuntime['findKnowledgeGraphPath']>[0]> {
+  const input: NonNullable<Parameters<DevMeshClientRuntime['findKnowledgeGraphPath']>[0]> = {
+    depth: options.depth,
+    limit: options.limit
+  };
+
+  if (options.branch !== undefined) {
+    input.branch = options.branch;
+  }
+
+  if (options.sourceId !== undefined) {
+    input.sourceId = options.sourceId;
+  }
+
+  if (options.sourceQuery !== undefined) {
+    input.sourceQuery = options.sourceQuery;
+  }
+
+  if (options.targetId !== undefined) {
+    input.targetId = options.targetId;
+  }
+
+  if (options.targetQuery !== undefined) {
+    input.targetQuery = options.targetQuery;
   }
 
   if (options.nodeKind.length > 0) {
@@ -791,6 +853,20 @@ interface GraphExploreOptions {
   branch?: string;
   query?: string;
   id: string[];
+  depth: number;
+  limit: number;
+  nodeKind: string[];
+  edgeKind: string[];
+  json?: boolean;
+}
+
+interface GraphPathOptions {
+  root: string;
+  branch?: string;
+  sourceId?: string;
+  sourceQuery?: string;
+  targetId?: string;
+  targetQuery?: string;
   depth: number;
   limit: number;
   nodeKind: string[];

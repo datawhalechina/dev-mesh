@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   DEV_MESH_MCP_INSTRUCTIONS,
+  MESH_CORE_TOOL_NAMES,
+  MESH_POWER_TOOL_NAMES,
   meshBranchCreateInputSchema,
   meshBranchListInputSchema,
   meshBranchPolicyInputSchema,
@@ -268,33 +270,26 @@ describe('MCP tool contract schemas', () => {
       searchMemberExperience: vi.fn(async () => ({ query: 'auth', items: [] })),
       resolveTerm: vi.fn(async () => [{ id: 'ki_term', title: 'Term item' }]),
       scanProjectKnowledge: vi.fn(async () => ({ projectRoot: '/tmp/project', findings: [] })),
+      graphPath: vi.fn(async () => ({
+        sourceNodeId: 'knowledge:ki_1',
+        targetNodeId: 'knowledge:ki_2',
+        pathFound: true,
+        nodeIds: ['knowledge:ki_1', 'knowledge:ki_2'],
+        nodes: [
+          { id: 'knowledge:ki_1', kind: 'knowledge', label: 'Source', metadata: {} },
+          { id: 'knowledge:ki_2', kind: 'knowledge', label: 'Target', metadata: {} }
+        ],
+        edges: [],
+        steps: [],
+        explanation: 'Source and target already resolve to Source.',
+        exploredNodeCount: 2
+      })),
       exploreKnowledgeGraph: vi.fn(async () => ({ nodes: [{ id: 'knowledge:ki_1', kind: 'knowledge' }], edges: [] }))
     };
 
     registerMeshTools(fakeServer as never, handlers);
 
-    expect(registered.map((tool) => tool.name)).toEqual([
-      'mesh_get_status',
-      'mesh_projection_status',
-      'mesh_projection_rebuild',
-      'mesh_branch_list',
-      'mesh_branch_create',
-      'mesh_branch_switch',
-      'mesh_branch_policy',
-      'mesh_search_context',
-      'mesh_get_knowledge',
-      'mesh_list_knowledge',
-      'mesh_capture_knowledge',
-      'mesh_update_knowledge',
-      'mesh_delete_knowledge',
-      'mesh_capture_task',
-      'mesh_rate_knowledge',
-      'mesh_link_knowledge',
-      'mesh_search_member_experience',
-      'mesh_resolve_term',
-      'mesh_scan_project_knowledge',
-      'mesh_explore_knowledge_graph'
-    ]);
+    expect(registered.map((tool) => tool.name)).toEqual(MESH_CORE_TOOL_NAMES);
 
     const toolDescriptions = Object.fromEntries(registered.map((tool) => [tool.name, tool.config.description ?? '']));
 
@@ -317,6 +312,7 @@ describe('MCP tool contract schemas', () => {
     expect(toolDescriptions.mesh_scan_project_knowledge).toContain('Capture only durable conclusions');
     expect(toolDescriptions.mesh_explore_knowledge_graph).toContain('related decisions');
     expect(toolDescriptions.mesh_explore_knowledge_graph).toContain('without switching checkout');
+    expect(registered.map((tool) => tool.name)).not.toContain('mesh_graph_path');
 
     const result = await registered[0]?.callback({ query: 'auth' });
     expect(result).toEqual({
@@ -399,6 +395,97 @@ describe('MCP tool contract schemas', () => {
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_capture_task');
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('mesh_link_knowledge');
     expect(DEV_MESH_MCP_INSTRUCTIONS).toContain('Do not capture secrets');
+  });
+
+  it('keeps power tools opt-in at registration time', () => {
+    const registered: string[] = [];
+    const fakeServer = {
+      registerTool(name: string) {
+        registered.push(name);
+      }
+    };
+
+    registerMeshTools(
+      fakeServer as never,
+      {
+        getStatus: vi.fn(async () => ({})),
+        getProjectionStatus: vi.fn(async () => ({})),
+        rebuildProjection: vi.fn(async () => ({})),
+        listBranches: vi.fn(async () => ({})),
+        createBranch: vi.fn(async () => ({})),
+        switchBranch: vi.fn(async () => ({})),
+        setBranchPolicy: vi.fn(async () => ({})),
+        searchContext: vi.fn(async () => ({})),
+        getKnowledge: vi.fn(async () => ({})),
+        listKnowledge: vi.fn(async () => ({})),
+        captureKnowledge: vi.fn(async () => ({})),
+        updateKnowledge: vi.fn(async () => ({})),
+        deleteKnowledge: vi.fn(async () => ({})),
+        captureTask: vi.fn(async () => ({})),
+        rateKnowledge: vi.fn(async () => ({})),
+        linkKnowledge: vi.fn(async () => ({})),
+        searchMemberExperience: vi.fn(async () => ({})),
+        resolveTerm: vi.fn(async () => ({})),
+        scanProjectKnowledge: vi.fn(async () => ({})),
+        graphPath: vi.fn(async () => ({})),
+        exploreKnowledgeGraph: vi.fn(async () => ({}))
+      },
+      {
+        capabilities: {
+          power: false
+        }
+      }
+    );
+
+    expect(registered).not.toContain('mesh_graph_path');
+    expect(MESH_POWER_TOOL_NAMES).toEqual(['mesh_graph_path']);
+  });
+
+  it('registers power tools when power capability is enabled', () => {
+    const registered: string[] = [];
+    const fakeServer = {
+      registerTool(name: string) {
+        registered.push(name);
+      }
+    };
+
+    registerMeshTools(
+      fakeServer as never,
+      {
+        getStatus: vi.fn(async () => ({})),
+        getProjectionStatus: vi.fn(async () => ({})),
+        rebuildProjection: vi.fn(async () => ({})),
+        listBranches: vi.fn(async () => ({})),
+        createBranch: vi.fn(async () => ({})),
+        switchBranch: vi.fn(async () => ({})),
+        setBranchPolicy: vi.fn(async () => ({})),
+        searchContext: vi.fn(async () => ({})),
+        getKnowledge: vi.fn(async () => ({})),
+        listKnowledge: vi.fn(async () => ({})),
+        captureKnowledge: vi.fn(async () => ({})),
+        updateKnowledge: vi.fn(async () => ({})),
+        deleteKnowledge: vi.fn(async () => ({})),
+        captureTask: vi.fn(async () => ({})),
+        rateKnowledge: vi.fn(async () => ({})),
+        linkKnowledge: vi.fn(async () => ({})),
+        searchMemberExperience: vi.fn(async () => ({})),
+        resolveTerm: vi.fn(async () => ({})),
+        scanProjectKnowledge: vi.fn(async () => ({})),
+        graphPath: vi.fn(async () => ({})),
+        exploreKnowledgeGraph: vi.fn(async () => ({}))
+      },
+      {
+        capabilities: {
+          power: true
+        }
+      }
+    );
+
+    expect(registered).toEqual([
+      ...MESH_CORE_TOOL_NAMES.slice(0, -1),
+      ...MESH_POWER_TOOL_NAMES,
+      MESH_CORE_TOOL_NAMES[MESH_CORE_TOOL_NAMES.length - 1]
+    ]);
   });
 });
 

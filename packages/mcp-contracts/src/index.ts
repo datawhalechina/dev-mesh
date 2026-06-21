@@ -211,6 +211,23 @@ export const meshExploreKnowledgeGraphInputSchema = z.object({
   edgeKinds: z.array(z.enum(knowledgeGraphEdgeKinds)).optional()
 });
 
+export const meshGraphPathInputSchema = z.object({
+  branch: z.string().min(1).optional(),
+  sourceId: z.string().min(1).optional(),
+  sourceQuery: z.string().min(1).optional(),
+  targetId: z.string().min(1).optional(),
+  targetQuery: z.string().min(1).optional(),
+  depth: z.number().int().min(1).max(8).default(4),
+  limit: z.number().int().min(2).max(400).default(120),
+  nodeKinds: z.array(z.enum(knowledgeGraphNodeKinds)).optional(),
+  edgeKinds: z.array(z.enum(knowledgeGraphEdgeKinds)).optional()
+}).refine(
+  (input) => (input.sourceId !== undefined || input.sourceQuery !== undefined) && (input.targetId !== undefined || input.targetQuery !== undefined),
+  {
+    message: 'graph path requires both a source and a target selector.'
+  }
+);
+
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
 export type MeshGetStatusInput = z.infer<typeof meshGetStatusInputSchema>;
 export type MeshProjectionStatusInput = z.infer<typeof meshProjectionStatusInputSchema>;
@@ -231,6 +248,15 @@ export type MeshSearchMemberExperienceInput = z.infer<typeof meshSearchMemberExp
 export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
 export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
 export type MeshExploreKnowledgeGraphInput = z.infer<typeof meshExploreKnowledgeGraphInputSchema>;
+export type MeshGraphPathInput = z.infer<typeof meshGraphPathInputSchema>;
+export type MeshToolCapabilityTier = 'core' | 'power' | 'admin';
+
+export interface MeshToolRegistrationOptions {
+  capabilities?: {
+    power?: boolean;
+    admin?: boolean;
+  };
+}
 
 export const DEV_MESH_MCP_INSTRUCTIONS = [
   'DevMesh is an assistant-led project knowledge memory. Treat knowledge capture as part of normal coding work, not as an optional user-requested step.',
@@ -270,6 +296,7 @@ export interface MeshToolHandlers {
   searchMemberExperience(input: MeshSearchMemberExperienceInput): Promise<unknown>;
   resolveTerm(input: MeshResolveTermInput): Promise<unknown>;
   scanProjectKnowledge(input: MeshScanProjectKnowledgeInput): Promise<unknown>;
+  graphPath(input: MeshGraphPathInput): Promise<unknown>;
   exploreKnowledgeGraph(input: MeshExploreKnowledgeGraphInput): Promise<unknown>;
 }
 
@@ -293,9 +320,44 @@ export type MeshToolName =
   | 'mesh_search_member_experience'
   | 'mesh_resolve_term'
   | 'mesh_scan_project_knowledge'
+  | 'mesh_graph_path'
   | 'mesh_explore_knowledge_graph';
 
-export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers): void {
+export const MESH_CORE_TOOL_NAMES = [
+  'mesh_get_status',
+  'mesh_projection_status',
+  'mesh_projection_rebuild',
+  'mesh_branch_list',
+  'mesh_branch_create',
+  'mesh_branch_switch',
+  'mesh_branch_policy',
+  'mesh_search_context',
+  'mesh_get_knowledge',
+  'mesh_list_knowledge',
+  'mesh_capture_knowledge',
+  'mesh_update_knowledge',
+  'mesh_delete_knowledge',
+  'mesh_capture_task',
+  'mesh_rate_knowledge',
+  'mesh_link_knowledge',
+  'mesh_search_member_experience',
+  'mesh_resolve_term',
+  'mesh_scan_project_knowledge',
+  'mesh_explore_knowledge_graph'
+] as const satisfies readonly MeshToolName[];
+
+export const MESH_POWER_TOOL_NAMES = ['mesh_graph_path'] as const satisfies readonly MeshToolName[];
+
+export const MESH_ADMIN_TOOL_NAMES = [] as const satisfies readonly MeshToolName[];
+
+export function registerMeshTools(
+  server: McpServer,
+  handlers: MeshToolHandlers,
+  options: MeshToolRegistrationOptions = {}
+): void {
+  const powerEnabled = options.capabilities?.power === true;
+  const adminEnabled = options.capabilities?.admin === true;
+
   server.registerTool(
     'mesh_get_status',
     {
@@ -544,6 +606,20 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
       )
   );
 
+  if (powerEnabled) {
+    server.registerTool(
+      'mesh_graph_path',
+      {
+        title: 'Find knowledge graph path',
+        description:
+          'Explain the shortest knowledge-relation path between two nodes or queries, including path steps, edge kinds, and an explanation of why the nodes connect.',
+        inputSchema: meshGraphPathInputSchema.shape
+      },
+      async (args) =>
+        textToolResult('mesh_graph_path', await handlers.graphPath(meshGraphPathInputSchema.parse(args)))
+    );
+  }
+
   server.registerTool(
     'mesh_explore_knowledge_graph',
     {
@@ -558,6 +634,11 @@ export function registerMeshTools(server: McpServer, handlers: MeshToolHandlers)
         await handlers.exploreKnowledgeGraph(meshExploreKnowledgeGraphInputSchema.parse(args))
       )
   );
+
+  if (!adminEnabled) {
+    // Admin tools are intentionally not registered yet; this branch keeps the
+    // capability gate explicit for the upcoming admin tool set.
+  }
 }
 
 export function formatMeshToolOutput(toolName: MeshToolName, value: unknown): string {
@@ -600,6 +681,8 @@ export function formatMeshToolOutput(toolName: MeshToolName, value: unknown): st
       return formatKnowledgeList('Resolved terms', value);
     case 'mesh_scan_project_knowledge':
       return formatProjectScan(value);
+    case 'mesh_graph_path':
+      return formatKnowledgeGraphPath(value);
     case 'mesh_explore_knowledge_graph':
       return formatKnowledgeGraph(value);
   }
@@ -939,6 +1022,38 @@ function formatKnowledgeGraph(value: unknown): string {
 
   if (nodes.length > 8 || edges.length > 8) {
     lines.push('Additional graph nodes or edges omitted.');
+  }
+
+  return lines.join('\n');
+}
+
+function formatKnowledgeGraphPath(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const nodes = toRecordArray(value.nodes);
+  const steps = toRecordArray(value.steps);
+  const lines = ['Knowledge graph path'];
+  pushField(lines, 'sourceNodeId', value.sourceNodeId);
+  pushField(lines, 'targetNodeId', value.targetNodeId);
+  pushField(lines, 'pathFound', value.pathFound);
+  pushField(lines, 'explanation', value.explanation);
+  pushField(lines, 'message', value.message);
+  pushField(lines, 'exploredNodeCount', value.exploredNodeCount);
+  lines.push(`steps: ${steps.length}`);
+
+  for (const [index, step] of steps.slice(0, 8).entries()) {
+    const kind = scalarToString(step.kind) ?? 'unknown';
+    const from = scalarToString(step.from) ?? 'unknown';
+    const to = scalarToString(step.to) ?? 'unknown';
+    const direction = scalarToString(step.direction) ?? 'unknown';
+
+    lines.push(`${index + 1}. ${from} -> ${to} | kind=${kind} | direction=${direction}`);
+  }
+
+  if (nodes.length > 0) {
+    lines.push(`nodes: ${nodes.length}`);
   }
 
   return lines.join('\n');

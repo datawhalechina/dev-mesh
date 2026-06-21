@@ -29,6 +29,7 @@ import {
   deleteProjectKnowledge,
   enqueuePendingKnowledge,
   exportProjectCrdtKnowledgeJsonl,
+  findProjectGraphPath,
   readProjectConfig,
   readProjectBranchScope,
   writeProjectConfig,
@@ -55,6 +56,8 @@ import {
   type ProjectStore,
   type ProjectKnowledgeGraphExploreInput,
   type ProjectKnowledgeGraphExploreResult,
+  type ProjectKnowledgeGraphPathInput,
+  type ProjectKnowledgeGraphPathResult,
   type RateProjectKnowledgeOptions,
   type RejectPendingKnowledgeResult,
   type RebuildProjectIndexResult,
@@ -148,6 +151,10 @@ type BranchScopedGraphExploreInput = ProjectKnowledgeGraphExploreInput & {
   branch?: string;
 };
 
+type BranchScopedGraphPathInput = ProjectKnowledgeGraphPathInput & {
+  branch?: string;
+};
+
 export interface DevMeshClientRuntime {
   projectRoot: string;
   core: DevMeshCore;
@@ -177,6 +184,7 @@ export interface DevMeshClientRuntime {
   scanProjectKnowledge(input?: ProjectKnowledgeScanInput): Promise<unknown>;
   exportKnowledge(input?: ExportProjectKnowledgeInput): Promise<ExportProjectKnowledgeResult>;
   exploreKnowledgeGraph(input?: BranchScopedGraphExploreInput): Promise<ProjectKnowledgeGraphExploreResult>;
+  findKnowledgeGraphPath(input?: BranchScopedGraphPathInput): Promise<ProjectKnowledgeGraphPathResult>;
   rebuildIndex(): Promise<RebuildProjectIndexResult>;
   projectionStatus(): Promise<unknown>;
   rebuildProjectionsFromCrdt(): Promise<RebuildProjectProjectionsFromCrdtResult>;
@@ -449,6 +457,13 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
     exportKnowledge: (input = {}) => exportProjectCrdtKnowledgeJsonl(projectRoot, input),
     async exploreKnowledgeGraph(input = {}) {
       return exploreProjectGraph(
+        projectRoot,
+        input,
+        input.branch === undefined ? await readProjectBranchScope(projectRoot) : createSingleBranchScope(input.branch)
+      );
+    },
+    async findKnowledgeGraphPath(input = {}) {
+      return findProjectGraphPath(
         projectRoot,
         input,
         input.branch === undefined ? await readProjectBranchScope(projectRoot) : createSingleBranchScope(input.branch)

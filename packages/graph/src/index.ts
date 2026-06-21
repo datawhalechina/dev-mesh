@@ -75,6 +75,41 @@ export interface ExploreKnowledgeGraphResult {
   totalEdges: number;
 }
 
+export interface KnowledgeGraphPathStep {
+  from: string;
+  to: string;
+  edgeId: string;
+  kind: KnowledgeGraphEdgeKind;
+  direction: 'forward' | 'reverse';
+}
+
+export interface KnowledgeGraphPathResult {
+  generatedAt: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  sourceNode?: KnowledgeGraphNode;
+  targetNode?: KnowledgeGraphNode;
+  pathFound: boolean;
+  nodeIds: string[];
+  nodes: KnowledgeGraphNode[];
+  edges: KnowledgeGraphEdge[];
+  steps: KnowledgeGraphPathStep[];
+  explanation: string;
+  exploredNodeCount: number;
+  message?: string;
+}
+
+export interface FindKnowledgeGraphPathInput {
+  sourceId?: string | undefined;
+  sourceQuery?: string | undefined;
+  targetId?: string | undefined;
+  targetQuery?: string | undefined;
+  depth?: number | undefined;
+  limit?: number | undefined;
+  nodeKinds?: KnowledgeGraphNodeKind[] | undefined;
+  edgeKinds?: KnowledgeGraphEdgeKind[] | undefined;
+}
+
 interface MutableGraph {
   nodes: Map<string, KnowledgeGraphNode>;
   edges: Map<string, KnowledgeGraphEdge>;
@@ -165,6 +200,200 @@ export function exploreKnowledgeGraph(
     totalNodes: graph.nodes.length,
     totalEdges: graph.edges.length
   };
+}
+
+export function findKnowledgeGraphPath(
+  graph: KnowledgeGraph,
+  input: FindKnowledgeGraphPathInput = {}
+): KnowledgeGraphPathResult {
+  const depth = clampInt(input.depth ?? 4, 1, 8);
+  const limit = clampInt(input.limit ?? 120, 2, 400);
+  const nodeKinds = input.nodeKinds === undefined ? new Set<KnowledgeGraphNodeKind>(['knowledge']) : new Set(input.nodeKinds);
+  const edgeKinds =
+    input.edgeKinds === undefined ? new Set<KnowledgeGraphEdgeKind>(KNOWLEDGE_GRAPH_SEMANTIC_EDGE_KINDS) : new Set(input.edgeKinds);
+  const nodesById = new Map(graph.nodes.map((node) => [node.id, node]));
+  const edges = graph.edges.filter((edge) => edgeKinds === undefined || edgeKinds.has(edge.kind));
+  const adjacency = createPathAdjacency(edges);
+  const source = resolvePathEndpoint(graph, nodesById, input.sourceId, input.sourceQuery, nodeKinds);
+  const target = resolvePathEndpoint(graph, nodesById, input.targetId, input.targetQuery, nodeKinds);
+
+  if (source.node === undefined || target.node === undefined) {
+    const result: KnowledgeGraphPathResult = {
+      generatedAt: graph.generatedAt,
+      sourceNodeId: source.node?.id ?? source.nodeId,
+      targetNodeId: target.node?.id ?? target.nodeId,
+      pathFound: false,
+      nodeIds: [],
+      nodes: [],
+      edges: [],
+      steps: [],
+      explanation: 'Unable to resolve one or both path endpoints.',
+      exploredNodeCount: 0,
+      message: source.node === undefined
+        ? describeMissingEndpoint('source', source)
+        : describeMissingEndpoint('target', target)
+    };
+
+    if (source.node !== undefined) {
+      result.sourceNode = source.node;
+    }
+
+    if (target.node !== undefined) {
+      result.targetNode = target.node;
+    }
+
+    if (source.query !== undefined) {
+      result.message = `${result.message ?? ''}${result.message === undefined ? '' : ' '}`;
+    }
+
+    if (target.query !== undefined) {
+      result.message = result.message ?? 'Unable to resolve one or both path endpoints.';
+    }
+
+    return result;
+  }
+
+  if (source.node.id === target.node.id) {
+    const result: KnowledgeGraphPathResult = {
+      generatedAt: graph.generatedAt,
+      sourceNodeId: source.node.id,
+      targetNodeId: target.node.id,
+      pathFound: true,
+      nodeIds: [source.node.id],
+      nodes: [source.node],
+      edges: [],
+      steps: [],
+      explanation: `Source and target already resolve to ${source.node.label}.`,
+      exploredNodeCount: 1
+    };
+
+    if (source.query !== undefined) {
+      result.message = `Source query: ${source.query}.`;
+    }
+
+    if (target.query !== undefined) {
+      result.message = `${result.message ?? ''}${result.message?.length ? ' ' : ''}Target query: ${target.query}.`;
+    }
+
+    return result;
+  }
+
+  const visited = new Set<string>([source.node.id]);
+  const queue: Array<{ id: string; distance: number }> = [{ id: source.node.id, distance: 0 }];
+  const parents = new Map<string, { from: string; edgeId: string; direction: 'forward' | 'reverse' }>();
+  let exploredNodeCount = 0;
+
+  while (queue.length > 0 && visited.size < limit) {
+    const current = queue.shift();
+
+    if (current === undefined || current.distance > depth) {
+      continue;
+    }
+
+    exploredNodeCount += 1;
+
+    if (current.id === target.node.id) {
+      break;
+    }
+
+    if (current.distance >= depth) {
+      continue;
+    }
+
+    for (const next of adjacency.get(current.id) ?? []) {
+      if (visited.has(next)) {
+        continue;
+      }
+
+      const nextNode = nodesById.get(next);
+
+      if (nextNode === undefined) {
+        continue;
+      }
+
+      if (nextNode.id !== target.node.id && nextNode.id !== source.node.id && !nodeKinds.has(nextNode.kind)) {
+        continue;
+      }
+
+      const edge = selectPathEdge(edges, current.id, next);
+
+      if (edge === undefined) {
+        continue;
+      }
+
+      visited.add(next);
+      parents.set(next, {
+        from: current.id,
+        edgeId: edge.id,
+        direction: edge.from === current.id && edge.to === next ? 'forward' : 'reverse'
+      });
+      queue.push({ id: next, distance: current.distance + 1 });
+    }
+  }
+
+  if (!parents.has(target.node.id)) {
+    const result: KnowledgeGraphPathResult = {
+      generatedAt: graph.generatedAt,
+      sourceNodeId: source.node.id,
+      targetNodeId: target.node.id,
+      pathFound: false,
+      nodeIds: [],
+      nodes: [],
+      edges: [],
+      steps: [],
+      explanation: `No path found within depth ${depth}.`,
+      exploredNodeCount,
+      message: `No path found between ${source.node.label} and ${target.node.label} within depth ${depth} and limit ${limit}.`
+    };
+
+    result.sourceNode = source.node;
+    result.targetNode = target.node;
+
+    if (source.query !== undefined) {
+      result.message = `${result.message ?? ''} Source query: ${source.query}.`;
+    }
+
+    if (target.query !== undefined) {
+      result.message = `${result.message ?? ''} Target query: ${target.query}.`;
+    }
+
+    return result;
+  }
+
+  const nodeIds = reconstructPathNodeIds(source.node.id, target.node.id, parents);
+  const nodes = nodeIds
+    .map((id) => nodesById.get(id))
+    .filter((node): node is KnowledgeGraphNode => node !== undefined);
+  const steps = reconstructPathSteps(nodeIds, parents);
+  const pathEdges = steps
+    .map((step) => edges.find((edge) => edge.id === step.edgeId))
+    .filter((edge): edge is KnowledgeGraphEdge => edge !== undefined);
+
+  const result: KnowledgeGraphPathResult = {
+    generatedAt: graph.generatedAt,
+    sourceNodeId: source.node.id,
+    targetNodeId: target.node.id,
+    pathFound: true,
+    nodeIds,
+    nodes,
+    edges: pathEdges,
+    steps,
+    explanation: describePath(nodes, steps),
+    exploredNodeCount
+  };
+
+  result.sourceNode = source.node;
+  result.targetNode = target.node;
+
+  if (source.query !== undefined) {
+    result.message = `Source query: ${source.query}.`;
+  }
+
+  if (target.query !== undefined) {
+    result.message = `${result.message ?? ''}${result.message?.length ? ' ' : ''}Target query: ${target.query}.`;
+  }
+
+  return result;
 }
 
 export function knowledgeNodeId(itemId: string): string {
@@ -338,6 +567,189 @@ function createAdjacency(edges: KnowledgeGraphEdge[]): Map<string, string[]> {
   }
 
   return adjacency;
+}
+
+function createPathAdjacency(edges: KnowledgeGraphEdge[]): Map<string, string[]> {
+  const adjacency = new Map<string, string[]>();
+
+  for (const edge of edges) {
+    pushAdjacent(adjacency, edge.from, edge.to);
+    pushAdjacent(adjacency, edge.to, edge.from);
+  }
+
+  return adjacency;
+}
+
+function selectPathEdge(edges: KnowledgeGraphEdge[], from: string, to: string): KnowledgeGraphEdge | undefined {
+  return edges.find((edge) => (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from));
+}
+
+function resolvePathEndpoint(
+  graph: KnowledgeGraph,
+  nodesById: Map<string, KnowledgeGraphNode>,
+  id: string | undefined,
+  query: string | undefined,
+  nodeKinds: Set<KnowledgeGraphNodeKind> | undefined
+): { nodeId: string; node?: KnowledgeGraphNode; query?: string; score?: number } {
+  if (id !== undefined) {
+    const candidates = id.startsWith('knowledge:')
+      || id.startsWith('para:')
+      || id.startsWith('type:')
+      || id.startsWith('tag:')
+      || id.startsWith('member:')
+      || id.startsWith('source:')
+      ? [id]
+      : [id, knowledgeNodeId(id)];
+    const nodeId = candidates.find((candidate) => nodesById.has(candidate));
+
+    if (nodeId === undefined) {
+      return { nodeId: candidates[0] ?? id };
+    }
+
+    const node = nodesById.get(nodeId);
+
+    if (node !== undefined && (nodeKinds === undefined || nodeKinds.has(node.kind))) {
+      return { nodeId, node };
+    }
+
+    const result: { nodeId: string; node?: KnowledgeGraphNode; query?: string; score?: number } = { nodeId };
+
+    if (node !== undefined) {
+      result.node = node;
+    }
+
+    return result;
+  }
+
+  const trimmedQuery = query?.trim().toLowerCase();
+
+  if (trimmedQuery === undefined || trimmedQuery.length === 0) {
+    return { nodeId: '' };
+  }
+
+  const candidate = graph.nodes
+    .filter((node) => nodeKinds === undefined || nodeKinds.has(node.kind))
+    .map((node) => ({ node, score: scoreNode(node, trimmedQuery) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.node.id.localeCompare(b.node.id))[0];
+
+  if (candidate === undefined) {
+    return { nodeId: '' };
+  }
+
+  const result: { nodeId: string; node?: KnowledgeGraphNode; query?: string; score?: number } = {
+    nodeId: candidate.node.id,
+    node: candidate.node,
+    score: candidate.score
+  };
+
+  if (query !== undefined) {
+    result.query = query;
+  }
+
+  return result;
+}
+
+function reconstructPathNodeIds(
+  sourceId: string,
+  targetId: string,
+  parents: Map<string, { from: string; edgeId: string; direction: 'forward' | 'reverse' }>
+): string[] {
+  const nodeIds = [targetId];
+  let current = targetId;
+
+  while (current !== sourceId) {
+    const parent = parents.get(current);
+
+    if (parent === undefined) {
+      return [];
+    }
+
+    current = parent.from;
+    nodeIds.push(current);
+  }
+
+  nodeIds.reverse();
+  return nodeIds;
+}
+
+function reconstructPathSteps(
+  nodeIds: string[],
+  parents: Map<string, { from: string; edgeId: string; direction: 'forward' | 'reverse' }>
+): KnowledgeGraphPathStep[] {
+  const steps: KnowledgeGraphPathStep[] = [];
+
+  for (let index = 1; index < nodeIds.length; index += 1) {
+    const current = nodeIds[index];
+    const previous = nodeIds[index - 1];
+
+    if (current === undefined || previous === undefined) {
+      continue;
+    }
+
+    const parent = parents.get(current);
+
+    if (parent === undefined) {
+      continue;
+    }
+
+    const edge = parent.edgeId;
+    const kind = edge.includes(':') ? (edge.split(':', 1)[0] as KnowledgeGraphEdgeKind) : 'supersedes';
+
+    steps.push({
+      from: previous,
+      to: current,
+      edgeId: edge,
+      kind,
+      direction: parent.direction
+    });
+  }
+
+  return steps;
+}
+
+function describePath(nodes: KnowledgeGraphNode[], steps: KnowledgeGraphPathStep[]): string {
+  if (nodes.length === 0) {
+    return 'No path found.';
+  }
+
+  if (steps.length === 0) {
+    return `Resolved to ${nodes[0]?.label ?? 'a single node'}.`;
+  }
+
+  const parts: string[] = [];
+
+  for (const step of steps) {
+    const direction = step.direction === 'forward' ? '->' : '<-';
+    parts.push(`${labelForPathNode(step.from)} ${direction}[${step.kind}] ${labelForPathNode(step.to)}`);
+  }
+
+  return parts.join(' | ');
+}
+
+function labelForPathNode(value: string): string {
+  const decoded = value.includes(':') ? value.slice(value.indexOf(':') + 1) : value;
+
+  try {
+    return decodeURIComponent(decoded);
+  } catch {
+    return decoded;
+  }
+}
+
+function describeMissingEndpoint(
+  side: 'source' | 'target',
+  endpoint: { nodeId: string; node?: KnowledgeGraphNode; query?: string }
+): string {
+  if (endpoint.query !== undefined) {
+    return `Unable to resolve ${side} query "${endpoint.query}".`;
+  }
+
+  if (endpoint.nodeId.length > 0) {
+    return `Unable to resolve ${side} node "${endpoint.nodeId}".`;
+  }
+
+  return `Missing ${side} selector.`;
 }
 
 function pushAdjacent(adjacency: Map<string, string[]>, from: string, to: string): void {
