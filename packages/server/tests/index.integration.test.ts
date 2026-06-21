@@ -3496,6 +3496,61 @@ describe('hub server HTTP integration', () => {
     }
   }, 30000);
 
+  it('serves admin MCP tools only through the admin MCP endpoint', async () => {
+    const core = createDevMeshCore();
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-admin-mcp-'));
+    const { app, url } = await startHubServer({
+      core,
+      hubStatePath: join(projectRoot, 'hub-state.json')
+    });
+    const client = new Client({
+      name: 'dev-mesh-admin-mcp-test',
+      version: '0.1.0'
+    });
+    let adminClient: Client | undefined;
+
+    try {
+      const publicTransport = new StreamableHTTPClientTransport(new URL(`${url}/mcp`));
+      await client.connect(publicTransport as never);
+      const publicTools = await client.listTools();
+
+      expect(publicTools.tools.map((tool) => tool.name)).not.toEqual(
+        expect.arrayContaining([
+          'mesh_admin_graph_overview',
+          'mesh_admin_member_activity',
+          'mesh_admin_quality_review',
+          'mesh_admin_conflict_queue',
+          'mesh_admin_entity_merge',
+          'mesh_admin_policy_update'
+        ])
+      );
+
+      await client.close().catch(() => undefined);
+
+      adminClient = new Client({
+        name: 'dev-mesh-admin-mcp-test',
+        version: '0.1.0'
+      });
+      const adminTransport = new StreamableHTTPClientTransport(new URL(`${url}/api/v1/admin/mcp`));
+      await adminClient.connect(adminTransport as never);
+      const adminTools = await adminClient.listTools();
+
+      expect(adminTools.tools.map((tool) => tool.name)).toEqual(
+        expect.arrayContaining([
+          'mesh_admin_graph_overview',
+          'mesh_admin_member_activity',
+          'mesh_admin_quality_review',
+          'mesh_admin_conflict_queue'
+        ])
+      );
+    } finally {
+      await adminClient?.close().catch(() => undefined);
+      await client.close().catch(() => undefined);
+      await app.close();
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  }, 30000);
+
   it('persists hub state and audit logs across server restarts', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-hub-state-'));
     const hubStatePath = join(projectRoot, 'hub-state.json');

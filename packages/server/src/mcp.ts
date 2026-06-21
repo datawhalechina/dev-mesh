@@ -47,6 +47,15 @@ import {
   type RateProjectKnowledgeResult,
   type UpdateProjectKnowledgeResult
 } from '@devmesh/local-store';
+import type { HubState } from './hub-state.js';
+import {
+  createAdminOverview,
+  createAdminQualityReview,
+  listAdminAuditLogs,
+  listAdminMembers,
+  listAdminKnowledgeEdges,
+  listAdminReviewQueue
+} from './hub-admin.js';
 import { filterKnowledgeByGroup } from './hub-knowledge-scope.js';
 
 interface ListKnowledgeRequest extends KnowledgeFilter {
@@ -56,6 +65,10 @@ interface ListKnowledgeRequest extends KnowledgeFilter {
 export interface MeshMcpServerOptions {
   knowledgeEdges?: () => KnowledgeGraphSemanticEdge[] | Promise<KnowledgeGraphSemanticEdge[]>;
   linkKnowledge?: (input: MeshLinkKnowledgeInput) => Promise<unknown>;
+  admin?: {
+    hub: HubState;
+    baseUrl: string;
+  };
 }
 
 export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOptions = {}): McpServer {
@@ -315,10 +328,79 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
       );
 
       return exploreKnowledgeGraph(graph, input);
+    },
+    async adminGraphOverview(input) {
+      if (options.admin === undefined) {
+        return { instruction: 'Admin graph overview is not enabled for this MCP server.' };
+      }
+
+      return createAdminOverview(options.admin.hub, core, options.admin.baseUrl);
+    },
+    async adminMemberActivity(input) {
+      if (options.admin === undefined) {
+        return { instruction: 'Admin member activity is not enabled for this MCP server.' };
+      }
+
+      const auditQuery: Parameters<typeof listAdminAuditLogs>[1] = {
+        limit: input.limit
+      };
+
+      if (input.branchKey !== undefined) {
+        auditQuery.branchKey = input.branchKey;
+      }
+
+      return {
+        members: listAdminMembers(options.admin.hub).filter((member) =>
+          input.memberId === undefined ? true : member.memberId === input.memberId
+        ),
+        auditLogs: listAdminAuditLogs(options.admin.hub, auditQuery).auditLogs
+      };
+    },
+    async adminQualityReview(input) {
+      if (options.admin === undefined) {
+        return { instruction: 'Admin quality review is not enabled for this MCP server.' };
+      }
+
+      const reviewQuery: Parameters<typeof createAdminQualityReview>[1] = {
+        limit: input.limit
+      };
+
+      if (input.branchKey !== undefined) {
+        reviewQuery.branchKey = input.branchKey;
+      }
+
+      if (input.projectKey !== undefined) {
+        reviewQuery.groupKey = input.projectKey;
+      }
+
+      if (input.layer !== undefined) {
+        reviewQuery.layer = input.layer;
+      }
+
+      return createAdminQualityReview(core, reviewQuery);
+    },
+    async adminConflictQueue(input) {
+      if (options.admin === undefined) {
+        return { instruction: 'Admin conflict queue is not enabled for this MCP server.' };
+      }
+
+      const edgeQuery: Parameters<typeof listAdminKnowledgeEdges>[1] = {
+        limit: input.limit
+      };
+
+      if (input.branchKey !== undefined) {
+        edgeQuery.branchKey = input.branchKey;
+      }
+
+      return {
+        reviewQueue: listAdminReviewQueue(),
+        knowledgeEdges: listAdminKnowledgeEdges(options.admin.hub, edgeQuery)
+      };
     }
   }, {
     capabilities: {
-      power: true
+      power: true,
+      admin: options.admin !== undefined
     }
   });
 

@@ -2,11 +2,18 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEV_MESH_MCP_INSTRUCTIONS,
   MESH_CORE_TOOL_NAMES,
+  MESH_ADMIN_TOOL_NAMES,
   MESH_POWER_TOOL_NAMES,
   meshBranchCreateInputSchema,
   meshBranchListInputSchema,
   meshBranchPolicyInputSchema,
   meshBranchSwitchInputSchema,
+  meshAdminConflictQueueInputSchema,
+  meshAdminEntityMergeInputSchema,
+  meshAdminGraphOverviewInputSchema,
+  meshAdminMemberActivityInputSchema,
+  meshAdminPolicyUpdateInputSchema,
+  meshAdminQualityReviewInputSchema,
   meshCaptureKnowledgeInputSchema,
   meshDeleteKnowledgeInputSchema,
   meshExploreKnowledgeGraphInputSchema,
@@ -486,6 +493,77 @@ describe('MCP tool contract schemas', () => {
       ...MESH_POWER_TOOL_NAMES,
       MESH_CORE_TOOL_NAMES[MESH_CORE_TOOL_NAMES.length - 1]
     ]);
+  });
+
+  it('keeps admin tools opt-in and returns not-implemented placeholders', async () => {
+    const registered: string[] = [];
+    const toolCallbacks = new Map<string, (args: unknown) => Promise<unknown>>();
+    const fakeServer = {
+      registerTool(name: string, _config: unknown, callback: (args: unknown) => Promise<unknown>) {
+        registered.push(name);
+        toolCallbacks.set(name, callback);
+      }
+    };
+
+    registerMeshTools(
+      fakeServer as never,
+      {
+        getStatus: vi.fn(async () => ({})),
+        getProjectionStatus: vi.fn(async () => ({})),
+        rebuildProjection: vi.fn(async () => ({})),
+        listBranches: vi.fn(async () => ({})),
+        createBranch: vi.fn(async () => ({})),
+        switchBranch: vi.fn(async () => ({})),
+        setBranchPolicy: vi.fn(async () => ({})),
+        searchContext: vi.fn(async () => ({})),
+        getKnowledge: vi.fn(async () => ({})),
+        listKnowledge: vi.fn(async () => ({})),
+        captureKnowledge: vi.fn(async () => ({})),
+        updateKnowledge: vi.fn(async () => ({})),
+        deleteKnowledge: vi.fn(async () => ({})),
+        captureTask: vi.fn(async () => ({})),
+        rateKnowledge: vi.fn(async () => ({})),
+        linkKnowledge: vi.fn(async () => ({})),
+        searchMemberExperience: vi.fn(async () => ({})),
+        resolveTerm: vi.fn(async () => ({})),
+        scanProjectKnowledge: vi.fn(async () => ({})),
+        graphPath: vi.fn(async () => ({})),
+        exploreKnowledgeGraph: vi.fn(async () => ({}))
+      },
+      {
+        capabilities: {
+          admin: true
+        }
+      }
+    );
+
+    expect(registered).toEqual([...MESH_CORE_TOOL_NAMES, ...MESH_ADMIN_TOOL_NAMES]);
+    expect(meshAdminGraphOverviewInputSchema.parse({})).toEqual({
+      limit: 50
+    });
+    expect(meshAdminMemberActivityInputSchema.parse({ memberId: 'member_1' })).toMatchObject({
+      memberId: 'member_1',
+      limit: 50
+    });
+    expect(meshAdminQualityReviewInputSchema.parse({ layer: 'canonical' })).toMatchObject({
+      layer: 'canonical',
+      limit: 50
+    });
+    expect(meshAdminConflictQueueInputSchema.parse({ branchKey: 'main' })).toMatchObject({
+      branchKey: 'main',
+      limit: 50
+    });
+    expect(meshAdminEntityMergeInputSchema.parse({ fromId: 'a', toId: 'b' })).toMatchObject({
+      fromId: 'a',
+      toId: 'b'
+    });
+    expect(meshAdminPolicyUpdateInputSchema.parse({ policy: 'balanced' })).toEqual({
+      policy: 'balanced'
+    });
+
+    const result = await toolCallbacks.get('mesh_admin_graph_overview')?.({});
+    expect(readRegisteredToolText(result)).toContain('Admin graph overview');
+    expect(registered).not.toContain('mesh_graph_path');
   });
 });
 

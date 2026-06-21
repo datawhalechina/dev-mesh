@@ -228,6 +228,30 @@ export const meshGraphPathInputSchema = z.object({
   }
 );
 
+const adminScopeInputSchema = z.object({
+  branchKey: z.string().min(1).optional(),
+  projectKey: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(100).default(50)
+});
+
+export const meshAdminGraphOverviewInputSchema = adminScopeInputSchema;
+export const meshAdminMemberActivityInputSchema = adminScopeInputSchema.extend({
+  memberId: z.string().min(1).optional()
+});
+export const meshAdminQualityReviewInputSchema = adminScopeInputSchema.extend({
+  layer: knowledgeLayerSchema.optional()
+});
+export const meshAdminConflictQueueInputSchema = adminScopeInputSchema;
+export const meshAdminEntityMergeInputSchema = z.object({
+  branchKey: z.string().min(1).optional(),
+  fromId: z.string().min(1).optional(),
+  toId: z.string().min(1).optional()
+});
+export const meshAdminPolicyUpdateInputSchema = z.object({
+  branchKey: z.string().min(1).optional(),
+  policy: knowledgeBranchPolicySchema
+});
+
 export type MeshSearchContextInput = z.infer<typeof meshSearchContextInputSchema>;
 export type MeshGetStatusInput = z.infer<typeof meshGetStatusInputSchema>;
 export type MeshProjectionStatusInput = z.infer<typeof meshProjectionStatusInputSchema>;
@@ -249,6 +273,12 @@ export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
 export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
 export type MeshExploreKnowledgeGraphInput = z.infer<typeof meshExploreKnowledgeGraphInputSchema>;
 export type MeshGraphPathInput = z.infer<typeof meshGraphPathInputSchema>;
+export type MeshAdminGraphOverviewInput = z.infer<typeof meshAdminGraphOverviewInputSchema>;
+export type MeshAdminMemberActivityInput = z.infer<typeof meshAdminMemberActivityInputSchema>;
+export type MeshAdminQualityReviewInput = z.infer<typeof meshAdminQualityReviewInputSchema>;
+export type MeshAdminConflictQueueInput = z.infer<typeof meshAdminConflictQueueInputSchema>;
+export type MeshAdminEntityMergeInput = z.infer<typeof meshAdminEntityMergeInputSchema>;
+export type MeshAdminPolicyUpdateInput = z.infer<typeof meshAdminPolicyUpdateInputSchema>;
 export type MeshToolCapabilityTier = 'core' | 'power' | 'admin';
 
 export interface MeshToolRegistrationOptions {
@@ -276,6 +306,12 @@ export const DEV_MESH_MCP_INSTRUCTIONS = [
 const assistantLedCaptureReminder =
   'IMPORTANT: Treat capture as a default end-of-task habit. Do not wait for the user to ask. Before the final response for meaningful coding, debugging, review, design, setup, release, deployment, or documentation work, decide whether the session produced durable project knowledge. If yes, summarize it yourself and call mesh_capture_knowledge or mesh_capture_task first.';
 
+function adminToolNotImplemented(toolName: string): { instruction: string } {
+  return {
+    instruction: `${toolName} is registered for the admin capability tier, but its server-side handler has not been wired yet.`
+  };
+}
+
 export interface MeshToolHandlers {
   getStatus(input: MeshGetStatusInput): Promise<unknown>;
   getProjectionStatus(input: MeshProjectionStatusInput): Promise<unknown>;
@@ -298,6 +334,12 @@ export interface MeshToolHandlers {
   scanProjectKnowledge(input: MeshScanProjectKnowledgeInput): Promise<unknown>;
   graphPath(input: MeshGraphPathInput): Promise<unknown>;
   exploreKnowledgeGraph(input: MeshExploreKnowledgeGraphInput): Promise<unknown>;
+  adminGraphOverview?(input: MeshAdminGraphOverviewInput): Promise<unknown>;
+  adminMemberActivity?(input: MeshAdminMemberActivityInput): Promise<unknown>;
+  adminQualityReview?(input: MeshAdminQualityReviewInput): Promise<unknown>;
+  adminConflictQueue?(input: MeshAdminConflictQueueInput): Promise<unknown>;
+  adminEntityMerge?(input: MeshAdminEntityMergeInput): Promise<unknown>;
+  adminPolicyUpdate?(input: MeshAdminPolicyUpdateInput): Promise<unknown>;
 }
 
 export type MeshToolName =
@@ -321,6 +363,12 @@ export type MeshToolName =
   | 'mesh_resolve_term'
   | 'mesh_scan_project_knowledge'
   | 'mesh_graph_path'
+  | 'mesh_admin_graph_overview'
+  | 'mesh_admin_member_activity'
+  | 'mesh_admin_quality_review'
+  | 'mesh_admin_conflict_queue'
+  | 'mesh_admin_entity_merge'
+  | 'mesh_admin_policy_update'
   | 'mesh_explore_knowledge_graph';
 
 export const MESH_CORE_TOOL_NAMES = [
@@ -348,7 +396,14 @@ export const MESH_CORE_TOOL_NAMES = [
 
 export const MESH_POWER_TOOL_NAMES = ['mesh_graph_path'] as const satisfies readonly MeshToolName[];
 
-export const MESH_ADMIN_TOOL_NAMES = [] as const satisfies readonly MeshToolName[];
+export const MESH_ADMIN_TOOL_NAMES = [
+  'mesh_admin_graph_overview',
+  'mesh_admin_member_activity',
+  'mesh_admin_quality_review',
+  'mesh_admin_conflict_queue',
+  'mesh_admin_entity_merge',
+  'mesh_admin_policy_update'
+] as const satisfies readonly MeshToolName[];
 
 export function registerMeshTools(
   server: McpServer,
@@ -635,9 +690,102 @@ export function registerMeshTools(
       )
   );
 
-  if (!adminEnabled) {
-    // Admin tools are intentionally not registered yet; this branch keeps the
-    // capability gate explicit for the upcoming admin tool set.
+  if (adminEnabled) {
+    server.registerTool(
+      'mesh_admin_graph_overview',
+      {
+        title: 'Admin graph overview',
+        description:
+          'Inspect the Admin-facing graph overview for groups, members, projects, review queue pressure, recent knowledge, and other projection-backed summaries.',
+        inputSchema: meshAdminGraphOverviewInputSchema.shape
+      },
+      async (args) =>
+        textToolResult(
+          'mesh_admin_graph_overview',
+          (await handlers.adminGraphOverview?.(meshAdminGraphOverviewInputSchema.parse(args))) ??
+            adminToolNotImplemented('mesh_admin_graph_overview')
+        )
+    );
+
+    server.registerTool(
+      'mesh_admin_member_activity',
+      {
+        title: 'Admin member activity',
+        description:
+          'Inspect member activity summaries for a branch or project, including member status, token lifecycle information, and recent administrative actions.',
+        inputSchema: meshAdminMemberActivityInputSchema.shape
+      },
+      async (args) =>
+        textToolResult(
+          'mesh_admin_member_activity',
+          (await handlers.adminMemberActivity?.(meshAdminMemberActivityInputSchema.parse(args))) ??
+            adminToolNotImplemented('mesh_admin_member_activity')
+        )
+    );
+
+    server.registerTool(
+      'mesh_admin_quality_review',
+      {
+        title: 'Admin quality review',
+        description:
+          'Inspect quality review queues and projection-backed knowledge health summaries for a branch or project.',
+        inputSchema: meshAdminQualityReviewInputSchema.shape
+      },
+      async (args) =>
+        textToolResult(
+          'mesh_admin_quality_review',
+          (await handlers.adminQualityReview?.(meshAdminQualityReviewInputSchema.parse(args))) ??
+            adminToolNotImplemented('mesh_admin_quality_review')
+        )
+    );
+
+    server.registerTool(
+      'mesh_admin_conflict_queue',
+      {
+        title: 'Admin conflict queue',
+        description:
+          'Inspect projection-backed conflict queues for semantic merge review, duplicate resolution, and contradictory claim handling.',
+        inputSchema: meshAdminConflictQueueInputSchema.shape
+      },
+      async (args) =>
+        textToolResult(
+          'mesh_admin_conflict_queue',
+          (await handlers.adminConflictQueue?.(meshAdminConflictQueueInputSchema.parse(args))) ??
+            adminToolNotImplemented('mesh_admin_conflict_queue')
+        )
+    );
+
+    server.registerTool(
+      'mesh_admin_entity_merge',
+      {
+        title: 'Admin entity merge',
+        description:
+          'Inspect or prepare entity merge operations for projection-backed knowledge, then write the chosen merge path back through the Hub admin flow.',
+        inputSchema: meshAdminEntityMergeInputSchema.shape
+      },
+      async (args) =>
+        textToolResult(
+          'mesh_admin_entity_merge',
+          (await handlers.adminEntityMerge?.(meshAdminEntityMergeInputSchema.parse(args))) ??
+            adminToolNotImplemented('mesh_admin_entity_merge')
+        )
+    );
+
+    server.registerTool(
+      'mesh_admin_policy_update',
+      {
+        title: 'Admin policy update',
+        description:
+          'Inspect or update an Admin policy preset for a branch or group, with the final write guarded by the Hub admin permission model.',
+        inputSchema: meshAdminPolicyUpdateInputSchema.shape
+      },
+      async (args) =>
+        textToolResult(
+          'mesh_admin_policy_update',
+          (await handlers.adminPolicyUpdate?.(meshAdminPolicyUpdateInputSchema.parse(args))) ??
+            adminToolNotImplemented('mesh_admin_policy_update')
+        )
+    );
   }
 }
 
@@ -683,6 +831,19 @@ export function formatMeshToolOutput(toolName: MeshToolName, value: unknown): st
       return formatProjectScan(value);
     case 'mesh_graph_path':
       return formatKnowledgeGraphPath(value);
+    case 'mesh_admin_graph_overview':
+      return formatAdminGraphOverview(value);
+    case 'mesh_admin_member_activity':
+      return formatAdminMemberActivity(value);
+    case 'mesh_admin_quality_review':
+      return formatAdminQualityReview(value);
+    case 'mesh_admin_conflict_queue':
+      return formatAdminConflictQueue(value);
+    case 'mesh_admin_entity_merge':
+      return formatAdminEntityMerge(value);
+    case 'mesh_admin_policy_update':
+      return formatAdminPolicyUpdate(value);
+      return formatGeneric(value);
     case 'mesh_explore_knowledge_graph':
       return formatKnowledgeGraph(value);
   }
@@ -1056,6 +1217,101 @@ function formatKnowledgeGraphPath(value: unknown): string {
     lines.push(`nodes: ${nodes.length}`);
   }
 
+  return lines.join('\n');
+}
+
+function formatAdminGraphOverview(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = ['Admin graph overview'];
+  pushField(lines, 'instruction', value.instruction);
+  pushField(lines, 'service', value.service);
+  pushField(lines, 'version', value.version);
+  pushField(lines, 'baseUrl', value.baseUrl);
+  pushField(lines, 'mcpUrl', value.mcpUrl);
+
+  if (isRecord(value.counts)) {
+    lines.push(`counts: ${formatRecordInline(value.counts, ['groups', 'members', 'projects', 'knowledgeItems', 'reviewQueue'])}`);
+  }
+
+  if (isRecord(value.sync)) {
+    lines.push(`sync: ${formatRecordInline(value.sync, ['status', 'joinedGroups'])}`);
+  }
+
+  lines.push(`recentKnowledge: ${Array.isArray(value.recentKnowledge) ? value.recentKnowledge.length : 0}`);
+  return lines.join('\n');
+}
+
+function formatAdminMemberActivity(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const members = toRecordArray(value.members);
+  const auditLogs = toRecordArray(value.auditLogs);
+  const lines = ['Admin member activity'];
+  pushField(lines, 'instruction', value.instruction);
+  lines.push(`members: ${members.length}`);
+  lines.push(`auditLogs: ${auditLogs.length}`);
+
+  for (const [index, member] of members.slice(0, 8).entries()) {
+    lines.push(`${index + 1}. ${formatRecordInline(member, ['memberId', 'displayName', 'groupKey', 'status'])}`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatAdminQualityReview(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = ['Admin quality review'];
+  pushField(lines, 'instruction', value.instruction);
+  if (isRecord(value.summary)) {
+    lines.push(`summary: ${formatRecordInline(value.summary, ['totalKnowledge', 'needsReview', 'lowQuality', 'lowConfidence', 'lowRating', 'lowAdoption', 'stale', 'nonActive'])}`);
+  }
+
+  const items = toRecordArray(value.items);
+  lines.push(`items: ${items.length}`);
+  return lines.join('\n');
+}
+
+function formatAdminConflictQueue(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = ['Admin conflict queue'];
+  pushField(lines, 'instruction', value.instruction);
+  if (isRecord(value.reviewQueue)) {
+    lines.push(`reviewQueue: ${formatRecordInline(value.reviewQueue, ['items'])}`);
+  }
+
+  const knowledgeEdges = toRecordArray(value.knowledgeEdges);
+  lines.push(`knowledgeEdges: ${knowledgeEdges.length}`);
+  return lines.join('\n');
+}
+
+function formatAdminEntityMerge(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = ['Admin entity merge'];
+  pushField(lines, 'instruction', value.instruction);
+  return lines.join('\n');
+}
+
+function formatAdminPolicyUpdate(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const lines = ['Admin policy update'];
+  pushField(lines, 'instruction', value.instruction);
   return lines.join('\n');
 }
 

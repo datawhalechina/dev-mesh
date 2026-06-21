@@ -113,11 +113,13 @@ export interface MeshListenOptions {
 export class KoaHubServer {
   readonly app: Koa;
   private readonly mcpSessions: Map<string, McpHttpSession>;
+  private readonly adminMcpSessions: Map<string, McpHttpSession>;
   private httpServer: Server | undefined;
 
-  constructor(app: Koa, mcpSessions: Map<string, McpHttpSession>) {
+  constructor(app: Koa, mcpSessions: Map<string, McpHttpSession>, adminMcpSessions: Map<string, McpHttpSession>) {
     this.app = app;
     this.mcpSessions = mcpSessions;
+    this.adminMcpSessions = adminMcpSessions;
   }
 
   async listen(options: MeshListenOptions = {}): Promise<string> {
@@ -152,8 +154,9 @@ export class KoaHubServer {
   }
 
   async close(): Promise<void> {
-    await Promise.all([...this.mcpSessions.values()].map((session) => session.transport.close()));
+    await Promise.all([...this.mcpSessions.values(), ...this.adminMcpSessions.values()].map((session) => session.transport.close()));
     this.mcpSessions.clear();
+    this.adminMcpSessions.clear();
 
     if (this.httpServer === undefined) {
       return;
@@ -185,7 +188,8 @@ export async function createHubServer(options: MeshServerOptions): Promise<KoaHu
   const hubStateStore = resolveHubStateStore(options);
   const hub = hubStateStore === undefined ? createHubState(options.hub) : await hubStateStore.load(options.hub);
   const mcpSessions = new Map<string, McpHttpSession>();
-  const router = createHubRouter(options.core, baseUrl, hub, mcpSessions);
+  const adminMcpSessions = new Map<string, McpHttpSession>();
+  const router = createHubRouter(options.core, baseUrl, hub, mcpSessions, adminMcpSessions);
 
   app.use(createErrorMiddleware(options.logger ?? false));
   app.use(createCorsMiddleware());
@@ -196,7 +200,7 @@ export async function createHubServer(options: MeshServerOptions): Promise<KoaHu
   app.use(router.routes());
   app.use(router.allowedMethods());
 
-  return new KoaHubServer(app, mcpSessions);
+  return new KoaHubServer(app, mcpSessions, adminMcpSessions);
 }
 
 function resolveHubStateStore(options: MeshServerOptions): HubStatePersistenceStore | undefined {
@@ -219,7 +223,8 @@ function createHubRouter(
   core: DevMeshCore,
   baseUrl: string | undefined,
   hub: HubState,
-  mcpSessions: Map<string, McpHttpSession>
+  mcpSessions: Map<string, McpHttpSession>,
+  adminMcpSessions: Map<string, McpHttpSession>
 ): Router {
   const router = new Router();
 
@@ -634,7 +639,11 @@ function createHubRouter(
   });
 
   router.all('/mcp', async (ctx) => {
-    await handleMcpRequest(ctx, core, hub, mcpSessions);
+    await handleMcpRequest(ctx, core, hub, mcpSessions, false, baseUrl);
+  });
+
+  router.all('/api/v1/admin/mcp', async (ctx) => {
+    await handleMcpRequest(ctx, core, hub, adminMcpSessions, true, baseUrl);
   });
 
   return router;
@@ -729,7 +738,9 @@ async function handleMcpRequest(
   ctx: Context,
   core: DevMeshCore,
   hub: HubState,
-  sessions: Map<string, McpHttpSession>
+  sessions: Map<string, McpHttpSession>,
+  admin: boolean,
+  baseUrl: string | undefined
 ): Promise<void> {
   const sessionId = readMcpSessionId(ctx.headers);
   let session = sessionId === undefined ? undefined : sessions.get(sessionId);
@@ -748,7 +759,9 @@ async function handleMcpRequest(
   }
 
   if (session === undefined) {
-    session = await createMcpHttpSession(core, hub, sessions);
+    session = admin
+      ? await createMcpHttpSession(core, hub, sessions, true, resolveBaseUrl(ctx, baseUrl))
+      : await createMcpHttpSession(core, hub, sessions, false);
   }
 
   ctx.respond = false;
@@ -758,7 +771,9 @@ async function handleMcpRequest(
 async function createMcpHttpSession(
   core: DevMeshCore,
   hub: HubState,
-  sessions: Map<string, McpHttpSession>
+  sessions: Map<string, McpHttpSession>,
+  admin: boolean,
+  baseUrl?: string
 ): Promise<McpHttpSession> {
   let session: McpHttpSession;
   const transport = new StreamableHTTPServerTransport({
@@ -794,7 +809,15 @@ async function createMcpHttpSession(
         : {
             error: result.error
           };
-    }
+    },
+    ...(admin
+      ? {
+          admin: {
+            hub,
+            baseUrl: baseUrl ?? 'http://127.0.0.1'
+          }
+        }
+      : {})
   });
 
   session = {
