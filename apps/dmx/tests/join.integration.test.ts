@@ -25,7 +25,7 @@ describe('dmx CLI join', () => {
         invites: [
           {
             token: 'inv_frontend',
-            groupKey: 'frontend-team'
+            branch: 'frontend-team'
           }
         ]
       }
@@ -63,7 +63,7 @@ describe('dmx CLI join', () => {
         identityPath: join(globalRoot, 'identity.json'),
         serverUrl,
         mcpUrl: `${serverUrl}/mcp`,
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         memberId: 'member_frontend-team_xiaoyun',
         clientId: expect.stringMatching(/^client_frontend-team_xiaoyun_/),
         expiresAt: expect.any(String)
@@ -83,7 +83,7 @@ describe('dmx CLI join', () => {
       expect(identity.joinedServers[0]).toMatchObject({
         serverUrl,
         mcpUrl: `${serverUrl}/mcp`,
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         memberId: output.memberId,
         clientId: output.clientId,
         displayName: 'Xiaoyun',
@@ -131,7 +131,7 @@ interface JoinCliOutput {
   identityPath: string;
   serverUrl: string;
   mcpUrl: string;
-  groupKey: string;
+  branch: string;
   memberId: string;
   clientId: string;
   expiresAt?: string;
@@ -141,7 +141,7 @@ interface JoinIdentity {
   joinedServers: Array<{
     serverUrl: string;
     mcpUrl: string;
-    groupKey: string;
+    branch: string;
     memberId: string;
     clientId: string;
     displayName: string;

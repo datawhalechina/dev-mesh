@@ -8,7 +8,6 @@ import {
   createBranch,
   createGlossaryItem,
   createInvite,
-  createGroup,
   createKnowledgeEdge,
   createProject,
   disableMember,
@@ -18,7 +17,6 @@ import {
   fetchBranches,
   fetchCrdtDocuments,
   fetchGlossary,
-  fetchGroups,
   fetchInvites,
   fetchKnowledge,
   fetchKnowledgeEdges,
@@ -43,8 +41,6 @@ import type {
   CrdtDocumentFilters,
   CrdtDocumentSummary,
   GlossaryInput,
-  GroupInput,
-  GroupSummary,
   InviteInput,
   InviteSummary,
   KnowledgeBranchPublishInput,
@@ -89,7 +85,6 @@ const errorMessage = ref('');
 const overview = ref<AdminOverview | null>(null);
 const branches = ref<BranchSummary[]>([]);
 const crdtDocuments = ref<CrdtDocumentSummary[]>([]);
-const groups = ref<GroupSummary[]>([]);
 const members = ref<MemberSummary[]>([]);
 const invites = ref<InviteSummary[]>([]);
 const projects = ref<ProjectSummary[]>([]);
@@ -118,7 +113,6 @@ const crdtDocumentProjectKey = ref('');
 const glossaryQuery = ref('');
 const glossaryBranchKey = ref('');
 const glossaryProjectKey = ref('');
-const groupDialogOpen = ref(false);
 const branchDialogOpen = ref(false);
 const branchMergePreviewDialogOpen = ref(false);
 const inviteDialogOpen = ref(false);
@@ -137,12 +131,6 @@ const branchMergeSelectedSourceIds = ref<string[]>([]);
 const branchMergeBulkPublishResult = ref<KnowledgeBranchBulkPublishResult | null>(null);
 const selectedPublishKnowledge = ref<KnowledgeItem | null>(null);
 const editingGlossaryId = ref<string | null>(null);
-const groupForm = reactive<GroupInput>({
-  key: '',
-  displayName: '',
-  description: '',
-  joinMode: 'invite'
-});
 const branchForm = reactive<BranchInput>({
   branchKey: '',
   displayName: '',
@@ -167,7 +155,7 @@ const inviteForm = reactive<InviteFormInput>({
   maxUses: ''
 });
 const projectAclForm = reactive<ProjectAclFormInput>({
-  visibility: 'group',
+  visibility: 'branch',
   memberIds: [],
   role: 'member'
 });
@@ -197,7 +185,6 @@ const edgeForm = reactive<KnowledgeEdgeFormInput>({
 
 const navItems = [
   { key: 'overview', label: 'Overview', icon: DataAnalysis },
-  { key: 'groups', label: 'Groups', icon: Collection },
   { key: 'branches', label: 'Branches', icon: Connection },
   { key: 'crdt', label: 'CRDT Docs', icon: Files },
   { key: 'members', label: 'Members', icon: User },
@@ -218,7 +205,7 @@ const stats = computed(() => {
   }
 
   return [
-    { label: 'Groups', value: overview.value.counts.groups, icon: Collection },
+    { label: 'Branches', value: overview.value.counts.branches, icon: Collection },
     { label: 'Members', value: overview.value.counts.members, icon: User },
     { label: 'Projects', value: overview.value.counts.projects, icon: Folder },
     { label: 'Knowledge', value: overview.value.counts.knowledgeItems, icon: Document }
@@ -264,7 +251,7 @@ const projectAclMembers = computed(() => {
     return [];
   }
 
-  return members.value.filter((member) => member.groupKey === selectedAclProject.value?.groupKey && member.status === 'active');
+  return members.value.filter((member) => member.branch === selectedAclProject.value?.branch && member.status === 'active');
 });
 
 const edgeKnowledgeOptions = computed(() =>
@@ -289,7 +276,6 @@ async function refreshAll(): Promise<void> {
       overviewData,
       branchData,
       crdtDocumentData,
-      groupData,
       memberData,
       inviteData,
       projectData,
@@ -305,7 +291,6 @@ async function refreshAll(): Promise<void> {
       fetchAdminOverview(),
       fetchBranches(),
       fetchCrdtDocuments(createCrdtDocumentFilters()),
-      fetchGroups(),
       fetchMembers(),
       fetchInvites(),
       fetchProjects(),
@@ -322,7 +307,6 @@ async function refreshAll(): Promise<void> {
     overview.value = overviewData;
     branches.value = branchData;
     crdtDocuments.value = crdtDocumentData;
-    groups.value = groupData;
     members.value = memberData;
     invites.value = inviteData;
     projects.value = projectData;
@@ -403,28 +387,8 @@ async function reloadGlossary(): Promise<void> {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
     loading.value = false;
-  }
 }
 
-async function submitGroup(): Promise<void> {
-  loading.value = true;
-  errorMessage.value = '';
-
-  try {
-    await createGroup(groupForm);
-    groupDialogOpen.value = false;
-    Object.assign(groupForm, {
-      key: '',
-      displayName: '',
-      description: '',
-      joinMode: 'invite'
-    });
-    await refreshAll();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    loading.value = false;
-  }
 }
 
 async function submitBranch(): Promise<void> {
@@ -620,7 +584,7 @@ async function rotateMemberTokenRow(row: MemberSummary): Promise<void> {
 
 function openProjectAcl(row: ProjectSummary): void {
   const access = row.access ?? {
-    visibility: 'group',
+    visibility: 'branch',
     members: []
   };
 
@@ -633,7 +597,7 @@ function openProjectAcl(row: ProjectSummary): void {
 
 function openProjectBranch(row: ProjectSummary): void {
   selectedBranchProject.value = row;
-  projectBranchForm.branchKey = row.groupKey;
+  projectBranchForm.branchKey = row.branch;
   projectBranchDialogOpen.value = true;
 }
 
@@ -646,7 +610,7 @@ async function submitProjectBranch(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    await checkoutProjectBranch(selectedBranchProject.value.groupKey, selectedBranchProject.value.id, {
+    await checkoutProjectBranch(selectedBranchProject.value.branch, selectedBranchProject.value.id, {
       branchKey: projectBranchForm.branchKey
     });
     projectBranchDialogOpen.value = false;
@@ -669,7 +633,7 @@ async function submitProjectAcl(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    await updateProjectAcl(selectedAclProject.value.groupKey, selectedAclProject.value.id, {
+    await updateProjectAcl(selectedAclProject.value.branch, selectedAclProject.value.id, {
       visibility: projectAclForm.visibility,
       members:
         projectAclForm.visibility === 'restricted'
@@ -682,7 +646,7 @@ async function submitProjectAcl(): Promise<void> {
     projectAclDialogOpen.value = false;
     selectedAclProject.value = null;
     Object.assign(projectAclForm, {
-      visibility: 'group',
+      visibility: 'branch',
       memberIds: [],
       role: 'member'
     });
@@ -697,7 +661,7 @@ async function submitProjectAcl(): Promise<void> {
 function openGlossaryDialog(row?: KnowledgeItem): void {
   editingGlossaryId.value = row?.id ?? null;
   Object.assign(glossaryForm, {
-    branchKey: readMetadataString(row, 'branchKey') ?? readMetadataString(row, 'groupKey') ?? branches.value[0]?.branchKey ?? '',
+    branchKey: readMetadataString(row, 'branchKey') ?? readMetadataString(row, 'branchKey') ?? branches.value[0]?.branchKey ?? '',
     projectKey: readMetadataString(row, 'projectKey') ?? '',
     term: row?.title ?? '',
     definition: row?.summary ?? '',
@@ -960,7 +924,7 @@ function branchMergePreviewStatusType(status: BranchMergePreviewItem['status']):
 
 function crdtDocumentScope(row: CrdtDocumentSummary): string {
   const parts = [row.kind];
-  const branchKey = row.branchKey ?? row.groupKey;
+  const branchKey = row.branchKey ?? row.branch;
 
   if (branchKey !== undefined) {
     parts.push(`branch:${branchKey}`);
@@ -1031,8 +995,8 @@ function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-function projectAccessVisibility(project: ProjectSummary): 'group' | 'restricted' {
-  return project.access?.visibility ?? 'group';
+function projectAccessVisibility(project: ProjectSummary): 'branch' | 'restricted' {
+  return project.access?.visibility ?? 'branch';
 }
 
 function projectAccessMemberCount(project: ProjectSummary): number {
@@ -1040,7 +1004,7 @@ function projectAccessMemberCount(project: ProjectSummary): number {
 }
 
 function projectAccessType(project: ProjectSummary): 'success' | 'warning' {
-  return projectAccessVisibility(project) === 'group' ? 'success' : 'warning';
+  return projectAccessVisibility(project) === 'branch' ? 'success' : 'warning';
 }
 
 function memberLabel(memberId: string): string {
@@ -1060,19 +1024,19 @@ function glossaryScope(row: KnowledgeItem): string {
 }
 
 function knowledgeBranchKey(row: KnowledgeItem): string {
-  return readMetadataString(row, 'branchKey') ?? readMetadataString(row, 'groupKey') ?? 'default';
+  return readMetadataString(row, 'branchKey') ?? readMetadataString(row, 'branchKey') ?? 'default';
 }
 
 function projectBranchKey(row: ProjectSummary): string {
-  return row.branchKey ?? row.groupKey;
+  return row.branchKey ?? row.branch;
 }
 
 function knowledgeEdgeBranchKey(row: KnowledgeEdge): string {
-  return row.branchKey ?? row.groupKey ?? '-';
+  return row.branchKey ?? row.branch ?? '-';
 }
 
 function auditLogBranchKey(row: AuditLog): string {
-  return row.branchKey ?? row.groupKey ?? '-';
+  return row.branchKey ?? row.branch ?? '-';
 }
 
 function glossaryAliases(row: KnowledgeItem | undefined): string[] {
@@ -1110,7 +1074,7 @@ interface InviteFormInput {
 }
 
 interface ProjectAclFormInput {
-  visibility: 'group' | 'restricted';
+  visibility: 'branch' | 'restricted';
   memberIds: string[];
   role: ProjectAclRole;
 }
@@ -1210,21 +1174,6 @@ interface KnowledgeEdgeFormInput {
               </section>
             </div>
           </section>
-
-          <section v-else-if="activeView === 'groups'" class="view">
-            <div class="toolbar">
-              <el-button :icon="Plus" type="primary" @click="groupDialogOpen = true">New Group</el-button>
-            </div>
-            <el-table :data="groups" empty-text="No groups">
-              <el-table-column prop="key" label="Key" min-width="160" />
-              <el-table-column prop="displayName" label="Name" min-width="180" />
-              <el-table-column prop="joinMode" label="Join" width="120" />
-              <el-table-column prop="memberCount" label="Members" width="110" />
-              <el-table-column prop="projectCount" label="Projects" width="110" />
-              <el-table-column prop="description" label="Description" min-width="220" />
-            </el-table>
-          </section>
-
           <section v-else-if="activeView === 'branches'" class="view">
             <div class="toolbar">
               <el-button :icon="Plus" type="primary" @click="branchDialogOpen = true">New Branch</el-button>
@@ -1274,7 +1223,7 @@ interface KnowledgeEdgeFormInput {
             <div class="toolbar">
               <el-select v-model="crdtDocumentKind" class="layer-select" placeholder="Kind" clearable @change="reloadCrdtDocuments">
                 <el-option label="project" value="project" />
-                <el-option label="group" value="group" />
+                <el-option label="branch" value="group" />
                 <el-option label="server-global" value="server-global" />
               </el-select>
               <el-select
@@ -1368,7 +1317,7 @@ interface KnowledgeEdgeFormInput {
             </div>
             <el-table :data="invites" empty-text="No invites">
               <el-table-column prop="token" label="Token" min-width="230" />
-              <el-table-column prop="groupKey" label="Group" width="150" />
+              <el-table-column prop="branch" label="Branch" width="150" />
               <el-table-column label="Status" width="120">
                 <template #default="{ row }">
                   <el-tag :type="inviteStatusType(row.status)">{{ row.status }}</el-tag>
@@ -1691,31 +1640,6 @@ interface KnowledgeEdgeFormInput {
       </el-container>
     </el-container>
 
-    <el-dialog v-model="groupDialogOpen" title="New Group" width="520px">
-      <el-form label-position="top">
-        <el-form-item label="Key">
-          <el-input v-model="groupForm.key" />
-        </el-form-item>
-        <el-form-item label="Name">
-          <el-input v-model="groupForm.displayName" />
-        </el-form-item>
-        <el-form-item label="Join Mode">
-          <el-select v-model="groupForm.joinMode">
-            <el-option label="invite" value="invite" />
-            <el-option label="open" value="open" />
-            <el-option label="admin" value="admin" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Description">
-          <el-input v-model="groupForm.description" type="textarea" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="groupDialogOpen = false">Cancel</el-button>
-        <el-button type="primary" @click="submitGroup">Create</el-button>
-      </template>
-    </el-dialog>
-
     <el-dialog v-model="inviteDialogOpen" title="New Invite" width="520px">
       <el-form label-position="top">
         <el-form-item label="Branch">
@@ -2024,11 +1948,11 @@ interface KnowledgeEdgeFormInput {
     <el-dialog v-model="projectAclDialogOpen" title="Project ACL" width="560px">
       <el-form label-position="top">
         <el-form-item label="Project">
-          <el-input :model-value="selectedAclProject ? `${selectedAclProject.groupKey}/${selectedAclProject.id}` : ''" disabled />
+          <el-input :model-value="selectedAclProject ? `${selectedAclProject.branch}/${selectedAclProject.id}` : ''" disabled />
         </el-form-item>
         <el-form-item label="Visibility">
           <el-radio-group v-model="projectAclForm.visibility">
-            <el-radio-button label="group">group</el-radio-button>
+            <el-radio-button label="branch">group</el-radio-button>
             <el-radio-button label="restricted">restricted</el-radio-button>
           </el-radio-group>
         </el-form-item>

@@ -73,8 +73,8 @@ import {
   createHubProject,
   createHubState,
   getHubProject,
-  joinHubGroup,
-  listHubGroups,
+  joinHubBranch,
+  listHubBranchs,
   listHubProjects,
   rotateHubAccessToken,
   type HubAuthContext,
@@ -244,12 +244,12 @@ function createHubRouter(
 
   router.get('/api/v1/groups', (ctx) => {
     ctx.body = {
-      groups: listHubGroups(hub)
+      groups: listHubBranchs(hub)
     };
   });
 
   router.post('/api/v1/join', (ctx) => {
-    sendHubResult(ctx, joinHubGroup(hub, readBody<JoinRequest>(ctx)));
+    sendHubResult(ctx, joinHubBranch(hub, readBody<JoinRequest>(ctx)));
   });
 
   router.post('/api/v1/auth/rotate', (ctx) => {
@@ -268,15 +268,15 @@ function createHubRouter(
 
     if (result.ok && result.value.accepted > 0) {
       await replayHubSyncKnowledgeSnapshots(hub, core, {
-        groupKey: auth.value.groupKey,
+        branch: auth.value.branch,
         actor: auth.value.memberId
       });
       await replayHubSyncTombstones(hub, core, {
-        groupKey: auth.value.groupKey,
+        branch: auth.value.branch,
         actor: auth.value.memberId
       });
       await replayHubSyncConflicts(hub, core, {
-        groupKey: auth.value.groupKey,
+        branch: auth.value.branch,
         actor: auth.value.memberId
       });
     }
@@ -305,7 +305,7 @@ function createHubRouter(
 
     const projectKey = readQueryString(ctx, 'projectKey');
     const query: AdminGlobalProjectionQuery = {
-      groupKey: auth.value.groupKey
+      branch: auth.value.branch
     };
 
     if (projectKey !== undefined) {
@@ -351,9 +351,9 @@ function createHubRouter(
       return;
     }
 
-    const groupKey = readQueryString(ctx, 'groupKey') ?? auth.value.groupKey;
+    const branch = readQueryString(ctx, 'branch') ?? auth.value.branch;
 
-    if (groupKey !== auth.value.groupKey) {
+    if (branch !== auth.value.branch) {
       sendHubError(ctx, {
         statusCode: 403,
         code: 'federation.group_mismatch',
@@ -364,7 +364,7 @@ function createHubRouter(
 
     ctx.body = pullHubSyncEventLog(
       hub,
-      groupKey,
+      branch,
       readQueryString(ctx, 'cursor'),
       readFederationEventLogLimit(ctx)
     );
@@ -440,7 +440,7 @@ function createHubRouter(
 
   router.get('/api/v1/admin/groups', (ctx) => {
     ctx.body = {
-      groups: listHubGroups(hub)
+      groups: listHubBranchs(hub)
     };
   });
 
@@ -533,36 +533,36 @@ function createHubRouter(
     sendHubResult(ctx, createAdminProject(hub, readBody<AdminProjectInput>(ctx)));
   });
 
-  router.put('/api/v1/admin/projects/:groupKey/:id/branch', (ctx) => {
-    const groupKey = ctx.params.groupKey;
+  router.put('/api/v1/admin/projects/:branch/:id/branch', (ctx) => {
+    const branch = ctx.params.branch;
     const projectId = ctx.params.id;
 
-    if (groupKey === undefined || projectId === undefined) {
+    if (branch === undefined || projectId === undefined) {
       sendHubError(ctx, {
         statusCode: 400,
         code: 'admin.project_branch_target_required',
-        message: 'Project groupKey and id are required.'
+        message: 'Project branch and id are required.'
       });
       return;
     }
 
-    sendHubResult(ctx, checkoutAdminProjectBranch(hub, groupKey, projectId, readBody<AdminProjectBranchInput>(ctx)));
+    sendHubResult(ctx, checkoutAdminProjectBranch(hub, branch, projectId, readBody<AdminProjectBranchInput>(ctx)));
   });
 
-  router.put('/api/v1/admin/projects/:groupKey/:id/acl', (ctx) => {
-    const groupKey = ctx.params.groupKey;
+  router.put('/api/v1/admin/projects/:branch/:id/acl', (ctx) => {
+    const branch = ctx.params.branch;
     const projectId = ctx.params.id;
 
-    if (groupKey === undefined || projectId === undefined) {
+    if (branch === undefined || projectId === undefined) {
       sendHubError(ctx, {
         statusCode: 400,
         code: 'admin.project_acl_target_required',
-        message: 'Project groupKey and id are required.'
+        message: 'Project branch and id are required.'
       });
       return;
     }
 
-    sendHubResult(ctx, updateAdminProjectAcl(hub, groupKey, projectId, readBody<AdminProjectAclInput>(ctx)));
+    sendHubResult(ctx, updateAdminProjectAcl(hub, branch, projectId, readBody<AdminProjectAclInput>(ctx)));
   });
 
   router.get('/api/v1/admin/glossary', async (ctx) => {
@@ -799,7 +799,7 @@ async function createMcpHttpSession(
       }
 
       if (input.project !== 'auto') {
-        edgeInput.groupKey = input.project;
+        edgeInput.branch = input.project;
       }
 
       const result = await createAdminKnowledgeEdge(hub, core, edgeInput);
@@ -854,7 +854,7 @@ function readQueryString(ctx: Context, key: string): string | undefined {
 }
 
 function readBranchQueryString(ctx: Context): string | undefined {
-  return readQueryString(ctx, 'branchKey') ?? readQueryString(ctx, 'groupKey');
+  return readQueryString(ctx, 'branchKey') ?? readQueryString(ctx, 'branch');
 }
 
 function readQueryBoolean(ctx: Context, key: string): boolean | undefined {
@@ -917,7 +917,7 @@ function readAdminKnowledgeQuery(ctx: Context): AdminKnowledgeQuery {
 function readAdminBranchMergePreviewInput(ctx: Context): AdminBranchMergePreviewInput {
   const input: AdminBranchMergePreviewInput = {};
   const sourceBranchKey = readQueryString(ctx, 'sourceBranchKey') ?? readQueryString(ctx, 'sourceGroupKey');
-  const targetBranchKey = readQueryString(ctx, 'targetBranchKey') ?? readQueryString(ctx, 'targetGroupKey');
+  const targetBranchKey = readQueryString(ctx, 'targetBranchKey') ?? readQueryString(ctx, 'targetBranchKey');
   const limit = Number.parseInt(readQueryString(ctx, 'limit') ?? '', 10);
 
   if (sourceBranchKey !== undefined) {

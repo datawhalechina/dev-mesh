@@ -7,7 +7,6 @@ describe('web-admin app structure', () => {
     const source = await readFile(join(import.meta.dirname, '..', 'src', 'App.vue'), 'utf8');
 
     expect(source).toContain("key: 'overview'");
-    expect(source).toContain("key: 'groups'");
     expect(source).toContain("key: 'crdt'");
     expect(source).toContain("key: 'members'");
     expect(source).toContain("key: 'invites'");
@@ -19,7 +18,6 @@ describe('web-admin app structure', () => {
     expect(source).toContain("key: 'digest'");
     expect(source).toContain("key: 'review'");
     expect(source).toContain("key: 'audit'");
-    expect(source).toContain('submitGroup');
     expect(source).toContain('submitInvite');
     expect(source).toContain('submitProject');
     expect(source).toContain('openProjectAcl');

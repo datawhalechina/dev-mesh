@@ -3,32 +3,32 @@ import type { KnowledgeItem } from '@devmesh/core';
 export const DEFAULT_HUB_KNOWLEDGE_GROUP = 'default';
 
 export function readKnowledgeGroupKey(item: KnowledgeItem): string | undefined {
-  return readKnowledgeMetadataString(item, 'groupKey');
+  return readKnowledgeMetadataString(item, 'branch');
 }
 
-export function withKnowledgeGroupKey(item: KnowledgeItem, groupKey: string): KnowledgeItem {
+export function withKnowledgeGroupKey(item: KnowledgeItem, branch: string): KnowledgeItem {
   return {
     ...item,
     source: {
       ...item.source,
       metadata: {
         ...(item.source.metadata ?? {}),
-        groupKey
+        branch
       }
     }
   };
 }
 
-export function filterKnowledgeByGroup(items: KnowledgeItem[], groupKey: string | undefined): KnowledgeItem[] {
-  if (groupKey === undefined) {
+export function filterKnowledgeByGroup(items: KnowledgeItem[], branch: string | undefined): KnowledgeItem[] {
+  if (branch === undefined) {
     return items;
   }
 
-  return items.filter((item) => item.visibility === 'org' || readKnowledgeGroupKeyOrDefault(item) === groupKey);
+  return items.filter((item) => item.visibility === 'org' || readKnowledgeGroupKeyOrDefault(item) === branch);
 }
 
-export function knowledgeBelongsToGroup(item: KnowledgeItem, groupKey: string | undefined): boolean {
-  return groupKey === undefined || item.visibility === 'org' || readKnowledgeGroupKeyOrDefault(item) === groupKey;
+export function knowledgeBelongsToGroup(item: KnowledgeItem, branch: string | undefined): boolean {
+  return branch === undefined || item.visibility === 'org' || readKnowledgeGroupKeyOrDefault(item) === branch;
 }
 
 export function readKnowledgeMetadataString(item: KnowledgeItem, key: string): string | undefined {

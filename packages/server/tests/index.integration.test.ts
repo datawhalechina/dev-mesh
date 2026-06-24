@@ -65,7 +65,7 @@ describe('hub server HTTP integration', () => {
         invites: [
           {
             token: 'inv_frontend',
-            groupKey: 'frontend-team'
+            branch: 'frontend-team'
           }
         ]
       }
@@ -77,7 +77,7 @@ describe('hub server HTTP integration', () => {
         method: 'POST',
         body: {
           inviteToken: 'inv_frontend',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           displayName: 'Xiaoyun',
           handle: 'xiaoyun'
         }
@@ -116,7 +116,7 @@ describe('hub server HTTP integration', () => {
       expect(join.body).toMatchObject({
         memberId: 'member_frontend-team_xiaoyun',
         clientId: expect.stringMatching(/^client_frontend-team_xiaoyun_/),
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         accessToken: expect.stringMatching(/^mesh_/),
         syncSigningSecret: expect.stringMatching(/^sync_/),
         expiresAt: expect.any(String)
@@ -211,15 +211,15 @@ describe('hub server HTTP integration', () => {
         invites: [
           {
             token: 'inv_frontend_a',
-            groupKey: 'frontend-team'
+            branch: 'frontend-team'
           },
           {
             token: 'inv_frontend_b',
-            groupKey: 'frontend-team'
+            branch: 'frontend-team'
           },
           {
             token: 'inv_backend',
-            groupKey: 'backend-team'
+            branch: 'backend-team'
           }
         ]
       }
@@ -302,7 +302,7 @@ describe('hub server HTTP integration', () => {
           clientId: backend.body.clientId,
           document: {
             kind: 'project',
-            groupKey: 'frontend-team',
+            branch: 'frontend-team',
             projectKey: 'frontend-dashboard'
           },
           heads: [],
@@ -317,7 +317,7 @@ describe('hub server HTTP integration', () => {
       const globalProjection = await requestJson(`${url}/api/v1/admin/global-projection`);
       const crdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents`);
       const frontendCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?branchKey=frontend-team`);
-      const legacyFrontendCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?groupKey=frontend-team`);
+      const legacyFrontendCrdtDocuments = await requestJson(`${url}/api/v1/admin/crdt-documents?branch=frontend-team`);
       const frontendProjectCrdtDocuments = await requestJson(
         `${url}/api/v1/admin/crdt-documents?kind=project&branchKey=frontend-team&projectKey=frontend-dashboard`
       );
@@ -338,7 +338,7 @@ describe('hub server HTTP integration', () => {
       expect(pushed.body).toMatchObject({
         document: {
           kind: 'project',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           projectKey: 'frontend-dashboard',
           schemaVersion: 2
         },
@@ -385,7 +385,7 @@ describe('hub server HTTP integration', () => {
       });
       expect(isolated.body).toMatchObject({
         document: {
-          groupKey: 'backend-team'
+          branch: 'backend-team'
         },
         heads: backendHeads,
         changes: []
@@ -402,7 +402,7 @@ describe('hub server HTTP integration', () => {
           actor: writer.body.memberId,
           action: 'sync.crdt_exchange',
           targetType: 'crdt_document',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           branchKey: 'frontend-team',
           payload: expect.objectContaining({
             clientId: writer.body.clientId,
@@ -418,7 +418,7 @@ describe('hub server HTTP integration', () => {
           actor: writer.body.memberId,
           action: 'sync.crdt_materialized',
           targetType: 'crdt_document',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           branchKey: 'frontend-team',
           payload: expect.objectContaining({
             materialized: 1,
@@ -434,7 +434,7 @@ describe('hub server HTTP integration', () => {
           title: 'V2 CRDT exchange',
           source: expect.objectContaining({
             metadata: expect.objectContaining({
-              groupKey: 'frontend-team',
+              branch: 'frontend-team',
               projectKey: 'frontend-dashboard'
             })
           })
@@ -454,7 +454,7 @@ describe('hub server HTTP integration', () => {
       expect(Object.values(globalProjection.body.documents)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            groupKey: 'frontend-team',
+            branch: 'frontend-team',
             projectKey: 'frontend-dashboard',
             sourceHeads: heads,
             knowledgeIds: ['ki_v2_sync'],
@@ -463,7 +463,7 @@ describe('hub server HTTP integration', () => {
             conflictIds: []
           }),
           expect.objectContaining({
-            groupKey: 'backend-team',
+            branch: 'backend-team',
             projectKey: 'frontend-dashboard',
             sourceHeads: backendHeads,
             knowledgeIds: []
@@ -476,13 +476,13 @@ describe('hub server HTTP integration', () => {
             document: expect.objectContaining({
               kind: 'project',
               branchKey: 'frontend-team',
-              groupKey: 'frontend-team',
+              branch: 'frontend-team',
               projectKey: 'frontend-dashboard',
               schemaVersion: 2
             }),
             kind: 'project',
             branchKey: 'frontend-team',
-            groupKey: 'frontend-team',
+            branch: 'frontend-team',
             projectKey: 'frontend-dashboard',
             heads,
             changeCount: 1,
@@ -491,7 +491,7 @@ describe('hub server HTTP integration', () => {
               id: expect.stringMatching(/^am_[a-f0-9]{32}$/),
               clientId: writer.body.clientId,
               branchKey: 'frontend-team',
-              groupKey: 'frontend-team',
+              branch: 'frontend-team',
               summary: 'Test CRDT change'
             })
           })
@@ -504,7 +504,7 @@ describe('hub server HTTP integration', () => {
           expect.objectContaining({
             kind: 'project',
             branchKey: 'frontend-team',
-            groupKey: 'frontend-team',
+            branch: 'frontend-team',
             projectKey: 'frontend-dashboard'
           })
         ])
@@ -521,7 +521,7 @@ describe('hub server HTTP integration', () => {
         expect.objectContaining({
           kind: 'project',
           branchKey: 'frontend-team',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           projectKey: 'frontend-dashboard'
         })
       ]);
@@ -530,7 +530,7 @@ describe('hub server HTTP integration', () => {
         expect.arrayContaining([
           expect.objectContaining({
             branchKey: 'frontend-team',
-            groupKey: 'frontend-team',
+            branch: 'frontend-team',
             displayName: 'Frontend Team',
             counts: expect.objectContaining({
               members: expect.any(Number),
@@ -546,7 +546,7 @@ describe('hub server HTTP integration', () => {
           }),
           expect.objectContaining({
             branchKey: 'backend-team',
-            groupKey: 'backend-team',
+            branch: 'backend-team',
             displayName: 'Backend Team',
             counts: expect.objectContaining({
               crdtDocuments: 1,
@@ -563,7 +563,7 @@ describe('hub server HTTP integration', () => {
       });
       expect(Object.values(frontendAdminProjection.body.documents)).toEqual([
         expect.objectContaining({
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           projectKey: 'frontend-dashboard',
           sourceHeads: heads,
           knowledgeIds: ['ki_v2_sync'],
@@ -579,7 +579,7 @@ describe('hub server HTTP integration', () => {
       });
       expect(Object.values(backendAdminProjection.body.documents)).toEqual([
         expect.objectContaining({
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           sourceHeads: backendHeads,
           knowledgeIds: []
         })
@@ -591,7 +591,7 @@ describe('hub server HTTP integration', () => {
       });
       expect(Object.values(frontendScopedProjection.body.documents)).toEqual([
         expect.objectContaining({
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           knowledgeIds: ['ki_v2_sync']
         })
       ]);
@@ -602,7 +602,7 @@ describe('hub server HTTP integration', () => {
       });
       expect(Object.values(backendScopedProjection.body.documents)).toEqual([
         expect.objectContaining({
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           sourceHeads: backendHeads,
           knowledgeIds: []
         })
@@ -621,13 +621,13 @@ describe('hub server HTTP integration', () => {
       expect(Object.values(persistedState.globalProjection.documents)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            groupKey: 'frontend-team',
+            branch: 'frontend-team',
             projectKey: 'frontend-dashboard',
             sourceHeads: heads,
             knowledgeIds: ['ki_v2_sync']
           }),
           expect.objectContaining({
-            groupKey: 'backend-team',
+            branch: 'backend-team',
             projectKey: 'frontend-dashboard',
             sourceHeads: backendHeads,
             knowledgeIds: []
@@ -656,11 +656,11 @@ describe('hub server HTTP integration', () => {
         invites: [
           {
             token: 'inv_frontend',
-            groupKey: 'frontend-team'
+            branch: 'frontend-team'
           },
           {
             token: 'inv_backend',
-            groupKey: 'backend-team'
+            branch: 'backend-team'
           }
         ]
       }
@@ -860,7 +860,7 @@ describe('hub server HTTP integration', () => {
           action: 'sync.tombstone_accepted',
           targetType: 'knowledge',
           targetId: 'kn_frontend_3',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           payload: expect.objectContaining({
             eventId: 'evt_frontend_3',
             clientId: frontendJoin.body.clientId,
@@ -948,7 +948,7 @@ describe('hub server HTTP integration', () => {
           visibility: 'team',
           source: expect.objectContaining({
             metadata: expect.objectContaining({
-              groupKey: 'default'
+              branch: 'default'
             })
           })
         })
@@ -959,7 +959,7 @@ describe('hub server HTTP integration', () => {
           action: 'sync.knowledge_snapshot_replayed',
           targetType: 'knowledge',
           targetId: item.id,
-          groupKey: 'default',
+          branch: 'default',
           payload: expect.objectContaining({
             eventId: 'evt_synced_admin_visible',
             clientId: joined.body.clientId,
@@ -1027,11 +1027,11 @@ describe('hub server HTTP integration', () => {
         invites: [
           {
             token: 'inv_branch_frontend',
-            groupKey: 'frontend-team'
+            branch: 'frontend-team'
           },
           {
             token: 'inv_branch_backend',
-            groupKey: 'backend-team'
+            branch: 'backend-team'
           }
         ]
       }
@@ -1203,7 +1203,7 @@ describe('hub server HTTP integration', () => {
             id: frontendItem.id,
             source: expect.objectContaining({
               metadata: expect.objectContaining({
-                groupKey: 'frontend-team'
+                branch: 'frontend-team'
               })
             })
           }),
@@ -1211,7 +1211,7 @@ describe('hub server HTTP integration', () => {
             id: frontendConflictItem.id,
             source: expect.objectContaining({
               metadata: expect.objectContaining({
-                groupKey: 'frontend-team'
+                branch: 'frontend-team'
               })
             })
           }),
@@ -1219,7 +1219,7 @@ describe('hub server HTTP integration', () => {
             id: frontendBulkItem.id,
             source: expect.objectContaining({
               metadata: expect.objectContaining({
-                groupKey: 'frontend-team'
+                branch: 'frontend-team'
               })
             })
           })
@@ -1230,7 +1230,7 @@ describe('hub server HTTP integration', () => {
           id: backendItem.id,
           source: expect.objectContaining({
             metadata: expect.objectContaining({
-              groupKey: 'backend-team'
+              branch: 'backend-team'
             })
           })
         })
@@ -1274,7 +1274,7 @@ describe('hub server HTTP integration', () => {
         source: expect.objectContaining({
           metadata: expect.objectContaining({
             branchKey: 'backend-team',
-            groupKey: 'backend-team',
+            branch: 'backend-team',
             publishedFromId: frontendItem.id,
             publishedFromBranch: 'frontend-team'
           })
@@ -1293,7 +1293,7 @@ describe('hub server HTTP integration', () => {
             id: backendItem.id,
             source: expect.objectContaining({
               metadata: expect.objectContaining({
-                groupKey: 'backend-team'
+                branch: 'backend-team'
               })
             })
           }),
@@ -1303,7 +1303,7 @@ describe('hub server HTTP integration', () => {
             source: expect.objectContaining({
               metadata: expect.objectContaining({
                 branchKey: 'backend-team',
-                groupKey: 'backend-team',
+                branch: 'backend-team',
                 publishedFromId: frontendItem.id
               })
             })
@@ -1337,7 +1337,7 @@ describe('hub server HTTP integration', () => {
             source: expect.objectContaining({
               metadata: expect.objectContaining({
                 branchKey: 'backend-team',
-                groupKey: 'backend-team',
+                branch: 'backend-team',
                 publishedFromId: frontendBulkItem.id,
                 publishedFromBranch: 'frontend-team'
               })
@@ -1390,7 +1390,7 @@ describe('hub server HTTP integration', () => {
           action: 'knowledge.branch.published',
           targetType: 'knowledge',
           targetId: expect.any(String),
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           payload: expect.objectContaining({
             sourceId: frontendBulkItem.id,
             sourceBranch: 'frontend-team',
@@ -1401,7 +1401,7 @@ describe('hub server HTTP integration', () => {
           action: 'knowledge.branch.published',
           targetType: 'knowledge',
           targetId: published.body.id,
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           payload: expect.objectContaining({
             sourceId: frontendItem.id,
             sourceBranch: 'frontend-team',
@@ -1418,7 +1418,7 @@ describe('hub server HTTP integration', () => {
             actor: 'admin',
             targetType: 'knowledge',
             targetId: published.body.id,
-            groupKey: 'backend-team',
+            branch: 'backend-team',
             payload: expect.objectContaining({
               sourceId: frontendItem.id,
               sourceBranch: 'frontend-team',
@@ -1430,7 +1430,7 @@ describe('hub server HTTP integration', () => {
             action: 'knowledge.branch.published',
             actor: 'admin',
             targetType: 'knowledge',
-            groupKey: 'backend-team',
+            branch: 'backend-team',
             payload: expect.objectContaining({
               sourceId: frontendBulkItem.id,
               sourceBranch: 'frontend-team',
@@ -1520,7 +1520,7 @@ describe('hub server HTTP integration', () => {
           action: 'sync.tombstone_replayed',
           targetType: 'knowledge',
           targetId: item.id,
-          groupKey: joined.groupKey,
+          branch: joined.branch,
           payload: expect.objectContaining({
             eventId: 'evt_tombstone_replay_1',
             clientId: joined.clientId,
@@ -1653,7 +1653,7 @@ describe('hub server HTTP integration', () => {
           toId: remoteRevision.id,
           createdBy: remoteJoin.body.memberId,
           branchKey: 'default',
-          groupKey: 'default',
+          branch: 'default',
           reason: 'Offline edits diverged'
         })
       ]);
@@ -1662,7 +1662,7 @@ describe('hub server HTTP integration', () => {
           action: 'sync.conflict_replayed',
           targetType: 'knowledge-edge',
           targetId: edges.body.edges[0].id,
-          groupKey: 'default',
+          branch: 'default',
           payload: expect.objectContaining({
             knowledgeId: base.id,
             eventIds: ['evt_http_conflict_local', 'evt_http_conflict_remote'],
@@ -1708,29 +1708,29 @@ describe('hub server HTTP integration', () => {
           ]
         }
       });
-      const forbidden = await requestJson(`${url}/api/v1/federation/sync-events?groupKey=other-team`, {
+      const forbidden = await requestJson(`${url}/api/v1/federation/sync-events?branch=other-team`, {
         headers: authHeaders(joined.accessToken)
       });
       const firstSync = await federateHubSyncEventsFromHttpPeer(target, {
         peerId: 'peer_http_source',
         peerBaseUrl: url,
         accessToken: joined.accessToken,
-        groupKey: joined.groupKey,
+        branch: joined.branch,
         limit: 1
       });
       const secondSync = await federateHubSyncEventsFromHttpPeer(target, {
         peerId: 'peer_http_source',
         peerBaseUrl: url,
         accessToken: joined.accessToken,
-        groupKey: joined.groupKey
+        branch: joined.branch
       });
       const emptySync = await federateHubSyncEventsFromHttpPeer(target, {
         peerId: 'peer_http_source',
         peerBaseUrl: url,
         accessToken: joined.accessToken,
-        groupKey: joined.groupKey
+        branch: joined.branch
       });
-      const targetEvents = target.syncEvents.get(joined.groupKey) ?? [];
+      const targetEvents = target.syncEvents.get(joined.branch) ?? [];
 
       expect(push.body).toMatchObject({
         accepted: 2,
@@ -1747,7 +1747,7 @@ describe('hub server HTTP integration', () => {
         ok: true,
         value: {
           peerId: 'peer_http_source',
-          groupKey: joined.groupKey,
+          branch: joined.branch,
           cursor: 'cur_default_1',
           pulled: 1,
           accepted: 1,
@@ -1778,7 +1778,7 @@ describe('hub server HTTP integration', () => {
         expect.objectContaining({
           id: 'evt_http_federation_1',
           clientId: joined.clientId,
-          groupKey: joined.groupKey,
+          branch: joined.branch,
           log: expect.objectContaining({
             sequence: 1,
             hash: expect.stringMatching(/^[a-f0-9]{64}$/)
@@ -1787,7 +1787,7 @@ describe('hub server HTTP integration', () => {
         expect.objectContaining({
           id: 'evt_http_federation_2',
           clientId: joined.clientId,
-          groupKey: joined.groupKey,
+          branch: joined.branch,
           log: expect.objectContaining({
             sequence: 2,
             previousHash: targetEvents[0]?.log?.hash,
@@ -1800,7 +1800,7 @@ describe('hub server HTTP integration', () => {
           expect.objectContaining({
             action: 'federation.synced',
             actor: 'peer_http_source',
-            groupKey: joined.groupKey,
+            branch: joined.branch,
             payload: expect.objectContaining({
               pulled: 1,
               accepted: 1
@@ -1809,7 +1809,7 @@ describe('hub server HTTP integration', () => {
           expect.objectContaining({
             action: 'federation.synced',
             actor: 'peer_http_source',
-            groupKey: joined.groupKey,
+            branch: joined.branch,
             payload: expect.objectContaining({
               previousCursor: 'cur_default_1',
               pulled: 1,
@@ -1832,7 +1832,7 @@ describe('hub server HTTP integration', () => {
       const joined = await joinDefaultGroup(url);
       const signedEvent = signSyncEvent({
         clientId: joined.clientId,
-        groupKey: joined.groupKey,
+        branch: joined.branch,
         secret: joined.syncSigningSecret,
         signedAt: '2026-06-06T12:00:00.000Z',
         event: {
@@ -1855,7 +1855,7 @@ describe('hub server HTTP integration', () => {
       const tamperedEvent = {
         ...signSyncEvent({
           clientId: joined.clientId,
-          groupKey: joined.groupKey,
+          branch: joined.branch,
           secret: joined.syncSigningSecret,
           signedAt: '2026-06-06T12:05:00.000Z',
           event: {
@@ -1917,7 +1917,7 @@ describe('hub server HTTP integration', () => {
         expect.objectContaining({
           action: 'sync.event_signature_rejected',
           targetId: 'evt_tampered_1',
-          groupKey: 'default',
+          branch: 'default',
           payload: expect.objectContaining({
             clientId: joined.clientId,
             reason: 'event.signature_mismatch'
@@ -1946,11 +1946,11 @@ describe('hub server HTTP integration', () => {
         invites: [
           {
             token: 'inv_frontend',
-            groupKey: 'frontend-team'
+            branch: 'frontend-team'
           },
           {
             token: 'inv_backend',
-            groupKey: 'backend-team'
+            branch: 'backend-team'
           }
         ]
       }
@@ -1967,7 +1967,7 @@ describe('hub server HTTP integration', () => {
         method: 'POST',
         body: {
           inviteToken: 'inv_frontend',
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           displayName: 'Wrong Group'
         }
       });
@@ -2037,30 +2037,30 @@ describe('hub server HTTP integration', () => {
       });
       expect(frontendProject.body.project).toMatchObject({
         id: 'shared-dashboard',
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         name: 'Shared Dashboard Frontend'
       });
       expect(backendProject.body.project).toMatchObject({
         id: 'shared-dashboard',
-        groupKey: 'backend-team',
+        branch: 'backend-team',
         name: 'Shared Dashboard Backend'
       });
       expect(frontendProjects.body.projects).toEqual([
         expect.objectContaining({
           id: 'shared-dashboard',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           name: 'Shared Dashboard Frontend'
         })
       ]);
       expect(backendProjects.body.projects).toEqual([
         expect.objectContaining({
           id: 'backend-private',
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           name: 'Backend Private'
         }),
         expect.objectContaining({
           id: 'shared-dashboard',
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           name: 'Shared Dashboard Backend'
         })
       ]);
@@ -2104,7 +2104,7 @@ describe('hub server HTTP integration', () => {
       expect(rotated.body).toMatchObject({
         memberId: joined.memberId,
         clientId: joined.clientId,
-        groupKey: joined.groupKey,
+        branch: joined.branch,
         syncSigningSecret: joined.syncSigningSecret,
         expiresAt: expect.any(String)
       });
@@ -2128,7 +2128,7 @@ describe('hub server HTTP integration', () => {
           action: 'auth.token_rotated',
           targetType: 'member',
           targetId: joined.memberId,
-          groupKey: joined.groupKey,
+          branch: joined.branch,
           payload: expect.objectContaining({
             clientId: joined.clientId,
             previousExpiresAt: joined.expiresAt,
@@ -2172,7 +2172,7 @@ describe('hub server HTTP integration', () => {
       expect(rotated.body).toMatchObject({
         memberId: joined.memberId,
         clientId: joined.clientId,
-        groupKey: joined.groupKey,
+        branch: joined.branch,
         syncSigningSecret: joined.syncSigningSecret,
         expiresAt: expect.any(String)
       });
@@ -2194,7 +2194,7 @@ describe('hub server HTTP integration', () => {
           action: 'auth.token_rotated',
           targetType: 'member',
           targetId: joined.memberId,
-          groupKey: joined.groupKey,
+          branch: joined.branch,
           payload: expect.objectContaining({
             clientId: joined.clientId,
             previousExpiresAt: joined.expiresAt,
@@ -2246,7 +2246,7 @@ describe('hub server HTTP integration', () => {
       const project = await requestJson(`${url}/api/v1/admin/projects`, {
         method: 'POST',
         body: {
-          groupKey: 'design-team',
+          branch: 'design-team',
           id: 'component-library',
           name: 'Component Library'
         }
@@ -2278,7 +2278,7 @@ describe('hub server HTTP integration', () => {
       });
       expect(branch.body).toMatchObject({
         branchKey: 'research',
-        groupKey: 'research',
+        branch: 'research',
         displayName: 'Research',
         joinMode: 'open',
         counts: {
@@ -2293,12 +2293,12 @@ describe('hub server HTTP integration', () => {
       });
       expect(project.body).toMatchObject({
         id: 'component-library',
-        groupKey: 'design-team',
+        branch: 'design-team',
         name: 'Component Library'
       });
       expect(checkedOutProject.body).toMatchObject({
         id: 'component-library',
-        groupKey: 'research',
+        branch: 'research',
         name: 'Component Library'
       });
       expect(overview.body).toMatchObject({
@@ -2320,14 +2320,14 @@ describe('hub server HTTP integration', () => {
       expect(projects.body.projects).toEqual([
         expect.objectContaining({
           id: 'component-library',
-          groupKey: 'research'
+          branch: 'research'
         })
       ]);
       expect(branches.body.branches).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             branchKey: 'research',
-            groupKey: 'research',
+            branch: 'research',
             displayName: 'Research',
             joinMode: 'open',
             counts: expect.objectContaining({
@@ -2336,7 +2336,7 @@ describe('hub server HTTP integration', () => {
             projects: [
               expect.objectContaining({
                 id: 'component-library',
-                groupKey: 'research'
+                branch: 'research'
               })
             ]
           })
@@ -2356,7 +2356,7 @@ describe('hub server HTTP integration', () => {
           action: 'project.branch.checked_out',
           targetType: 'project',
           targetId: 'component-library',
-          groupKey: 'research',
+          branch: 'research',
           payload: expect.objectContaining({
             fromBranch: 'design-team',
             toBranch: 'research'
@@ -2398,7 +2398,7 @@ describe('hub server HTTP integration', () => {
           snapshotPresent: true,
           latestChange: expect.objectContaining({
             clientId: 'admin',
-            groupKey: 'research',
+            branch: 'research',
             actorId: 'admin',
             summary: 'project.branch.checked_out'
           })
@@ -2423,7 +2423,7 @@ describe('hub server HTTP integration', () => {
             actor: 'admin',
             targetType: 'branch',
             targetId: 'research',
-            groupKey: 'research',
+            branch: 'research',
             payload: expect.objectContaining({
               branchKey: 'research',
               displayName: 'Research',
@@ -2435,7 +2435,7 @@ describe('hub server HTTP integration', () => {
             actor: 'admin',
             targetType: 'project',
             targetId: 'component-library',
-            groupKey: 'research',
+            branch: 'research',
             payload: expect.objectContaining({
               projectKey: 'component-library',
               fromBranch: 'design-team',
@@ -2459,7 +2459,7 @@ describe('hub server HTTP integration', () => {
       const invite = await requestJson(`${url}/api/v1/admin/invites`, {
         method: 'POST',
         body: {
-          groupKey: 'default',
+          branch: 'default',
           token: 'inv_admin_panel',
           maxUses: 2
         }
@@ -2498,7 +2498,7 @@ describe('hub server HTTP integration', () => {
 
       expect(invite.body).toMatchObject({
         token: 'inv_admin_panel',
-        groupKey: 'default',
+        branch: 'default',
         uses: 0,
         maxUses: 2,
         expiresAt: expect.any(String),
@@ -2620,7 +2620,7 @@ describe('hub server HTTP integration', () => {
       expect(created.body.project).toMatchObject({
         id: 'restricted-dashboard',
         access: {
-          visibility: 'group',
+          visibility: 'branch',
           members: []
         }
       });
@@ -2698,7 +2698,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'admin',
         metadata: {
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           projectKey: 'frontend-dashboard'
         }
       }
@@ -2717,7 +2717,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'admin',
         metadata: {
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           projectKey: 'frontend-dashboard'
         }
       }
@@ -2736,7 +2736,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'admin',
         metadata: {
-          groupKey: 'backend-team',
+          branch: 'backend-team',
           projectKey: 'frontend-dashboard'
         }
       }
@@ -2757,11 +2757,11 @@ describe('hub server HTTP integration', () => {
         invites: [
           {
             token: 'inv_frontend_org_brief',
-            groupKey: 'frontend-team'
+            branch: 'frontend-team'
           },
           {
             token: 'inv_backend_org_brief',
-            groupKey: 'backend-team'
+            branch: 'backend-team'
           }
         ]
       }
@@ -2791,12 +2791,12 @@ describe('hub server HTTP integration', () => {
 
       expect(project.body.project).toMatchObject({
         id: 'frontend-dashboard',
-        groupKey: 'frontend-team'
+        branch: 'frontend-team'
       });
       expect(brief.status).toBe(200);
       expect(brief.body).toMatchObject({
         projectId: 'frontend-dashboard',
-        groupKey: 'frontend-team'
+        branch: 'frontend-team'
       });
       expect(briefItemIds).toEqual(
         expect.arrayContaining(['kn_frontend_project_brief_local', 'kn_frontend_project_brief_org'])
@@ -2816,7 +2816,7 @@ describe('hub server HTTP integration', () => {
       const created = await requestJson(`${url}/api/v1/admin/glossary`, {
         method: 'POST',
         body: {
-          groupKey: 'default',
+          branch: 'default',
           projectKey: 'frontend-dashboard',
           term: 'Mesh Client',
           definition: 'The local proxy and capture runtime that runs on a developer machine.',
@@ -2828,7 +2828,7 @@ describe('hub server HTTP integration', () => {
       const updated = await requestJson(`${url}/api/v1/admin/glossary/${created.body.id}`, {
         method: 'PUT',
         body: {
-          groupKey: 'default',
+          branch: 'default',
           projectKey: 'frontend-dashboard',
           term: 'Mesh Client',
           definition: 'The local MCP proxy, capture runtime, and sync client on a developer machine.',
@@ -2852,7 +2852,7 @@ describe('hub server HTTP integration', () => {
         source: {
           kind: 'admin',
           metadata: {
-            groupKey: 'default',
+            branch: 'default',
             projectKey: 'frontend-dashboard',
             aliases: ['local proxy']
           }
@@ -2883,7 +2883,7 @@ describe('hub server HTTP integration', () => {
         expect.objectContaining({
           action: 'glossary.updated',
           targetId: created.body.id,
-          groupKey: 'default'
+          branch: 'default'
         })
       ]);
     } finally {
@@ -2903,7 +2903,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'admin',
         metadata: {
-          groupKey: 'default'
+          branch: 'default'
         }
       }
     });
@@ -2916,7 +2916,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'admin',
         metadata: {
-          groupKey: 'default'
+          branch: 'default'
         }
       }
     });
@@ -2934,7 +2934,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'admin',
         metadata: {
-          groupKey: 'default'
+          branch: 'default'
         }
       }
     });
@@ -2951,7 +2951,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'admin',
         metadata: {
-          groupKey: 'default'
+          branch: 'default'
         }
       }
     });
@@ -3060,7 +3060,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'task',
         metadata: {
-          groupKey: 'default'
+          branch: 'default'
         }
       }
     });
@@ -3081,7 +3081,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'task',
         metadata: {
-          groupKey: 'default'
+          branch: 'default'
         }
       }
     });
@@ -3102,7 +3102,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'task',
         metadata: {
-          groupKey: 'default'
+          branch: 'default'
         }
       }
     });
@@ -3115,7 +3115,7 @@ describe('hub server HTTP integration', () => {
       source: {
         kind: 'task',
         metadata: {
-          groupKey: 'default',
+          branch: 'default',
           taskKey: 'TASK-789',
           status: 'in_progress'
         }
@@ -3216,7 +3216,7 @@ describe('hub server HTTP integration', () => {
           kind: 'supersedes',
           fromId: newItem.id,
           toId: oldItem.id,
-          groupKey: 'default',
+          branch: 'default',
           reason: 'The current workflow replaces the legacy workflow.'
         }
       });
@@ -3226,7 +3226,7 @@ describe('hub server HTTP integration', () => {
           kind: 'duplicates',
           fromId: newItem.id,
           toId: peerItem.id,
-          groupKey: 'default'
+          branch: 'default'
         }
       });
       const contradicts = await requestJson(`${url}/api/v1/admin/knowledge-edges`, {
@@ -3235,14 +3235,14 @@ describe('hub server HTTP integration', () => {
           kind: 'contradicts',
           fromId: newItem.id,
           toId: contradictingItem.id,
-          groupKey: 'default'
+          branch: 'default'
         }
       });
       const defaultSearch = await requestJson(`${url}/api/v1/admin/knowledge?query=edge-conflict%20status&limit=10`);
       const allSearch = await requestJson(
         `${url}/api/v1/admin/knowledge?query=edge-conflict%20status&includeSuperseded=true&limit=10`
       );
-      const edges = await requestJson(`${url}/api/v1/admin/knowledge-edges?groupKey=default`);
+      const edges = await requestJson(`${url}/api/v1/admin/knowledge-edges?branch=default`);
       const conflictEdges = await requestJson(`${url}/api/v1/admin/knowledge-edges?kind=contradicts`);
       const audit = await requestJson(`${url}/api/v1/admin/audit?action=knowledge.edge.created&limit=10`);
 
@@ -3250,7 +3250,7 @@ describe('hub server HTTP integration', () => {
         kind: 'supersedes',
         fromId: newItem.id,
         toId: oldItem.id,
-        groupKey: 'default',
+        branch: 'default',
         reason: 'The current workflow replaces the legacy workflow.'
       });
       expect(duplicates.body).toMatchObject({
@@ -3317,7 +3317,7 @@ describe('hub server HTTP integration', () => {
           expect.objectContaining({
             action: 'knowledge.edge.created',
             targetId: supersedes.body.id,
-            groupKey: 'default'
+            branch: 'default'
           })
         ])
       );
@@ -3363,14 +3363,14 @@ describe('hub server HTTP integration', () => {
       expect(project.status).toBe(200);
       expect(project.body.project).toMatchObject({
         id: 'frontend-dashboard',
-        groupKey: 'default',
+        branch: 'default',
         name: 'Frontend Dashboard',
         createdByMemberId: joined.memberId
       });
       expect(brief.status).toBe(200);
       expect(brief.body).toMatchObject({
         projectId: 'frontend-dashboard',
-        groupKey: 'default'
+        branch: 'default'
       });
       expect(brief.body.items).toHaveLength(1);
       expect(brief.body.items[0]).toMatchObject({
@@ -3599,7 +3599,7 @@ describe('hub server HTTP integration', () => {
         projects: [
           expect.objectContaining({
             id: 'persisted-hub-project',
-            groupKey: 'default'
+            branch: 'default'
           })
         ],
         auditLogs: expect.arrayContaining([
@@ -3953,7 +3953,7 @@ function readInlineField(text: string, linePrefix: string, field: string): strin
 
 function signSyncEvent(input: {
   clientId: string;
-  groupKey: string;
+  branch: string;
   secret: string;
   signedAt?: string;
   keyId?: string;
@@ -3969,7 +3969,7 @@ function signSyncEvent(input: {
     .update(
       stableStringify({
         clientId: input.clientId,
-        groupKey: input.groupKey,
+        branch: input.branch,
         event: {
           id: input.event.id,
           kind: input.event.kind,
@@ -4092,7 +4092,7 @@ interface JsonRequestInit {
 interface JoinResponseBody {
   memberId: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
   accessToken: string;
   syncSigningSecret: string;
   expiresAt: string;

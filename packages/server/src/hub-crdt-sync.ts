@@ -164,7 +164,7 @@ export async function materializeHubCrdtDocument(
   const relations = isPlainRecord(doc.relations) ? doc.relations : {};
   const qualitySignals = isPlainRecord(doc.qualitySignals) ? doc.qualitySignals : {};
   const conflicts = isPlainRecord(doc.conflicts) ? doc.conflicts : {};
-  const groupKey = document.document.groupKey;
+  const branch = document.document.branch;
   let materialized = 0;
   let skipped = 0;
 
@@ -176,7 +176,7 @@ export async function materializeHubCrdtDocument(
     materializedAt: new Date().toISOString()
   });
 
-  if (groupKey === undefined) {
+  if (branch === undefined) {
     return {
       documentKey,
       materialized: 0,
@@ -193,7 +193,7 @@ export async function materializeHubCrdtDocument(
       continue;
     }
 
-    await core.repository.upsert(withKnowledgeGroupKey(item, groupKey));
+    await core.repository.upsert(withKnowledgeGroupKey(item, branch));
     materialized += 1;
   }
 
@@ -203,7 +203,7 @@ export async function materializeHubCrdtDocument(
       action: 'sync.crdt_materialized',
       targetType: 'crdt_document',
       targetId: document.key,
-      groupKey,
+      branch,
       payload: {
         document: document.document,
         materialized,
@@ -247,8 +247,8 @@ function updateGlobalProjectionDocument(
     conflictIds: input.conflictIds
   };
 
-  if (document.document.groupKey !== undefined) {
-    projectionDocument.groupKey = document.document.groupKey;
+  if (document.document.branch !== undefined) {
+    projectionDocument.branch = document.document.branch;
   }
 
   if (document.document.projectKey !== undefined) {
@@ -261,7 +261,7 @@ function updateGlobalProjectionDocument(
 
 function recalculateGlobalProjectionCounts(state: HubState): void {
   const documents = Object.values(state.globalProjection.documents);
-  const groups = new Set(documents.map((document) => document.groupKey).filter((groupKey): groupKey is string => groupKey !== undefined));
+  const groups = new Set(documents.map((document) => document.branch).filter((branch): branch is string => branch !== undefined));
 
   state.globalProjection.updatedAt = new Date().toISOString();
   state.globalProjection.counts = {
@@ -333,10 +333,10 @@ function normalizeDocumentRef(
   }
 
   const rawDocument = isPlainRecord(value) ? value : {};
-  const requestedGroupKey = readNonEmptyString(rawDocument.groupKey);
+  const requestedGroupKey = readNonEmptyString(rawDocument.branch);
 
-  if (requestedGroupKey !== undefined && requestedGroupKey !== auth.groupKey) {
-    return hubError(403, 'crdt_sync.group_mismatch', 'CRDT sync document groupKey must match the authenticated group.');
+  if (requestedGroupKey !== undefined && requestedGroupKey !== auth.branch) {
+    return hubError(403, 'crdt_sync.group_mismatch', 'CRDT sync document branch must match the authenticated group.');
   }
 
   const kind = (readNonEmptyString(rawDocument.kind) ?? 'project') as CrdtSyncDocumentKind;
@@ -351,7 +351,7 @@ function normalizeDocumentRef(
 
   const document: CrdtSyncDocumentRef = {
     kind,
-    groupKey: auth.groupKey
+    branch: auth.branch
   };
 
   if (projectKey !== undefined) {
@@ -519,7 +519,7 @@ function createStoredCrdtChange(input: {
     headsAfter: [...input.headsAfter],
     receivedAt: input.receivedAt,
     clientId: input.auth.clientId,
-    groupKey: input.auth.groupKey
+    branch: input.auth.branch
   };
 
   if (input.change.actorId !== undefined) {
@@ -728,7 +728,7 @@ function readKnowledgeSource(value: unknown, document: CrdtSyncDocumentRef): Kno
 
   source.metadata = {
     ...metadata,
-    groupKey: document.groupKey,
+    branch: document.branch,
     projectKey: document.projectKey ?? metadata.projectKey
   };
 
@@ -841,7 +841,7 @@ function auditCrdtExchange(
     action: 'sync.crdt_exchange',
     targetType: 'crdt_document',
     targetId: input.document.key,
-    groupKey: auth.groupKey,
+    branch: auth.branch,
     payload: {
       clientId: auth.clientId,
       document: input.document.document,
@@ -871,7 +871,7 @@ function createDocumentKey(document: CrdtSyncDocumentRef): string {
     .update(
       stableStringify({
         kind: document.kind,
-        groupKey: document.groupKey,
+        branch: document.branch,
         projectKey: document.projectKey,
         documentId: document.documentId,
         namespace: document.namespace
@@ -890,8 +890,8 @@ function cloneDocumentRef(document: CrdtSyncDocumentRef): CrdtSyncDocumentRef {
     kind: document.kind
   };
 
-  if (document.groupKey !== undefined) {
-    clone.groupKey = document.groupKey;
+  if (document.branch !== undefined) {
+    clone.branch = document.branch;
   }
 
   if (document.projectKey !== undefined) {

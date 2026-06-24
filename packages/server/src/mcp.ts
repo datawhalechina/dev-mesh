@@ -374,7 +374,7 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
       }
 
       if (input.projectKey !== undefined) {
-        reviewQuery.groupKey = input.projectKey;
+        reviewQuery.branch = input.projectKey;
       }
 
       if (input.layer !== undefined) {
@@ -636,15 +636,15 @@ async function buildServerScopedContextPack(core: DevMeshCore, input: MeshSearch
 
 function filterSemanticEdgesByGroup(
   edges: KnowledgeGraphSemanticEdge[] | undefined,
-  groupKey: string | undefined
+  branch: string | undefined
 ): KnowledgeGraphSemanticEdge[] | undefined {
-  if (edges === undefined || groupKey === undefined) {
+  if (edges === undefined || branch === undefined) {
     return edges;
   }
 
   return edges.filter((edge) => {
-    const scoped = edge as KnowledgeGraphSemanticEdge & { groupKey?: string };
-    return scoped.groupKey === undefined || scoped.groupKey === groupKey;
+    const scoped = edge as KnowledgeGraphSemanticEdge & { branch?: string };
+    return scoped.branch === undefined || scoped.branch === branch;
   });
 }
 

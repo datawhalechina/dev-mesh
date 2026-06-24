@@ -7,7 +7,7 @@ export {
 export type {
   HubAuthContext,
   HubError,
-  HubGroupSeed,
+  HubBranchSeed,
   HubInviteSeed,
   HubProjectSeed,
   HubResult,
@@ -15,10 +15,10 @@ export type {
   HubStateOptions
 } from './hub-model.js';
 export { createHubState } from './hub-seed.js';
-export { authenticateHubToken, joinHubGroup, rotateHubAccessToken } from './hub-auth.js';
+export { authenticateHubToken, joinHubBranch, rotateHubAccessToken } from './hub-auth.js';
 export {
   createHubProject,
   getHubProject,
-  listHubGroups,
+  listHubBranchs,
   listHubProjects
 } from './hub-projects.js';

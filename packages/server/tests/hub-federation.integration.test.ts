@@ -73,11 +73,11 @@ describe('hub federation sync', () => {
 
     const firstSync = federateHubSyncEvents(source, target, {
       peerId: 'peer_server_a',
-      groupKey: 'frontend-team'
+      branch: 'frontend-team'
     });
     const duplicateSync = federateHubSyncEvents(source, target, {
       peerId: 'peer_server_a',
-      groupKey: 'frontend-team',
+      branch: 'frontend-team',
       cursor: undefined
     });
     const secondPush = pushHubSyncEvents(source, frontendAuth, {
@@ -95,7 +95,7 @@ describe('hub federation sync', () => {
     });
     const secondSync = federateHubSyncEvents(source, target, {
       peerId: 'peer_server_a',
-      groupKey: 'frontend-team'
+      branch: 'frontend-team'
     });
     const targetFrontendPull = pullHubSyncEvents(target, frontendAuth, undefined);
     const targetBackendPull = pullHubSyncEvents(target, backendAuth, undefined);
@@ -112,7 +112,7 @@ describe('hub federation sync', () => {
       ok: true,
       value: {
         peerId: 'peer_server_a',
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         cursor: 'cur_frontend-team_2',
         pulled: 2,
         accepted: 2,
@@ -196,7 +196,7 @@ describe('hub federation sync', () => {
         expect.objectContaining({
           action: 'federation.synced',
           actor: 'peer_server_a',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           payload: expect.objectContaining({
             pulled: 2,
             accepted: 2
@@ -205,7 +205,7 @@ describe('hub federation sync', () => {
         expect.objectContaining({
           action: 'federation.synced',
           actor: 'peer_server_a',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           payload: expect.objectContaining({
             previousCursor: 'cur_frontend-team_2',
             pulled: 1,
@@ -217,7 +217,7 @@ describe('hub federation sync', () => {
           actor: 'peer_server_a',
           targetType: 'knowledge',
           targetId: 'kn_frontend_1',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           payload: expect.objectContaining({
             eventId: 'evt_frontend_tombstone',
             clientId: frontendAuth.clientId,
@@ -235,7 +235,7 @@ describe('hub federation sync', () => {
     expect(
       federateHubSyncEvents(source, target, {
         peerId: '',
-        groupKey: 'default'
+        branch: 'default'
       })
     ).toMatchObject({
       ok: false,
@@ -246,7 +246,7 @@ describe('hub federation sync', () => {
     expect(
       federateHubSyncEvents(source, target, {
         peerId: 'peer_server_a',
-        groupKey: 'missing'
+        branch: 'missing'
       })
     ).toMatchObject({
       ok: false,
@@ -257,7 +257,7 @@ describe('hub federation sync', () => {
     expect(
       federateHubSyncEvents(source, target, {
         peerId: 'peer_server_a',
-        groupKey: 'default',
+        branch: 'default',
         limit: 0
       })
     ).toMatchObject({
@@ -269,11 +269,11 @@ describe('hub federation sync', () => {
   });
 });
 
-function createAuth(groupKey: string): HubAuthContext {
+function createAuth(branch: string): HubAuthContext {
   return {
-    memberId: `member_${groupKey}`,
-    clientId: `client_${groupKey}`,
-    groupKey,
-    syncSigningSecret: `sync_secret_${groupKey}`
+    memberId: `member_${branch}`,
+    clientId: `client_${branch}`,
+    branch,
+    syncSigningSecret: `sync_secret_${branch}`
   };
 }

@@ -7,8 +7,6 @@ import type {
   CrdtDocumentFilters,
   CrdtDocumentSummary,
   GlossaryInput,
-  GroupInput,
-  GroupSummary,
   InviteInput,
   InviteSummary,
   KnowledgeBranchPublishInput,
@@ -32,12 +30,6 @@ import type {
 
 export async function fetchAdminOverview(): Promise<AdminOverview> {
   return requestJson<AdminOverview>('/api/v1/admin/overview');
-}
-
-export async function fetchGroups(): Promise<GroupSummary[]> {
-  const response = await requestJson<{ groups: GroupSummary[] }>('/api/v1/admin/groups');
-
-  return response.groups;
 }
 
 export async function fetchBranches(): Promise<BranchSummary[]> {
@@ -75,7 +67,7 @@ export async function fetchCrdtDocuments(input: CrdtDocumentFilters = {}): Promi
     params.set('kind', input.kind.trim());
   }
 
-  const branchKey = input.branchKey?.trim() ?? input.groupKey?.trim();
+  const branchKey = input.branchKey?.trim() ?? input.branch?.trim();
 
   if (branchKey) {
     params.set('branchKey', branchKey);
@@ -89,13 +81,6 @@ export async function fetchCrdtDocuments(input: CrdtDocumentFilters = {}): Promi
   const response = await requestJson<{ documents: CrdtDocumentSummary[] }>(`/api/v1/admin/crdt-documents${suffix}`);
 
   return response.documents;
-}
-
-export async function createGroup(input: GroupInput): Promise<GroupSummary> {
-  return requestJson<GroupSummary>('/api/v1/admin/groups', {
-    method: 'POST',
-    body: input
-  });
 }
 
 export async function fetchMembers(): Promise<MemberSummary[]> {
@@ -166,9 +151,9 @@ export async function checkoutProjectBranch(
   );
 }
 
-export async function updateProjectAcl(groupKey: string, projectId: string, input: ProjectAclInput): Promise<ProjectSummary> {
+export async function updateProjectAcl(branch: string, projectId: string, input: ProjectAclInput): Promise<ProjectSummary> {
   return requestJson<ProjectSummary>(
-    `/api/v1/admin/projects/${encodeURIComponent(groupKey)}/${encodeURIComponent(projectId)}/acl`,
+    `/api/v1/admin/projects/${encodeURIComponent(branch)}/${encodeURIComponent(projectId)}/acl`,
     {
       method: 'PUT',
       body: input
@@ -244,7 +229,7 @@ export async function fetchQualityReview(input: QualityReviewFilters = {}): Prom
     params.set('layer', input.layer);
   }
 
-  const branchKey = input.branchKey?.trim() ?? input.groupKey?.trim();
+  const branchKey = input.branchKey?.trim() ?? input.branch?.trim();
 
   if (branchKey) {
     params.set('branchKey', branchKey);
@@ -268,7 +253,7 @@ export async function fetchQualityReview(input: QualityReviewFilters = {}): Prom
 
 export async function fetchTaskDigest(input: TaskDigestFilters = {}): Promise<TaskDigestResponse> {
   const params = new URLSearchParams();
-  const branchKey = input.branchKey?.trim() ?? input.groupKey?.trim();
+  const branchKey = input.branchKey?.trim() ?? input.branch?.trim();
 
   if (branchKey) {
     params.set('branchKey', branchKey);

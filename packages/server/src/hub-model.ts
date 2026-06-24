@@ -5,7 +5,7 @@ export const DEFAULT_GROUP_KEY = 'default';
 export const ACCESS_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const DEFAULT_ADMIN_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
-export interface HubGroupSeed {
+export interface HubBranchSeed {
   key: string;
   displayName?: string;
   description?: string;
@@ -14,14 +14,14 @@ export interface HubGroupSeed {
 
 export interface HubInviteSeed {
   token: string;
-  groupKey: string;
+  branch: string;
   expiresAt?: string;
   maxUses?: number;
 }
 
 export interface HubProjectSeed {
   id: string;
-  groupKey: string;
+  branch: string;
   name?: string;
   projectKey?: string;
   description?: string;
@@ -31,7 +31,7 @@ export interface HubProjectSeed {
 }
 
 export interface HubStateOptions {
-  groups?: HubGroupSeed[];
+  groups?: HubBranchSeed[];
   invites?: HubInviteSeed[];
   projects?: HubProjectSeed[];
 }
@@ -39,7 +39,7 @@ export interface HubStateOptions {
 export interface HubAuthContext {
   memberId: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
   syncSigningSecret: string;
 }
 
@@ -51,7 +51,7 @@ export interface HubError {
 
 export type HubResult<T> = { ok: true; value: T } | { ok: false; error: HubError };
 
-export interface HubGroup {
+export interface HubBranch {
   key: string;
   displayName: string;
   joinMode: 'invite' | 'open' | 'admin';
@@ -60,7 +60,7 @@ export interface HubGroup {
 
 export interface HubInvite {
   token: string;
-  groupKey: string;
+  branch: string;
   uses: number;
   createdAt: string;
   createdBy: string;
@@ -73,7 +73,7 @@ export interface HubInvite {
 export interface HubMember {
   memberId: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
   displayName: string;
   handle: string;
   joinedAt: string;
@@ -93,7 +93,7 @@ export interface HubAuditLog {
   action: string;
   targetType: string;
   targetId: string;
-  groupKey?: string;
+  branch?: string;
   createdAt: string;
   payload?: Record<string, unknown>;
 }
@@ -107,14 +107,14 @@ export interface HubKnowledgeEdge {
   toId: string;
   createdBy: string;
   createdAt: string;
-  groupKey?: string;
+  branch?: string;
   reason?: string;
 }
 
 export interface HubSyncEvent extends SyncEvent {
   createdAt: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
   acceptedAt: string;
 }
 
@@ -122,7 +122,7 @@ export interface HubCrdtChange extends CrdtSyncChange {
   id: string;
   receivedAt: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
 }
 
 export interface HubCrdtDocument {
@@ -137,7 +137,7 @@ export interface HubCrdtDocument {
 export interface HubGlobalProjectionDocument {
   documentKey: string;
   document: CrdtSyncDocumentRef;
-  groupKey?: string;
+  branch?: string;
   projectKey?: string;
   sourceHeads: string[];
   materializedAt: string;
@@ -177,7 +177,7 @@ export function createEmptyHubGlobalProjection(): HubGlobalProjection {
 }
 
 export interface HubState {
-  groups: Map<string, HubGroup>;
+  groups: Map<string, HubBranch>;
   invites: Map<string, HubInvite>;
   members: Map<string, HubMember>;
   tokens: Map<string, HubAccessToken>;

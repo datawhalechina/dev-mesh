@@ -67,22 +67,14 @@ export interface ProjectMeta {
   id: string;
   key: string;
   name: string;
-  groupKey: string;
-  groupId?: string;
+  branch: string;
+  branchId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ServerMeta {
   id: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface GroupNode {
-  id: string;
-  key: string;
   name: string;
   createdAt: string;
   updatedAt: string;
@@ -108,14 +100,10 @@ export interface ClientNode {
   updatedAt: string;
 }
 
-export interface GroupScopedNode {
-  groupKey: string;
-  groupId?: string;
-  sourceProjectId?: string;
-}
-
-export interface KnowledgeNode extends GroupScopedNode {
+export interface KnowledgeNode {
   id: string;
+  branch: string;
+  sourceProjectId?: string;
   layer: KnowledgeLayer;
   entryKey: string;
   type: KnowledgeType;
@@ -134,8 +122,10 @@ export interface KnowledgeNode extends GroupScopedNode {
   quality: QualitySignals;
 }
 
-export interface EntityNode extends GroupScopedNode {
+export interface EntityNode {
   id: string;
+  branch: string;
+  sourceProjectId?: string;
   kind: EntityKind;
   name: string;
   aliases: string[];
@@ -144,8 +134,10 @@ export interface EntityNode extends GroupScopedNode {
   updatedAt: string;
 }
 
-export interface RelationEdge extends GroupScopedNode {
+export interface RelationEdge {
   id: string;
+  branch: string;
+  sourceProjectId?: string;
   from: string;
   to: string;
   kind: RelationKind;
@@ -155,8 +147,10 @@ export interface RelationEdge extends GroupScopedNode {
   createdAt: string;
 }
 
-export interface ClaimNode extends GroupScopedNode {
+export interface ClaimNode {
   id: string;
+  branch: string;
+  sourceProjectId?: string;
   text: string;
   subjectEntityId?: string;
   objectEntityId?: string;
@@ -167,8 +161,10 @@ export interface ClaimNode extends GroupScopedNode {
   updatedAt: string;
 }
 
-export interface QualitySignal extends GroupScopedNode {
+export interface QualitySignal {
   id: string;
+  branch: string;
+  sourceProjectId?: string;
   knowledgeId: string;
   kind: QualitySignalKind;
   actorId: string;
@@ -177,8 +173,10 @@ export interface QualitySignal extends GroupScopedNode {
   createdAt: string;
 }
 
-export interface ConflictNode extends GroupScopedNode {
+export interface ConflictNode {
   id: string;
+  branch: string;
+  sourceProjectId?: string;
   kind: string;
   subjectIds: string[];
   status: ConflictStatus;
@@ -197,7 +195,7 @@ export interface ExtensionState {
 export interface ProjectDoc {
   schemaVersion: 2;
   project: ProjectMeta;
-  groupKey: string;
+  branch: string;
   knowledge: Record<string, KnowledgeNode>;
   entities: Record<string, EntityNode>;
   relations: Record<string, RelationEdge>;
@@ -210,7 +208,7 @@ export interface ProjectDoc {
 export interface ServerGlobalDoc {
   schemaVersion: 2;
   server: ServerMeta;
-  groups: Record<string, GroupNode>;
+  groups: Record<string, BranchNode>;
   projects: Record<string, ProjectNode>;
   members: Record<string, MemberNode>;
   clients: Record<string, ClientNode>;
@@ -289,8 +287,8 @@ export interface CreateProjectDocInput {
   projectId: string;
   projectKey: string;
   name: string;
-  groupKey?: string;
-  groupId?: string;
+  branch?: string;
+  branchId?: string;
   now?: () => Date;
 }
 
@@ -302,24 +300,24 @@ export interface CreateServerGlobalDocInput {
 
 export function createProjectDoc(input: CreateProjectDocInput): ProjectDoc {
   const timestamp = (input.now?.() ?? new Date()).toISOString();
-  const groupKey = input.groupKey ?? input.projectKey;
+  const branch = input.branch ?? input.projectKey;
   const project: ProjectMeta = {
     id: input.projectId,
     key: input.projectKey,
     name: input.name,
-    groupKey,
+    branch,
     createdAt: timestamp,
     updatedAt: timestamp
   };
 
-  if (input.groupId !== undefined) {
-    project.groupId = input.groupId;
+  if (input.branchId !== undefined) {
+    project.branchId = input.branchId;
   }
 
   return {
     schemaVersion: CRDT_STORE_SCHEMA_VERSION,
     project,
-    groupKey,
+    branch,
     knowledge: {},
     entities: {},
     relations: {},
@@ -353,7 +351,7 @@ export function createServerGlobalDoc(input: CreateServerGlobalDocInput): Server
   };
 }
 
-export function knowledgeItemToNode(item: KnowledgeItem, group: GroupScopedNode): KnowledgeNode {
+export function knowledgeItemToNode(item: KnowledgeItem, group: BranchScopedNode): KnowledgeNode {
   const node: KnowledgeNode = {
     id: item.id,
     layer: item.layer,
@@ -370,15 +368,15 @@ export function knowledgeItemToNode(item: KnowledgeItem, group: GroupScopedNode)
     updatedAt: item.updatedAt,
     visibility: item.visibility,
     quality: item.quality,
-    groupKey: group.groupKey
+    branch: group.branch
   };
 
   if (item.content !== undefined) {
     node.content = item.content;
   }
 
-  if (group.groupId !== undefined) {
-    node.groupId = group.groupId;
+  if (group.branchId !== undefined) {
+    node.branchId = group.branchId;
   }
 
   if (group.sourceProjectId !== undefined) {
@@ -400,13 +398,13 @@ export async function importV1JsonlToProjectDoc(
   input: ImportV1JsonlToProjectDocInput
 ): Promise<ImportV1JsonlToProjectDocResult> {
   const sourceFiles = new Set<string>();
-  const group: GroupScopedNode = {
-    groupKey: input.doc.groupKey,
+  const group: BranchScopedNode = {
+    branch: input.doc.branch,
     sourceProjectId: input.doc.project.id
   };
 
-  if (input.doc.project.groupId !== undefined) {
-    group.groupId = input.doc.project.groupId;
+  if (input.doc.project.branchId !== undefined) {
+    group.branchId = input.doc.project.branchId;
   }
   const result: ImportV1JsonlToProjectDocResult = {
     doc: cloneJson(input.doc),
@@ -885,7 +883,7 @@ export function createQualitySignal(input: {
   knowledgeId: string;
   kind: QualitySignalKind;
   actorId: string;
-  group: GroupScopedNode;
+  group: BranchScopedNode;
   value?: number;
   reason?: string;
   now?: () => Date;
@@ -909,7 +907,7 @@ export function createQualitySignal(input: {
     kind: input.kind,
     actorId: input.actorId,
     createdAt,
-    groupKey: input.group.groupKey
+    branch: input.group.branch
   };
 
   if (input.value !== undefined) {
@@ -920,8 +918,8 @@ export function createQualitySignal(input: {
     signal.reason = input.reason;
   }
 
-  if (input.group.groupId !== undefined) {
-    signal.groupId = input.group.groupId;
+  if (input.group.branchId !== undefined) {
+    signal.branchId = input.group.branchId;
   }
 
   if (input.group.sourceProjectId !== undefined) {
@@ -1030,7 +1028,7 @@ async function readJsonlRecords(path: string): Promise<unknown[]> {
   return records;
 }
 
-function projectKnowledgeEdgeToRelation(edge: ProjectKnowledgeEdgeRecord, group: GroupScopedNode): RelationEdge {
+function projectKnowledgeEdgeToRelation(edge: ProjectKnowledgeEdgeRecord, group: BranchScopedNode): RelationEdge {
   const relation: RelationEdge = {
     id: edge.id,
     from: edge.fromId,
@@ -1040,11 +1038,11 @@ function projectKnowledgeEdgeToRelation(edge: ProjectKnowledgeEdgeRecord, group:
     confidence: 0.8,
     createdBy: edge.createdBy ?? { displayName: 'migration' },
     createdAt: edge.createdAt,
-    groupKey: group.groupKey
+    branch: group.branch
   };
 
-  if (group.groupId !== undefined) {
-    relation.groupId = group.groupId;
+  if (group.branchId !== undefined) {
+    relation.branchId = group.branchId;
   }
 
   if (group.sourceProjectId !== undefined) {
@@ -1056,7 +1054,7 @@ function projectKnowledgeEdgeToRelation(edge: ProjectKnowledgeEdgeRecord, group:
 
 function knowledgeRatingToQualitySignals(
   rating: KnowledgeRatingRecord,
-  group: GroupScopedNode,
+  group: BranchScopedNode,
   fallbackActorId = 'migration'
 ): QualitySignal[] {
   const actorId = rating.createdBy?.memberId ?? rating.createdBy?.handle ?? fallbackActorId;
@@ -1115,7 +1113,7 @@ function knowledgeRatingToQualitySignals(
 
 function knowledgeUsageToQualitySignal(
   usage: KnowledgeUsageRecord,
-  group: GroupScopedNode,
+  group: BranchScopedNode,
   fallbackActorId = 'migration'
 ): QualitySignal {
   return createQualitySignal(
@@ -1134,7 +1132,7 @@ function knowledgeUsageToQualitySignal(
 function importEventHints(
   doc: ProjectDoc,
   event: DevMeshEventRecord,
-  group: GroupScopedNode,
+  group: BranchScopedNode,
   fallbackActorId = 'migration'
 ): ImportEventHintsResult {
   const result: ImportEventHintsResult = {
@@ -1383,7 +1381,7 @@ function qualitySignalInput(input: {
   knowledgeId: string;
   kind: QualitySignalKind;
   actorId: string;
-  group: GroupScopedNode;
+  group: BranchScopedNode;
   value?: number | undefined;
   reason?: string | undefined;
   now?: (() => Date) | undefined;
@@ -1391,7 +1389,7 @@ function qualitySignalInput(input: {
   knowledgeId: string;
   kind: QualitySignalKind;
   actorId: string;
-  group: GroupScopedNode;
+  group: BranchScopedNode;
   value?: number;
   reason?: string;
   now?: () => Date;
@@ -1400,7 +1398,7 @@ function qualitySignalInput(input: {
     knowledgeId: string;
     kind: QualitySignalKind;
     actorId: string;
-    group: GroupScopedNode;
+    group: BranchScopedNode;
     value?: number;
     reason?: string;
     now?: () => Date;

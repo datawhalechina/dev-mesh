@@ -22,7 +22,7 @@ export async function joinServerGroup(options: JoinServerOptions): Promise<JoinS
     identityPath: paths.identityPath,
     serverUrl: record.serverUrl,
     mcpUrl: record.mcpUrl,
-    groupKey: record.groupKey,
+    branch: record.branch,
     memberId: record.memberId,
     clientId: record.clientId
   };
@@ -44,8 +44,8 @@ function createJoinRequest(options: JoinServerOptions): JoinRequest {
     request.inviteToken = options.inviteToken;
   }
 
-  if (options.groupKey !== undefined) {
-    request.groupKey = options.groupKey;
+  if (options.branch !== undefined) {
+    request.branch = options.branch;
   }
 
   if (options.handle !== undefined) {
@@ -65,7 +65,7 @@ function createJoinedServerRecord(
   const record: JoinedServerRecord = {
     serverUrl,
     mcpUrl,
-    groupKey: joined.groupKey,
+    branch: joined.branch,
     memberId: joined.memberId,
     clientId: joined.clientId,
     displayName: options.displayName,

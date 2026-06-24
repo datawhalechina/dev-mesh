@@ -4,7 +4,7 @@ import type { HubAuthContext } from './hub-model.js';
 
 export interface HubProjectBrief {
   projectId: string;
-  groupKey: string;
+  branch: string;
   items: KnowledgeItem[];
 }
 
@@ -21,21 +21,21 @@ export async function createHubProjectBrief(
 
   return {
     projectId: project.id,
-    groupKey: project.groupKey,
+    branch: project.branch,
     items: candidates
-      .filter((item) => canShareKnowledgeWithProject(item, auth.groupKey, project.projectKey))
+      .filter((item) => canShareKnowledgeWithProject(item, auth.branch, project.projectKey))
       .slice(0, 5)
   };
 }
 
-export function canShareKnowledgeWithProject(item: KnowledgeItem, groupKey: string, projectKey: string): boolean {
+export function canShareKnowledgeWithProject(item: KnowledgeItem, branch: string, projectKey: string): boolean {
   if (item.visibility === 'org') {
     return true;
   }
 
-  const itemGroupKey = readKnowledgeMetadataString(item, 'groupKey');
+  const itemGroupKey = readKnowledgeMetadataString(item, 'branch');
 
-  if (itemGroupKey !== undefined && itemGroupKey !== groupKey) {
+  if (itemGroupKey !== undefined && itemGroupKey !== branch) {
     return false;
   }
 

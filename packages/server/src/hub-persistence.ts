@@ -6,7 +6,7 @@ import type {
   HubAuditLog,
   HubCrdtDocument,
   HubGlobalProjection,
-  HubGroup,
+  HubBranch,
   HubInvite,
   HubKnowledgeEdge,
   HubMember,
@@ -28,7 +28,7 @@ export interface HubStatePersistenceStore {
 
 interface SerializedHubState {
   version: 2;
-  groups: HubGroup[];
+  groups: HubBranch[];
   invites: HubInvite[];
   members: HubMember[];
   tokens: HubAccessToken[];
@@ -79,13 +79,13 @@ export function serializeHubState(state: HubState): SerializedHubState {
   return {
     version: 2,
     groups: [...state.groups.values()].sort((a, b) => a.key.localeCompare(b.key)),
-    invites: [...state.invites.values()].sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.token.localeCompare(b.token)),
-    members: [...state.members.values()].sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.memberId.localeCompare(b.memberId)),
+    invites: [...state.invites.values()].sort((a, b) => a.branch.localeCompare(b.branch) || a.token.localeCompare(b.token)),
+    members: [...state.members.values()].sort((a, b) => a.branch.localeCompare(b.branch) || a.memberId.localeCompare(b.memberId)),
     tokens: [...state.tokens.values()].sort((a, b) => a.memberId.localeCompare(b.memberId) || a.token.localeCompare(b.token)),
-    projects: [...state.projects.values()].sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.id.localeCompare(b.id)),
+    projects: [...state.projects.values()].sort((a, b) => a.branch.localeCompare(b.branch) || a.id.localeCompare(b.id)),
     knowledgeEdges: state.knowledgeEdges.slice().sort((a, b) => a.id.localeCompare(b.id)),
     syncEvents: [...state.syncEvents.entries()]
-      .map(([groupKey, events]) => [groupKey, events] as [string, HubSyncEvent[]])
+      .map(([branch, events]) => [branch, events] as [string, HubSyncEvent[]])
       .sort(([leftGroupKey], [rightGroupKey]) => leftGroupKey.localeCompare(rightGroupKey)),
     crdtDocuments: [...state.crdtDocuments.entries()].sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
     globalProjection: state.globalProjection,
@@ -104,7 +104,7 @@ export function deserializeHubState(value: unknown): HubState {
     invites: new Map(value.invites.map((invite) => [invite.token, invite])),
     members: new Map(value.members.map((member) => [member.memberId, member])),
     tokens: new Map(value.tokens.map((token) => [token.token, token])),
-    projects: new Map(value.projects.map((project) => [`${project.groupKey}:${project.id}`, project])),
+    projects: new Map(value.projects.map((project) => [`${project.branch}:${project.id}`, project])),
     knowledgeEdges: value.knowledgeEdges,
     syncEvents: new Map(value.syncEvents),
     crdtDocuments: new Map(value.crdtDocuments),

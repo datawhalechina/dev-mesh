@@ -12,7 +12,7 @@ export interface HubSyncEventLogPage {
 }
 
 export interface HubSyncEventMergeInput {
-  groupKey: string;
+  branch: string;
   events: HubSyncEvent[];
   acceptedAt?: string;
   actor?: string;
@@ -25,7 +25,7 @@ export interface HubSyncEventMergeResult {
 }
 
 export interface HubSyncEventLogVerificationInput {
-  groupKey: string;
+  branch: string;
   actor?: string;
 }
 
@@ -41,7 +41,7 @@ export interface HubSyncEventLogVerificationResult {
 }
 
 export interface HubSyncTombstoneReplayInput {
-  groupKey: string;
+  branch: string;
   cursor?: string;
   actor?: string;
 }
@@ -55,7 +55,7 @@ export interface HubSyncTombstoneReplayResult {
 }
 
 export interface HubSyncConflictReplayInput {
-  groupKey: string;
+  branch: string;
   cursor?: string;
   actor?: string;
 }
@@ -69,7 +69,7 @@ export interface HubSyncConflictReplayResult {
 }
 
 export interface HubSyncKnowledgeSnapshotReplayInput {
-  groupKey: string;
+  branch: string;
   cursor?: string;
   actor?: string;
 }
@@ -101,7 +101,7 @@ export function pushHubSyncEvents(
     return hubError(400, 'sync.events_invalid', 'events must be an array.');
   }
 
-  const groupEvents = getGroupSyncEvents(state, auth.groupKey);
+  const groupEvents = getBranchSyncEvents(state, auth.branch);
   const existingIds = new Set(groupEvents.map((event) => event.id));
   const rejected: SyncPushResponse['rejected'] = [];
   let accepted = 0;
@@ -133,7 +133,7 @@ export function pushHubSyncEvents(
     accepted += 1;
     auditSyncTombstoneAccepted(state, {
       actor: auth.memberId,
-      groupKey: auth.groupKey,
+      branch: auth.branch,
       event: hubEvent
     });
   }
@@ -141,7 +141,7 @@ export function pushHubSyncEvents(
   return ok({
     accepted,
     rejected,
-    cursor: createSyncCursor(auth.groupKey, groupEvents.length)
+    cursor: createSyncCursor(auth.branch, groupEvents.length)
   });
 }
 
@@ -150,7 +150,7 @@ export function pullHubSyncEvents(
   auth: HubAuthContext,
   cursor: string | undefined
 ): SyncPullResponse {
-  const page = pullHubSyncEventLog(state, auth.groupKey, cursor);
+  const page = pullHubSyncEventLog(state, auth.branch, cursor);
 
   return {
     cursor: page.cursor,
@@ -160,25 +160,25 @@ export function pullHubSyncEvents(
 
 export function pullHubSyncEventLog(
   state: HubState,
-  groupKey: string,
+  branch: string,
   cursor: string | undefined,
   limit?: number
 ): HubSyncEventLogPage {
-  const groupEvents = getGroupSyncEvents(state, groupKey);
-  const offset = readSyncCursorOffset(groupKey, cursor);
+  const groupEvents = getBranchSyncEvents(state, branch);
+  const offset = readSyncCursorOffset(branch, cursor);
   const boundedLimit = limit === undefined ? undefined : Math.max(0, Math.floor(limit));
   const end = boundedLimit === undefined ? undefined : offset + boundedLimit;
   const nextEvents = groupEvents.slice(offset, end);
   const nextOffset = boundedLimit === undefined ? groupEvents.length : offset + nextEvents.length;
 
   return {
-    cursor: createSyncCursor(groupKey, nextOffset),
+    cursor: createSyncCursor(branch, nextOffset),
     events: nextEvents.map(cloneHubSyncEvent)
   };
 }
 
 export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeInput): HubSyncEventMergeResult {
-  const groupEvents = getGroupSyncEvents(state, input.groupKey);
+  const groupEvents = getBranchSyncEvents(state, input.branch);
   const existingIds = new Set(groupEvents.map((event) => event.id));
   const acceptedAt = input.acceptedAt ?? new Date().toISOString();
   let accepted = 0;
@@ -194,7 +194,7 @@ export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeIn
       groupEvents,
       cloneHubSyncEvent({
         ...event,
-        groupKey: input.groupKey,
+        branch: input.branch,
         acceptedAt
       })
     );
@@ -202,7 +202,7 @@ export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeIn
     accepted += 1;
     auditSyncTombstoneAccepted(state, {
       actor: input.actor ?? merged.clientId,
-      groupKey: input.groupKey,
+      branch: input.branch,
       event: merged
     });
   }
@@ -210,7 +210,7 @@ export function mergeHubSyncEventLog(state: HubState, input: HubSyncEventMergeIn
   return {
     accepted,
     skipped,
-    cursor: createSyncCursor(input.groupKey, groupEvents.length)
+    cursor: createSyncCursor(input.branch, groupEvents.length)
   };
 }
 
@@ -219,7 +219,7 @@ export async function replayHubSyncTombstones(
   core: DevMeshCore,
   input: HubSyncTombstoneReplayInput
 ): Promise<HubSyncTombstoneReplayResult> {
-  const page = pullHubSyncEventLog(state, input.groupKey, input.cursor);
+  const page = pullHubSyncEventLog(state, input.branch, input.cursor);
   let applied = 0;
   let skipped = 0;
   let missing = 0;
@@ -248,7 +248,7 @@ export async function replayHubSyncTombstones(
     applied += 1;
     auditSyncTombstoneReplayed(state, {
       actor: input.actor ?? event.clientId,
-      groupKey: input.groupKey,
+      branch: input.branch,
       event,
       tombstone,
       previousStatus: existing.status
@@ -269,8 +269,8 @@ export async function replayHubSyncConflicts(
   core: DevMeshCore,
   input: HubSyncConflictReplayInput
 ): Promise<HubSyncConflictReplayResult> {
-  const page = pullHubSyncEventLog(state, input.groupKey, input.cursor);
-  const revisionsByKnowledgeId = collectKnowledgeConflictRevisions(state, input.groupKey);
+  const page = pullHubSyncEventLog(state, input.branch, input.cursor);
+  const revisionsByKnowledgeId = collectKnowledgeConflictRevisions(state, input.branch);
   const processedPairs = new Set<string>();
   const knownKnowledge = new Map<string, boolean>();
   let conflicts = 0;
@@ -296,7 +296,7 @@ export async function replayHubSyncConflicts(
 
     for (const contender of contenders) {
       const [left, right] = orderKnowledgeConflictPair(revision, contender);
-      const pairKey = createKnowledgeConflictPairKey(input.groupKey, left, right);
+      const pairKey = createKnowledgeConflictPairKey(input.branch, left, right);
 
       if (processedPairs.has(pairKey)) {
         continue;
@@ -305,7 +305,7 @@ export async function replayHubSyncConflicts(
       processedPairs.add(pairKey);
       conflicts += 1;
 
-      if (hasKnowledgeConflictEdge(state, input.groupKey, left.revisionId, right.revisionId)) {
+      if (hasKnowledgeConflictEdge(state, input.branch, left.revisionId, right.revisionId)) {
         skipped += 1;
         continue;
       }
@@ -321,7 +321,7 @@ export async function replayHubSyncConflicts(
       }
 
       const edge = createHubSyncConflictEdge({
-        groupKey: input.groupKey,
+        branch: input.branch,
         actor: input.actor ?? revision.event.clientId,
         left,
         right
@@ -330,7 +330,7 @@ export async function replayHubSyncConflicts(
       edgesCreated += 1;
       auditSyncConflictReplayed(state, {
         actor: input.actor ?? revision.event.clientId,
-        groupKey: input.groupKey,
+        branch: input.branch,
         edge,
         left,
         right
@@ -352,7 +352,7 @@ export async function replayHubSyncKnowledgeSnapshots(
   core: DevMeshCore,
   input: HubSyncKnowledgeSnapshotReplayInput
 ): Promise<HubSyncKnowledgeSnapshotReplayResult> {
-  const page = pullHubSyncEventLog(state, input.groupKey, input.cursor);
+  const page = pullHubSyncEventLog(state, input.branch, input.cursor);
   let upserted = 0;
   let skipped = 0;
 
@@ -364,11 +364,11 @@ export async function replayHubSyncKnowledgeSnapshots(
       continue;
     }
 
-    await core.repository.upsert(withKnowledgeGroupKey(item, input.groupKey));
+    await core.repository.upsert(withKnowledgeGroupKey(item, input.branch));
     upserted += 1;
     auditSyncKnowledgeSnapshotReplayed(state, {
       actor: input.actor ?? event.clientId,
-      groupKey: input.groupKey,
+      branch: input.branch,
       event,
       item
     });
@@ -386,7 +386,7 @@ export function verifyHubSyncEventLog(
   state: HubState,
   input: HubSyncEventLogVerificationInput
 ): HubSyncEventLogVerificationResult {
-  const groupEvents = getGroupSyncEvents(state, input.groupKey);
+  const groupEvents = getBranchSyncEvents(state, input.branch);
   const rejected: HubSyncEventLogVerificationFailure[] = [];
   let previousHash: string | undefined;
 
@@ -444,12 +444,12 @@ export function verifyHubSyncEventLog(
   return result;
 }
 
-function getGroupSyncEvents(state: HubState, groupKey: string): HubSyncEvent[] {
-  let events = state.syncEvents.get(groupKey);
+function getBranchSyncEvents(state: HubState, branch: string): HubSyncEvent[] {
+  let events = state.syncEvents.get(branch);
 
   if (events === undefined) {
     events = [];
-    state.syncEvents.set(groupKey, events);
+    state.syncEvents.set(branch, events);
   }
 
   return events;
@@ -594,7 +594,7 @@ function createHubSyncEvent(auth: HubAuthContext, event: SyncEvent): HubSyncEven
     payload: event.payload,
     createdAt,
     clientId: auth.clientId,
-    groupKey: auth.groupKey,
+    branch: auth.branch,
     acceptedAt: new Date().toISOString()
   };
 
@@ -631,7 +631,7 @@ function cloneHubSyncEvent(event: HubSyncEvent): HubSyncEvent {
     payload: event.payload,
     createdAt: event.createdAt,
     clientId: event.clientId,
-    groupKey: event.groupKey,
+    branch: event.branch,
     acceptedAt: event.acceptedAt
   };
 
@@ -705,7 +705,7 @@ function createSyncEventLogHash(
           payload: event.payload,
           createdAt: event.createdAt,
           clientId: event.clientId,
-          groupKey: event.groupKey,
+          branch: event.branch,
           acceptedAt: event.acceptedAt,
           signature: event.signature ?? null
         }
@@ -714,12 +714,12 @@ function createSyncEventLogHash(
     .digest('hex');
 }
 
-function createSyncCursor(groupKey: string, offset: number): string {
-  return `cur_${groupKey}_${offset}`;
+function createSyncCursor(branch: string, offset: number): string {
+  return `cur_${branch}_${offset}`;
 }
 
-function readSyncCursorOffset(groupKey: string, cursor: string | undefined): number {
-  const prefix = `cur_${groupKey}_`;
+function readSyncCursorOffset(branch: string, cursor: string | undefined): number {
+  const prefix = `cur_${branch}_`;
 
   if (cursor === undefined || !cursor.startsWith(prefix)) {
     return 0;
@@ -871,10 +871,10 @@ function readKnowledgeSnapshot(event: HubSyncEvent): KnowledgeItem | undefined {
 
 function collectKnowledgeConflictRevisions(
   state: HubState,
-  groupKey: string
+  branch: string
 ): Map<string, KnowledgeConflictRevision[]> {
   const revisions = new Map<string, KnowledgeConflictRevision[]>();
-  const events = pullHubSyncEventLog(state, groupKey, undefined).events;
+  const events = pullHubSyncEventLog(state, branch, undefined).events;
 
   for (const event of events) {
     const revision = readKnowledgeConflictRevision(event);
@@ -944,18 +944,18 @@ function orderKnowledgeConflictPair(
 }
 
 function createKnowledgeConflictPairKey(
-  groupKey: string,
+  branch: string,
   left: KnowledgeConflictRevision,
   right: KnowledgeConflictRevision
 ): string {
-  return `${groupKey}:${left.knowledgeId}:${left.revisionId}:${right.revisionId}`;
+  return `${branch}:${left.knowledgeId}:${left.revisionId}:${right.revisionId}`;
 }
 
-function hasKnowledgeConflictEdge(state: HubState, groupKey: string, leftId: string, rightId: string): boolean {
+function hasKnowledgeConflictEdge(state: HubState, branch: string, leftId: string, rightId: string): boolean {
   return state.knowledgeEdges.some(
     (edge) =>
       edge.kind === 'contradicts' &&
-      edge.groupKey === groupKey &&
+      edge.branch === branch &&
       ((edge.fromId === leftId && edge.toId === rightId) || (edge.fromId === rightId && edge.toId === leftId))
   );
 }
@@ -974,7 +974,7 @@ async function hasKnowledgeItem(core: DevMeshCore, cache: Map<string, boolean>, 
 }
 
 function createHubSyncConflictEdge(input: {
-  groupKey: string;
+  branch: string;
   actor: string;
   left: KnowledgeConflictRevision;
   right: KnowledgeConflictRevision;
@@ -983,20 +983,20 @@ function createHubSyncConflictEdge(input: {
     input.left.reason ?? input.right.reason ?? `Offline update conflict for knowledge ${input.left.knowledgeId}`;
 
   return {
-    id: createSyncConflictEdgeId(input.groupKey, input.left.knowledgeId, input.left.revisionId, input.right.revisionId),
+    id: createSyncConflictEdgeId(input.branch, input.left.knowledgeId, input.left.revisionId, input.right.revisionId),
     kind: 'contradicts',
     fromId: input.left.revisionId,
     toId: input.right.revisionId,
     createdBy: input.actor,
     createdAt: new Date().toISOString(),
-    groupKey: input.groupKey,
+    branch: input.branch,
     reason
   };
 }
 
-function createSyncConflictEdgeId(groupKey: string, knowledgeId: string, leftId: string, rightId: string): string {
+function createSyncConflictEdgeId(branch: string, knowledgeId: string, leftId: string, rightId: string): string {
   return `edge_sync_conflict_${createHash('sha256')
-    .update(`${groupKey}:${knowledgeId}:${leftId}:${rightId}`)
+    .update(`${branch}:${knowledgeId}:${leftId}:${rightId}`)
     .digest('hex')
     .slice(0, 24)}`;
 }
@@ -1102,7 +1102,7 @@ function createSyncEventSignature(auth: HubAuthContext, event: SyncEvent): strin
     .update(
       stableStringify({
         clientId: auth.clientId,
-        groupKey: auth.groupKey,
+        branch: auth.branch,
         event: {
           id: event.id,
           kind: event.kind,
@@ -1155,11 +1155,11 @@ function verifyStoredSyncEventSignature(
 
 function findSyncEventAuthContext(state: HubState, event: HubSyncEvent): HubAuthContext | undefined {
   for (const token of state.tokens.values()) {
-    if (token.clientId === event.clientId && token.groupKey === event.groupKey) {
+    if (token.clientId === event.clientId && token.branch === event.branch) {
       return {
         memberId: token.memberId,
         clientId: token.clientId,
-        groupKey: token.groupKey,
+        branch: token.branch,
         syncSigningSecret: token.syncSigningSecret
       };
     }
@@ -1183,7 +1183,7 @@ function auditSyncSignatureRejection(
     action: 'sync.event_signature_rejected',
     targetType: 'sync_event',
     targetId: eventId,
-    groupKey: auth.groupKey,
+    branch: auth.branch,
     payload: {
       clientId: auth.clientId,
       reason
@@ -1200,8 +1200,8 @@ function auditSyncEventLogVerificationFailure(
     actor: input.actor ?? 'system',
     action: 'sync.event_log_verification_failed',
     targetType: 'sync_log',
-    targetId: input.groupKey,
-    groupKey: input.groupKey,
+    targetId: input.branch,
+    branch: input.branch,
     payload: {
       checked: result.checked,
       rejected: result.rejected
@@ -1213,7 +1213,7 @@ function auditSyncTombstoneAccepted(
   state: HubState,
   input: {
     actor: string;
-    groupKey: string;
+    branch: string;
     event: HubSyncEvent;
   }
 ): void {
@@ -1241,7 +1241,7 @@ function auditSyncTombstoneAccepted(
     action: 'sync.tombstone_accepted',
     targetType: 'knowledge',
     targetId: tombstone.knowledgeId,
-    groupKey: input.groupKey,
+    branch: input.branch,
     payload
   });
 }
@@ -1250,7 +1250,7 @@ function auditSyncTombstoneReplayed(
   state: HubState,
   input: {
     actor: string;
-    groupKey: string;
+    branch: string;
     event: HubSyncEvent;
     tombstone: { knowledgeId: string; reason?: string; deletedAt?: string };
     previousStatus: string;
@@ -1275,7 +1275,7 @@ function auditSyncTombstoneReplayed(
     action: 'sync.tombstone_replayed',
     targetType: 'knowledge',
     targetId: input.tombstone.knowledgeId,
-    groupKey: input.groupKey,
+    branch: input.branch,
     payload
   });
 }
@@ -1284,7 +1284,7 @@ function auditSyncKnowledgeSnapshotReplayed(
   state: HubState,
   input: {
     actor: string;
-    groupKey: string;
+    branch: string;
     event: HubSyncEvent;
     item: KnowledgeItem;
   }
@@ -1294,7 +1294,7 @@ function auditSyncKnowledgeSnapshotReplayed(
     action: 'sync.knowledge_snapshot_replayed',
     targetType: 'knowledge',
     targetId: input.item.id,
-    groupKey: input.groupKey,
+    branch: input.branch,
     payload: {
       eventId: input.event.id,
       clientId: input.event.clientId,
@@ -1308,7 +1308,7 @@ function auditSyncConflictReplayed(
   state: HubState,
   input: {
     actor: string;
-    groupKey: string;
+    branch: string;
     edge: HubKnowledgeEdge;
     left: KnowledgeConflictRevision;
     right: KnowledgeConflictRevision;
@@ -1332,7 +1332,7 @@ function auditSyncConflictReplayed(
     action: 'sync.conflict_replayed',
     targetType: 'knowledge-edge',
     targetId: input.edge.id,
-    groupKey: input.groupKey,
+    branch: input.branch,
     payload
   });
 }

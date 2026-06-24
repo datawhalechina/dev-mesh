@@ -45,7 +45,7 @@ describe('joinServerGroup', () => {
         return jsonResponse({
           memberId: 'member_frontend-team_xiaoyun',
           clientId: 'client_frontend-team_xiaoyun_abc123',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           accessToken: 'mesh_secret_token',
           syncSigningSecret: 'sync_secret_value',
           expiresAt: '2026-06-13T00:00:00.000Z'
@@ -67,7 +67,7 @@ describe('joinServerGroup', () => {
       const result = await joinServerGroup({
         globalRoot,
         serverUrl: 'mesh.test/',
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         displayName: 'Xiaoyun',
         handle: 'xiaoyun',
         inviteToken: 'inv_frontend'
@@ -83,7 +83,7 @@ describe('joinServerGroup', () => {
         identityPath: join(globalRoot, 'identity.json'),
         serverUrl: 'http://mesh.test',
         mcpUrl: 'http://mesh.test/mcp',
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         memberId: 'member_frontend-team_xiaoyun',
         clientId: 'client_frontend-team_xiaoyun_abc123',
         expiresAt: '2026-06-13T00:00:00.000Z'
@@ -95,7 +95,7 @@ describe('joinServerGroup', () => {
       expect(requests[1]?.init?.method).toBe('POST');
       expect(requests[1]?.body).toMatchObject({
         inviteToken: 'inv_frontend',
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         displayName: 'Xiaoyun',
         handle: 'xiaoyun',
         hostname: expect.any(String)
@@ -116,7 +116,7 @@ describe('joinServerGroup', () => {
       expect(identity.joinedServers[0]).toMatchObject({
         serverUrl: 'http://mesh.test',
         mcpUrl: 'http://mesh.test/mcp',
-        groupKey: 'frontend-team',
+        branch: 'frontend-team',
         memberId: 'member_frontend-team_xiaoyun',
         clientId: 'client_frontend-team_xiaoyun_abc123',
         accessToken: 'mesh_secret_token',

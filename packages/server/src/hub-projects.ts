@@ -3,7 +3,7 @@ import { appendHubAuditLog } from './hub-audit.js';
 import type { HubAuthContext, HubResult, HubState } from './hub-model.js';
 import { countByGroup, hubError, ok, projectMapKey, slugHandle } from './hub-utils.js';
 
-export function listHubGroups(state: HubState): ServerGroupSummary[] {
+export function listHubBranchs(state: HubState): ServerGroupSummary[] {
   return [...state.groups.values()]
     .map((group) => {
       const summary: ServerGroupSummary = {
@@ -32,7 +32,7 @@ export function listHubProjects(state: HubState, auth: HubAuthContext): ProjectS
 
 /**
  * Creates a project inside the authenticated member's group. The caller cannot
- * choose groupKey from the request body; group ownership always comes from the
+ * choose branch from the request body; group ownership always comes from the
  * bearer token to keep the ACL rule easy to audit.
  */
 export function createHubProject(
@@ -52,7 +52,7 @@ export function createHubProject(
     return hubError(400, 'project.id_invalid', 'project id could not be derived.');
   }
 
-  const key = projectMapKey(auth.groupKey, id);
+  const key = projectMapKey(auth.branch, id);
   const existing = state.projects.get(key);
 
   if (existing) {
@@ -62,7 +62,7 @@ export function createHubProject(
   const project: ProjectSummary = {
     id,
     projectKey: input.projectKey?.trim() || id,
-    groupKey: auth.groupKey,
+    branch: auth.branch,
     name,
     createdByMemberId: auth.memberId,
     createdAt: new Date().toISOString()
@@ -79,7 +79,7 @@ export function createHubProject(
     action: 'project.created',
     targetType: 'project',
     targetId: project.id,
-    groupKey: auth.groupKey,
+    branch: auth.branch,
     payload: {
       projectKey: project.projectKey,
       name: project.name
@@ -95,7 +95,7 @@ export function createHubProject(
  * so group boundaries do not leak project ids.
  */
 export function getHubProject(state: HubState, auth: HubAuthContext, id: string): HubResult<ProjectSummary> {
-  const project = state.projects.get(projectMapKey(auth.groupKey, id));
+  const project = state.projects.get(projectMapKey(auth.branch, id));
 
   if (!project || !canAccessProject(project, auth)) {
     // Return 404 rather than 403 so project ids in other groups are not leaked.
@@ -107,7 +107,7 @@ export function getHubProject(state: HubState, auth: HubAuthContext, id: string)
 
 export function normalizeProjectAccess(project: ProjectSummary): ProjectAccess {
   return project.access ?? {
-    visibility: 'group',
+    visibility: 'branch',
     members: []
   };
 }
@@ -120,13 +120,13 @@ export function withNormalizedAccess(project: ProjectSummary): ProjectSummary {
 }
 
 export function canAccessProject(project: ProjectSummary, auth: HubAuthContext): boolean {
-  if (project.groupKey !== auth.groupKey) {
+  if (project.branch !== auth.branch) {
     return false;
   }
 
   const access = normalizeProjectAccess(project);
 
-  if (access.visibility === 'group') {
+  if (access.visibility === 'branch') {
     return true;
   }
 

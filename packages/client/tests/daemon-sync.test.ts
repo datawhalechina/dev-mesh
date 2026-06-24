@@ -40,7 +40,7 @@ describe('daemon sync', () => {
     const joinedServer = {
       serverUrl: 'http://mesh.test',
       mcpUrl: 'http://mesh.test/mcp',
-      groupKey: 'frontend-team',
+      branch: 'frontend-team',
       memberId: 'member_frontend-team_xiaoyun',
       clientId: 'client_frontend-team_xiaoyun_abc123',
       displayName: 'Xiaoyun',
@@ -139,7 +139,7 @@ describe('daemon sync', () => {
             projectKey,
             document: {
               kind: 'project',
-              groupKey: joinedServer.groupKey,
+              branch: joinedServer.branch,
               projectKey,
               schemaVersion: 2
             }
@@ -221,7 +221,7 @@ describe('daemon sync', () => {
       };
       const storedStatus = await readDaemonSyncStatus(projectRoot);
       const storedHeads = await readDaemonSyncHeads(projectRoot);
-      const remoteKey = `${joinedServer.serverUrl}|${joinedServer.groupKey}|${joinedServer.clientId}`;
+      const remoteKey = `${joinedServer.serverUrl}|${joinedServer.branch}|${joinedServer.clientId}`;
       const remoteHeads = heads.remotes[remoteKey];
       const localItems = await loadProjectKnowledgeItemsFromCrdt(projectRoot, {
         projectKey
@@ -286,7 +286,7 @@ describe('daemon sync', () => {
         remotes: [
           {
             serverUrl: joinedServer.serverUrl,
-            groupKey: joinedServer.groupKey,
+            branch: joinedServer.branch,
             clientId: joinedServer.clientId,
             queuedLocalChanges: 0,
             pushedChanges: firstRequest.changes.length,
@@ -497,7 +497,7 @@ describe('daemon sync', () => {
         projectKey,
         document: {
           kind: 'project',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           projectKey,
           schemaVersion: 2
         }
@@ -505,7 +505,7 @@ describe('daemon sync', () => {
       expect(status.remotes).toEqual([
         expect.objectContaining({
           serverUrl: 'http://frontend.mesh.test',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           clientId: 'client_frontend_frontend-team',
           branchRole: 'active',
           readOnly: false,
@@ -619,7 +619,7 @@ describe('daemon sync', () => {
         requests.push(body);
 
         const responseChanges =
-          body.document.groupKey === 'shared'
+          body.document.branch === 'shared'
             ? (await readBranchCrdtChangesSince(remoteRoot, 'shared', body.heads, {
                 projectKey
               })).changes.map(toTestCrdtSyncChange)
@@ -721,14 +721,14 @@ describe('daemon sync', () => {
       expect(firstStatus.remotes).toEqual([
         expect.objectContaining({
           branchRole: 'active',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           pushedChanges: expect.any(Number),
           pulledChanges: 0,
           exchangeComplete: true
         }),
         expect.objectContaining({
           branchRole: 'base',
-          groupKey: 'shared',
+          branch: 'shared',
           pulledChanges: expect.any(Number),
           appliedChanges: expect.any(Number),
           exchangeComplete: true
@@ -737,19 +737,19 @@ describe('daemon sync', () => {
       expect(offlineStatus.remotes).toEqual([
         expect.objectContaining({
           branchRole: 'active',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           lastError: expect.stringContaining('offline')
         }),
         expect.objectContaining({
           branchRole: 'base',
-          groupKey: 'shared',
+          branch: 'shared',
           lastError: expect.stringContaining('offline')
         })
       ]);
       expect(recoveredStatus.remotes).toEqual([
         expect.objectContaining({
           branchRole: 'active',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           queuedLocalChanges: 0,
           pushedChanges: expect.any(Number),
           pulledChanges: 0,
@@ -757,7 +757,7 @@ describe('daemon sync', () => {
         }),
         expect.objectContaining({
           branchRole: 'base',
-          groupKey: 'shared',
+          branch: 'shared',
           queuedLocalChanges: 0,
           pushedChanges: 0,
           pulledChanges: expect.any(Number),
@@ -768,7 +768,7 @@ describe('daemon sync', () => {
       expect(repeatStatus.remotes).toEqual([
         expect.objectContaining({
           branchRole: 'active',
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           queuedLocalChanges: 0,
           pushedChanges: 0,
           pulledChanges: 0,
@@ -776,14 +776,14 @@ describe('daemon sync', () => {
         }),
         expect.objectContaining({
           branchRole: 'base',
-          groupKey: 'shared',
+          branch: 'shared',
           queuedLocalChanges: 0,
           pushedChanges: 0,
           pulledChanges: 0,
           appliedChanges: 0
         })
       ]);
-      expect(requests.map((request) => request.document.groupKey)).toEqual([
+      expect(requests.map((request) => request.document.branch)).toEqual([
         'frontend-team',
         'shared',
         'frontend-team',
@@ -941,9 +941,9 @@ describe('daemon sync', () => {
             headsAfter: body.heads
           })),
           rejected: [],
-          heads: body.document.groupKey === 'shared' ? baseRemoteChanges.heads : body.heads,
+          heads: body.document.branch === 'shared' ? baseRemoteChanges.heads : body.heads,
           changes:
-            body.document.groupKey === 'shared'
+            body.document.branch === 'shared'
               ? baseRemoteChanges.changes.map(toTestCrdtSyncChange)
               : [],
           projection: {
@@ -986,14 +986,14 @@ describe('daemon sync', () => {
       });
 
       expect(requests).toHaveLength(2);
-      expect(requests.map((request) => request.document.groupKey)).toEqual(['frontend-team', 'shared']);
+      expect(requests.map((request) => request.document.branch)).toEqual(['frontend-team', 'shared']);
       expect(requests[0].changes.length).toBeGreaterThan(0);
       expect(requests[1]).toMatchObject({
         clientId: 'client_shared_shared',
         projectKey,
         document: {
           kind: 'project',
-          groupKey: 'shared',
+          branch: 'shared',
           projectKey,
           schemaVersion: 2
         },
@@ -1002,13 +1002,13 @@ describe('daemon sync', () => {
       });
       expect(status.remotes).toEqual([
         expect.objectContaining({
-          groupKey: 'frontend-team',
+          branch: 'frontend-team',
           branchRole: 'active',
           readOnly: false,
           pushedChanges: requests[0].changes.length
         }),
         expect.objectContaining({
-          groupKey: 'shared',
+          branch: 'shared',
           branchRole: 'base',
           readOnly: true,
           queuedLocalChanges: 0,
@@ -1033,7 +1033,7 @@ describe('daemon sync', () => {
       expect(Object.values(syncHeads?.remotes ?? {})).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            groupKey: 'shared',
+            branch: 'shared',
             branchRole: 'base',
             readOnly: true,
             cachePath: baseCache.path,
@@ -1330,13 +1330,13 @@ function createTestCrdtChangeId(change: Uint8Array): string {
   return `am_${createHash('sha256').update(change).digest('hex').slice(0, 32)}`;
 }
 
-function createJoinedServerRecord(label: string, groupKey: string): Record<string, string> {
+function createJoinedServerRecord(label: string, branch: string): Record<string, string> {
   return {
     serverUrl: `http://${label}.mesh.test`,
     mcpUrl: `http://${label}.mesh.test/mcp`,
-    groupKey,
-    memberId: `member_${label}_${groupKey}`,
-    clientId: `client_${label}_${groupKey}`,
+    branch,
+    memberId: `member_${label}_${branch}`,
+    clientId: `client_${label}_${branch}`,
     displayName: label,
     joinedAt: '2026-06-09T00:00:00.000Z',
     accessToken: `mesh_${label}_token`,
@@ -1349,7 +1349,7 @@ interface TestCrdtSyncRequest {
   projectKey: string;
   document: {
     kind: 'project';
-    groupKey: string;
+    branch: string;
     projectKey: string;
     schemaVersion: 2;
   };

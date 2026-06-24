@@ -111,7 +111,7 @@ export interface DaemonProjectionMaintenanceStatus {
 export interface DaemonSyncRemoteStatus {
   key: string;
   serverUrl: string;
-  groupKey: string;
+  branch: string;
   clientId: string;
   branchRole: DaemonSyncBranchRole;
   readOnly: boolean;
@@ -154,7 +154,7 @@ export interface DaemonSyncHeadsStatus {
 
 export interface DaemonSyncRemoteHeadsStatus {
   serverUrl: string;
-  groupKey: string;
+  branch: string;
   clientId: string;
   branchRole: DaemonSyncBranchRole;
   readOnly: boolean;
@@ -379,8 +379,8 @@ function isValidJoinedServerRecord(record: JoinedServerRecord): record is ValidJ
   return Boolean(
     typeof record.serverUrl === 'string' &&
       record.serverUrl.trim() &&
-      typeof record.groupKey === 'string' &&
-      record.groupKey.trim() &&
+      typeof record.branch === 'string' &&
+      record.branch.trim() &&
       typeof record.clientId === 'string' &&
       record.clientId.trim() &&
       typeof record.accessToken === 'string' &&
@@ -399,7 +399,7 @@ function selectRemotesForProjectBranches(
     config.knowledgeBranch.base === undefined ? new Set<string>() : createSyncGroupKeys(config.knowledgeBranch.base);
 
   for (const remote of remotes) {
-    if (activeGroupKeys.has(remote.groupKey)) {
+    if (activeGroupKeys.has(remote.branch)) {
       const target: DaemonSyncRemoteTarget = {
         remote,
         branchRole: 'active',
@@ -411,7 +411,7 @@ function selectRemotesForProjectBranches(
   }
 
   for (const remote of remotes) {
-    if (!baseGroupKeys.has(remote.groupKey)) {
+    if (!baseGroupKeys.has(remote.branch)) {
       continue;
     }
 
@@ -432,14 +432,14 @@ function selectRemotesForProjectBranches(
 }
 
 function createSyncGroupKeys(activeBranch: string): Set<string> {
-  const groupKeys = new Set<string>();
-  groupKeys.add(activeBranch);
+  const branchs = new Set<string>();
+  branchs.add(activeBranch);
 
   if (activeBranch === 'main') {
-    groupKeys.add('default');
+    branchs.add('default');
   }
 
-  return groupKeys;
+  return branchs;
 }
 
 async function maintainProjectProjections(
@@ -624,7 +624,7 @@ function normalizeDaemonSyncRemoteHeads(remotes: Record<string, unknown>): Recor
 
     const remote: DaemonSyncRemoteHeadsStatus = {
       serverUrl: readString(value.serverUrl) ?? '',
-      groupKey: readString(value.groupKey) ?? '',
+      branch: readString(value.branch) ?? '',
       clientId: readString(value.clientId) ?? '',
       branchRole: isDaemonSyncBranchRole(value.branchRole) ? value.branchRole : 'active',
       readOnly: value.readOnly === true,
@@ -815,7 +815,7 @@ function isDaemonSyncRemoteStatus(value: unknown): value is DaemonSyncRemoteStat
   return (
     typeof value.key === 'string' &&
     typeof value.serverUrl === 'string' &&
-    typeof value.groupKey === 'string' &&
+    typeof value.branch === 'string' &&
     typeof value.clientId === 'string' &&
     typeof value.enabled === 'boolean' &&
     typeof value.queuedLocalChanges === 'number' &&
@@ -872,7 +872,7 @@ async function syncRemote(
   const timestamp = (options.now ?? (() => new Date()))().toISOString();
   const knownRemoteHeads = peer.remoteHeads ?? [];
   const branchCacheBefore = target.readOnly
-    ? await readBranchCrdtSyncState(store.projectRoot, target.remote.groupKey, {
+    ? await readBranchCrdtSyncState(store.projectRoot, target.remote.branch, {
         projectKey: config.projectKey
       })
     : undefined;
@@ -895,7 +895,7 @@ async function syncRemote(
   if (target.readOnly && exchange.changes.length > 0) {
     const applied = await applyBranchCrdtChanges(
       store.projectRoot,
-      target.remote.groupKey,
+      target.remote.branch,
       decodeCrdtSyncChanges(exchange.changes),
       {
         projectKey: config.projectKey
@@ -918,7 +918,7 @@ async function syncRemote(
   }
 
   const latestLocal = target.readOnly
-    ? await readBranchCrdtSyncState(store.projectRoot, target.remote.groupKey, {
+    ? await readBranchCrdtSyncState(store.projectRoot, target.remote.branch, {
         projectKey: config.projectKey
       })
     : await readProjectCrdtSyncState(store.projectRoot, {
@@ -947,7 +947,7 @@ async function syncRemote(
   const status: DaemonSyncRemoteStatus = {
     key: createRemoteTargetKey(target),
     serverUrl: target.remote.serverUrl,
-    groupKey: target.remote.groupKey,
+    branch: target.remote.branch,
     clientId: target.remote.clientId,
     branchRole: target.branchRole,
     readOnly: target.readOnly,
@@ -982,7 +982,7 @@ function createCrdtExchangeRequest(
     projectKey: config.projectKey,
     document: {
       kind: 'project',
-      groupKey: remote.groupKey,
+      branch: remote.branch,
       projectKey: config.projectKey,
       schemaVersion: 2
     },
@@ -1080,7 +1080,7 @@ async function writeDaemonSyncHeads(store: ProjectStore, status: DaemonSyncStatu
       status.remotes.map((remote) => {
         const remoteState: DaemonSyncRemoteHeadsStatus = {
           serverUrl: remote.serverUrl,
-          groupKey: remote.groupKey,
+          branch: remote.branch,
           clientId: remote.clientId,
           branchRole: remote.branchRole,
           readOnly: remote.readOnly,
@@ -1172,7 +1172,7 @@ function createRemoteErrorStatus(target: DaemonSyncRemoteTarget, error: unknown)
   return {
     key: createRemoteTargetKey(target),
     serverUrl: target.remote.serverUrl,
-    groupKey: target.remote.groupKey,
+    branch: target.remote.branch,
     clientId: target.remote.clientId,
     branchRole: target.branchRole,
     readOnly: target.readOnly,
@@ -1219,7 +1219,7 @@ function normalizeServerUrl(serverUrl: string): string {
 }
 
 function createRemoteKey(remote: JoinedServerRecord): string {
-  return `${remote.serverUrl}|${remote.groupKey}|${remote.clientId}`;
+  return `${remote.serverUrl}|${remote.branch}|${remote.clientId}`;
 }
 
 function createRemoteTargetKey(target: DaemonSyncRemoteTarget): string {

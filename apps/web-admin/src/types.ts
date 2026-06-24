@@ -4,7 +4,7 @@ export interface AdminOverview {
   baseUrl: string;
   mcpUrl: string;
   counts: {
-    groups: number;
+    branches: number;
     members: number;
     projects: number;
     knowledgeItems: number;
@@ -17,21 +17,12 @@ export interface AdminOverview {
   recentKnowledge: KnowledgeItem[];
 }
 
-export interface GroupSummary {
-  key: string;
+export interface BranchSummary {
+  branchKey: string;
+  branch: string;
   displayName: string;
   description?: string;
   joinMode: 'invite' | 'open' | 'admin';
-  projectCount: number;
-  memberCount: number;
-}
-
-export interface BranchSummary {
-  branchKey: string;
-  groupKey: string;
-  displayName: string;
-  description?: string;
-  joinMode: GroupSummary['joinMode'];
   counts: {
     members: number;
     projects: number;
@@ -49,7 +40,7 @@ export interface BranchInput {
   branchKey: string;
   displayName: string;
   description?: string;
-  joinMode: GroupSummary['joinMode'];
+  joinMode: 'invite' | 'open' | 'admin';
 }
 
 export interface BranchMergePreview {
@@ -77,7 +68,7 @@ export interface CrdtDocumentSummary {
   document: {
     kind: string;
     branchKey?: string;
-    groupKey?: string;
+    branch?: string;
     projectKey?: string;
     documentId?: string;
     namespace?: string;
@@ -85,7 +76,7 @@ export interface CrdtDocumentSummary {
   };
   kind: string;
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   projectKey?: string;
   documentId?: string;
   namespace?: string;
@@ -102,7 +93,7 @@ export interface CrdtChangeSummary {
   receivedAt: string;
   clientId: string;
   branchKey: string;
-  groupKey: string;
+  branch: string;
   actorId?: string;
   createdAt?: string;
   summary?: string;
@@ -111,14 +102,14 @@ export interface CrdtChangeSummary {
 export interface CrdtDocumentFilters {
   kind?: string;
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   projectKey?: string;
 }
 
 export interface MemberSummary {
   memberId: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
   displayName: string;
   handle: string;
   joinedAt: string;
@@ -131,7 +122,7 @@ export interface MemberSummary {
 export interface RotatedAccessToken {
   memberId: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
   accessToken: string;
   syncSigningSecret?: string;
   expiresAt?: string;
@@ -141,7 +132,7 @@ export interface ProjectSummary {
   id: string;
   projectKey: string;
   branchKey?: string;
-  groupKey: string;
+  branch: string;
   name: string;
   description?: string;
   createdByMemberId: string;
@@ -149,7 +140,7 @@ export interface ProjectSummary {
   access?: ProjectAccess;
 }
 
-export type ProjectAclVisibility = 'group' | 'restricted';
+export type ProjectAclVisibility = 'branch' | 'restricted';
 export type ProjectAclRole = 'owner' | 'maintainer' | 'member' | 'readonly';
 export type KnowledgeStatus = 'active' | 'superseded' | 'tombstone';
 export type KnowledgeEdgeKind = 'supersedes' | 'duplicates' | 'contradicts';
@@ -173,7 +164,7 @@ export interface KnowledgeEdge {
   createdBy: string;
   createdAt: string;
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   reason?: string;
 }
 
@@ -271,7 +262,7 @@ export interface AuditLog {
   targetType: string;
   targetId: string;
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   createdAt: string;
   payload?: Record<string, unknown>;
 }
@@ -279,7 +270,7 @@ export interface AuditLog {
 export interface InviteSummary {
   token: string;
   branchKey?: string;
-  groupKey: string;
+  branch: string;
   uses: number;
   createdAt: string;
   createdBy: string;
@@ -290,16 +281,9 @@ export interface InviteSummary {
   revokedBy?: string;
 }
 
-export interface GroupInput {
-  key: string;
-  displayName: string;
-  description?: string;
-  joinMode: 'invite' | 'open' | 'admin';
-}
-
 export interface ProjectInput {
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   id?: string;
   name: string;
   description?: string;
@@ -311,7 +295,7 @@ export interface ProjectBranchInput {
 
 export interface InviteInput {
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   token?: string;
   expiresAt?: string;
   maxUses?: number;
@@ -327,7 +311,7 @@ export interface GlossaryInput {
   definition: string;
   content?: string;
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   projectKey?: string;
   aliases?: string[];
   tags?: string[];
@@ -338,7 +322,7 @@ export interface KnowledgeEdgeInput {
   fromId: string;
   toId: string;
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   reason?: string;
 }
 
@@ -366,7 +350,7 @@ export interface KnowledgeBranchBulkPublishResult {
 
 export interface QualityReviewFilters {
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   layer?: string;
   limit?: number;
   includeSuperseded?: boolean;
@@ -379,7 +363,7 @@ export interface QualityReviewFilters {
 
 export interface TaskDigestFilters {
   branchKey?: string;
-  groupKey?: string;
+  branch?: string;
   projectKey?: string;
   status?: TaskStatus | '';
   limit?: number;

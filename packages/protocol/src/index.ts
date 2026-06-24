@@ -17,7 +17,7 @@ export interface WellKnownDevMesh {
 
 export interface JoinRequest {
   inviteToken?: string;
-  groupKey?: string;
+  branch?: string;
   displayName: string;
   handle?: string;
   clientLabel?: string;
@@ -33,7 +33,7 @@ export interface JoinRequest {
 export interface JoinResponse {
   memberId: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
   accessToken: string;
   syncSigningSecret?: string;
   expiresAt?: string;
@@ -66,7 +66,7 @@ export interface CreateProjectRequest {
 export interface ProjectSummary {
   id: string;
   projectKey: string;
-  groupKey: string;
+  branch: string;
   name: string;
   description?: string;
   createdByMemberId: string;
@@ -74,7 +74,7 @@ export interface ProjectSummary {
   access?: ProjectAccess;
 }
 
-export type ProjectAclVisibility = 'group' | 'restricted';
+export type ProjectAclVisibility = 'branch' | 'restricted';
 export type ProjectAclRole = 'owner' | 'maintainer' | 'member' | 'readonly';
 
 export interface ProjectAclMember {
@@ -143,11 +143,11 @@ export interface SyncPullResponse {
   events: SyncEvent[];
 }
 
-export type CrdtSyncDocumentKind = 'project' | 'server-global' | 'group' | (string & {});
+export type CrdtSyncDocumentKind = 'project' | 'server-global' | 'branch' | (string & {});
 
 export interface CrdtSyncDocumentRef {
   kind: CrdtSyncDocumentKind;
-  groupKey?: string;
+  branch?: string;
   projectKey?: string;
   documentId?: string;
   namespace?: string;

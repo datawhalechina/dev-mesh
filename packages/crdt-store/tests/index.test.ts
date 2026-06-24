@@ -21,19 +21,19 @@ describe('@devmesh/crdt-store', () => {
       projectId: 'project_alpha',
       projectKey: 'alpha',
       name: 'Alpha',
-      groupKey: 'frontend-platform',
-      groupId: 'group_default',
+      branch: 'frontend-platform',
+      branchId: 'group_default',
       now: () => new Date('2026-06-15T00:00:00.000Z')
     });
 
     expect(doc).toMatchObject({
       schemaVersion: 2,
-      groupKey: 'frontend-platform',
+      branch: 'frontend-platform',
       project: {
         id: 'project_alpha',
         key: 'alpha',
-        groupKey: 'frontend-platform',
-        groupId: 'group_default'
+        branch: 'frontend-platform',
+        branchId: 'group_default'
       },
       knowledge: {},
       entities: {},
@@ -52,22 +52,22 @@ describe('@devmesh/crdt-store', () => {
       title: 'Use group boundaries for shared knowledge',
       summary: 'Projects only share knowledge when they join the same group.',
       content: 'A project can use its own group for isolation.',
-      tags: ['group'],
+      tags: ['branch'],
       para: { category: 'projects', key: 'alpha' },
       createdAt: '2026-06-15T00:00:00.000Z'
     });
 
     const node = knowledgeItemToNode(item, {
-      groupKey: 'frontend-platform',
+      branch: 'frontend-platform',
       sourceProjectId: 'project_alpha',
-      groupId: 'group_default'
+      branchId: 'group_default'
     });
 
     expect(node).toMatchObject({
       id: 'ki_design_group',
-      groupKey: 'frontend-platform',
+      branch: 'frontend-platform',
       sourceProjectId: 'project_alpha',
-      groupId: 'group_default',
+      branchId: 'group_default',
       content: 'A project can use its own group for isolation.'
     });
   });
@@ -78,7 +78,7 @@ describe('@devmesh/crdt-store', () => {
         projectId: 'project_alpha',
         projectKey: 'alpha',
         name: 'Alpha',
-        groupKey: 'frontend-platform'
+        branch: 'frontend-platform'
       })
     );
 
@@ -89,7 +89,7 @@ describe('@devmesh/crdt-store', () => {
       mutate(doc) {
         doc.knowledge['ki_one'] = {
           id: 'ki_one',
-          groupKey: 'frontend-platform',
+          branch: 'frontend-platform',
           sourceProjectId: 'project_alpha',
           layer: 'extract',
           type: 'note',
@@ -124,8 +124,8 @@ describe('@devmesh/crdt-store', () => {
       actorId: 'member_alice',
       reason: 'Reviewed in admin',
       group: {
-        groupKey: 'frontend-platform',
-        groupId: 'group_default'
+        branch: 'frontend-platform',
+        branchId: 'group_default'
       },
       now: () => new Date('2026-06-15T00:00:00.000Z')
     });
@@ -135,8 +135,8 @@ describe('@devmesh/crdt-store', () => {
       kind: 'confirm',
       actorId: 'member_alice',
       reason: 'Reviewed in admin',
-      groupKey: 'frontend-platform',
-      groupId: 'group_default'
+      branch: 'frontend-platform',
+      branchId: 'group_default'
     });
   });
 
@@ -174,7 +174,7 @@ describe('@devmesh/crdt-store', () => {
       projectId: 'project_alpha',
       projectKey: 'alpha',
       name: 'Alpha',
-      groupKey: 'frontend-platform',
+      branch: 'frontend-platform',
       now: () => new Date('2026-06-15T00:00:00.000Z')
     });
 
@@ -191,7 +191,7 @@ describe('@devmesh/crdt-store', () => {
         mutate(doc) {
           doc.knowledge['ki_crdt_file'] = {
             id: 'ki_crdt_file',
-            groupKey: 'frontend-platform',
+            branch: 'frontend-platform',
             sourceProjectId: 'project_alpha',
             layer: 'canonical',
             entryKey: 'projects/alpha/crdt-file',
@@ -260,7 +260,7 @@ describe('@devmesh/crdt-store', () => {
       projectId: 'project_alpha',
       projectKey: 'alpha',
       name: 'Alpha',
-      groupKey: 'frontend-platform',
+      branch: 'frontend-platform',
       now: () => new Date('2026-06-15T00:00:00.000Z')
     });
 
@@ -286,7 +286,7 @@ describe('@devmesh/crdt-store', () => {
               createdAt: '2026-06-15T00:00:01.000Z'
             }),
             {
-              groupKey: 'frontend-platform',
+              branch: 'frontend-platform',
               sourceProjectId: 'project_alpha'
             }
           );
@@ -350,7 +350,7 @@ describe('@devmesh/crdt-store', () => {
       projectId: 'project_alpha',
       projectKey: 'alpha',
       name: 'Alpha',
-      groupKey: 'frontend-platform',
+      branch: 'frontend-platform',
       now: () => new Date('2026-06-15T00:00:00.000Z')
     });
 
@@ -382,7 +382,7 @@ describe('@devmesh/crdt-store', () => {
               createdAt: '2026-06-15T00:00:01.000Z'
             }),
             {
-              groupKey: 'frontend-platform',
+              branch: 'frontend-platform',
               sourceProjectId: 'project_alpha'
             }
           );
@@ -405,7 +405,7 @@ describe('@devmesh/crdt-store', () => {
               createdAt: '2026-06-15T00:00:02.000Z'
             }),
             {
-              groupKey: 'frontend-platform',
+              branch: 'frontend-platform',
               sourceProjectId: 'project_alpha'
             }
           );
@@ -430,7 +430,7 @@ describe('@devmesh/crdt-store', () => {
       projectId: 'project_alpha',
       projectKey: 'alpha',
       name: 'Alpha',
-      groupKey: 'frontend-platform',
+      branch: 'frontend-platform',
       now: () => new Date('2026-06-15T00:00:00.000Z')
     });
 
@@ -456,7 +456,7 @@ describe('@devmesh/crdt-store', () => {
               createdAt: '2026-06-15T00:00:01.000Z'
             }),
             {
-              groupKey: 'frontend-platform',
+              branch: 'frontend-platform',
               sourceProjectId: 'project_alpha'
             }
           );
@@ -602,7 +602,7 @@ describe('@devmesh/crdt-store', () => {
           projectId: 'project_alpha',
           projectKey: 'alpha',
           name: 'Alpha',
-          groupKey: 'frontend-platform',
+          branch: 'frontend-platform',
           now: () => new Date('2026-06-15T00:00:00.000Z')
         }),
         knowledgeDir,
@@ -619,7 +619,7 @@ describe('@devmesh/crdt-store', () => {
       });
       expect(imported.doc.knowledge['ki_imported']).toMatchObject({
         entryKey: active.entryKey,
-        groupKey: 'frontend-platform',
+        branch: 'frontend-platform',
         sourceProjectId: 'project_alpha',
         quality: active.quality,
         type: 'task',
@@ -639,7 +639,7 @@ describe('@devmesh/crdt-store', () => {
         kind: 'supersedes',
         from: 'ki_imported',
         to: 'ki_deleted',
-        groupKey: 'frontend-platform'
+        branch: 'frontend-platform'
       });
       expect(Object.values(imported.doc.qualitySignals).map((signal) => signal.kind).sort()).toEqual([
         'confirm',

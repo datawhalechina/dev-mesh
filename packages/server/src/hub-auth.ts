@@ -6,10 +6,10 @@ import { hubError, isExpired, ok, slugHandle } from './hub-utils.js';
 
 /**
  * Exchanges an invite token for a group-scoped client identity. The invite owns
- * the group decision; a request may repeat that groupKey, but it cannot use a
+ * the group decision; a request may repeat that branch, but it cannot use a
  * token from one group to join another group.
  */
-export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<JoinResponse> {
+export function joinHubBranch(state: HubState, input: JoinRequest): HubResult<JoinResponse> {
   const displayName = input.displayName?.trim();
 
   if (!displayName) {
@@ -32,9 +32,9 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
     return hubError(401, 'join.invite_exhausted', 'inviteToken has no remaining uses.');
   }
 
-  const requestedGroupKey = input.groupKey?.trim() || invite.groupKey;
+  const requestedGroupKey = input.branch?.trim() || invite.branch;
 
-  if (requestedGroupKey !== invite.groupKey) {
+  if (requestedGroupKey !== invite.branch) {
     return hubError(403, 'join.group_mismatch', 'inviteToken is not valid for the requested group.');
   }
 
@@ -61,7 +61,7 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
   state.members.set(memberId, {
     memberId,
     clientId,
-    groupKey: group.key,
+    branch: group.key,
     displayName,
     handle,
     joinedAt,
@@ -71,7 +71,7 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
     token: accessToken,
     memberId,
     clientId,
-    groupKey: group.key,
+    branch: group.key,
     syncSigningSecret,
     expiresAt
   });
@@ -81,7 +81,7 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
     action: 'member.joined',
     targetType: 'member',
     targetId: memberId,
-    groupKey: group.key,
+    branch: group.key,
     payload: {
       clientId
     }
@@ -90,7 +90,7 @@ export function joinHubGroup(state: HubState, input: JoinRequest): HubResult<Joi
   return ok({
     memberId,
     clientId,
-    groupKey: group.key,
+    branch: group.key,
     accessToken,
     syncSigningSecret,
     expiresAt
@@ -123,7 +123,7 @@ export function rotateHubAccessToken(state: HubState, token: string | undefined)
     action: 'auth.token_rotated',
     targetType: 'member',
     targetId: auth.value.memberId,
-    groupKey: auth.value.groupKey,
+    branch: auth.value.branch,
     payload: {
       clientId: auth.value.clientId,
       previousExpiresAt: previousToken.expiresAt,
@@ -134,7 +134,7 @@ export function rotateHubAccessToken(state: HubState, token: string | undefined)
   return ok({
     memberId: auth.value.memberId,
     clientId: auth.value.clientId,
-    groupKey: auth.value.groupKey,
+    branch: auth.value.branch,
     accessToken,
     syncSigningSecret: auth.value.syncSigningSecret,
     expiresAt
@@ -142,7 +142,7 @@ export function rotateHubAccessToken(state: HubState, token: string | undefined)
 }
 
 /**
- * Validates a bearer token issued by joinHubGroup. The returned auth context is
+ * Validates a bearer token issued by joinHubBranch. The returned auth context is
  * intentionally small so route handlers can pass it around without exposing the
  * raw token or member profile.
  */
@@ -166,7 +166,7 @@ export function authenticateHubToken(state: HubState, token: string | undefined)
   return ok({
     memberId: accessToken.memberId,
     clientId: accessToken.clientId,
-    groupKey: accessToken.groupKey,
+    branch: accessToken.branch,
     syncSigningSecret: accessToken.syncSigningSecret
   });
 }

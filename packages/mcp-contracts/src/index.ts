@@ -1191,7 +1191,7 @@ function formatProjectBrief(value: unknown): string {
   const items = toRecordArray(value.items);
   const lines = ['Project brief'];
   pushField(lines, 'projectId', value.projectId);
-  pushField(lines, 'groupKey', value.groupKey);
+  pushField(lines, 'branch', value.branch);
   lines.push(`items: ${items.length}`);
 
   for (const [index, item] of items.slice(0, 8).entries()) {
@@ -1304,7 +1304,7 @@ function formatAdminMemberActivity(value: unknown): string {
   lines.push(`auditLogs: ${auditLogs.length}`);
 
   for (const [index, member] of members.slice(0, 8).entries()) {
-    lines.push(`${index + 1}. ${formatRecordInline(member, ['memberId', 'displayName', 'groupKey', 'status'])}`);
+    lines.push(`${index + 1}. ${formatRecordInline(member, ['memberId', 'displayName', 'branch', 'status'])}`);
   }
 
   return lines.join('\n');

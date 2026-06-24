@@ -17,7 +17,7 @@ import {
   type CrdtChangeInput,
   knowledgeItemToNode,
   touchProjectDoc,
-  type GroupScopedNode,
+  type BranchScopedNode,
   type KnowledgeNode,
   type ProjectDoc,
   type QualitySignalKind,
@@ -487,7 +487,7 @@ export async function upsertProjectKnowledgeToCrdt(
     actorId: options.actorId ?? readKnowledgeActorId(item.createdBy),
     summary: options.summary ?? `Upsert knowledge ${item.id}`,
     mutate(doc) {
-      const group = createGroupScope(doc as ProjectDoc);
+      const group = createBranchScope(doc as ProjectDoc);
 
       doc.knowledge[item.id] = knowledgeItemToNode(item, group);
       doc.project.updatedAt = item.updatedAt;
@@ -519,7 +519,7 @@ export async function createProjectRelationInCrdt(
     actorId: options.actorId ?? readKnowledgeActorId(input.createdBy),
     summary: options.summary ?? `Create relation ${input.id}`,
     mutate(doc) {
-      const group = createGroupScope(doc as ProjectDoc);
+      const group = createBranchScope(doc as ProjectDoc);
 
       doc.relations[input.id] = {
         id: input.id,
@@ -562,7 +562,7 @@ export async function createProjectQualitySignalInCrdt(
     actorId: options.actorId ?? input.actorId ?? 'local',
     summary: options.summary ?? `Create quality signal ${input.id}`,
     mutate(doc) {
-      const group = createGroupScope(doc as ProjectDoc);
+      const group = createBranchScope(doc as ProjectDoc);
       const signalInput: Parameters<typeof createQualitySignal>[0] = {
         knowledgeId: input.knowledgeId,
         kind: input.kind,
@@ -733,7 +733,7 @@ function encodeBranchFilename(branchKey: string): string {
 async function createInitialProjectDoc(
   projectRoot: string,
   options: ImportProjectJsonlToCrdtOptions,
-  groupKey?: string
+  branch?: string
 ): Promise<ProjectDoc> {
   const store = await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey));
   const config = await readProjectConfigFile(store.paths.config);
@@ -743,7 +743,7 @@ async function createInitialProjectDoc(
     projectId: projectKey,
     projectKey,
     name: config.displayName,
-    groupKey: groupKey ?? config.knowledgeBranch.active,
+    branch: branch ?? config.knowledgeBranch.active,
     now: () => new Date(PROJECT_CRDT_GENESIS_TIME)
   });
 }
@@ -797,14 +797,14 @@ function compareKnowledgeItemsForExport(left: KnowledgeItem, right: KnowledgeIte
   return right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id);
 }
 
-function createGroupScope(doc: ProjectDoc): GroupScopedNode {
-  const group: GroupScopedNode = {
-    groupKey: doc.groupKey,
+function createBranchScope(doc: ProjectDoc): BranchScopedNode {
+  const group: BranchScopedNode = {
+    branch: doc.branch,
     sourceProjectId: doc.project.id
   };
 
-  if (doc.project.groupId !== undefined) {
-    group.groupId = doc.project.groupId;
+  if (doc.project.branchId !== undefined) {
+    group.branchId = doc.project.branchId;
   }
 
   return group;

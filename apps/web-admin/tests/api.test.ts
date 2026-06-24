@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createGlossaryItem,
-  createGroup,
+  createBranch,
   createInvite,
   createKnowledgeEdge,
   disableMember,
@@ -56,31 +56,29 @@ describe('web-admin API client', () => {
     });
   });
 
-  it('posts group creation requests as JSON', async () => {
+  it('posts branch creation requests as JSON', async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({
-        key: 'design-team',
+        branchKey: 'design-team',
         displayName: 'Design Team',
-        joinMode: 'invite',
-        projectCount: 0,
-        memberCount: 0
+        joinMode: 'invite'
       })
     );
 
     vi.stubGlobal('fetch', fetchMock);
 
-    await createGroup({
-      key: 'design-team',
+    await createBranch({
+      branchKey: 'design-team',
       displayName: 'Design Team',
       joinMode: 'invite'
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/v1/admin/groups',
+      '/api/v1/admin/branches',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          key: 'design-team',
+          branchKey: 'design-team',
           displayName: 'Design Team',
           joinMode: 'invite'
         })
@@ -255,7 +253,7 @@ describe('web-admin API client', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           token: 'inv_design',
-          groupKey: 'design-team',
+          branch: 'design-team',
           uses: 0,
           status: 'active',
           createdAt: '2026-06-06T00:00:00.000Z',
@@ -265,7 +263,7 @@ describe('web-admin API client', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           token: 'inv_design',
-          groupKey: 'design-team',
+          branch: 'design-team',
           uses: 0,
           status: 'revoked',
           createdAt: '2026-06-06T00:00:00.000Z',
@@ -282,7 +280,7 @@ describe('web-admin API client', () => {
         jsonResponse({
           memberId: 'member_design_xiaoyun',
           clientId: 'client_design_xiaoyun',
-          groupKey: 'design-team',
+          branch: 'design-team',
           accessToken: 'mesh_rotated',
           expiresAt: '2026-06-13T00:00:00.000Z'
         })
@@ -341,7 +339,7 @@ describe('web-admin API client', () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({
         id: 'component-library',
-        groupKey: 'design-team',
+        branch: 'design-team',
         access: {
           visibility: 'restricted',
           members: [

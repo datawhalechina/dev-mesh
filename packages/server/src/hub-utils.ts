@@ -1,10 +1,10 @@
 import type { HubResult } from './hub-model.js';
 
-export function countByGroup(values: Iterable<{ groupKey: string }>, groupKey: string): number {
+export function countByGroup(values: Iterable<{ branch: string }>, branch: string): number {
   let count = 0;
 
   for (const value of values) {
-    if (value.groupKey === groupKey) {
+    if (value.branch === branch) {
       count += 1;
     }
   }
@@ -12,8 +12,8 @@ export function countByGroup(values: Iterable<{ groupKey: string }>, groupKey: s
   return count;
 }
 
-export function projectMapKey(groupKey: string, projectId: string): string {
-  return `${groupKey}:${projectId}`;
+export function projectMapKey(branch: string, projectId: string): string {
+  return `${branch}:${projectId}`;
 }
 
 export function ok<T>(value: T): HubResult<T> {

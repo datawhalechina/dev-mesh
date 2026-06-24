@@ -5,14 +5,14 @@ import { mergeHubSyncEventLog, pullHubSyncEventLog, type HubSyncEventLogPage } f
 
 export interface HubFederationSyncInput {
   peerId: string;
-  groupKey: string;
+  branch: string;
   cursor?: string;
   limit?: number;
 }
 
 export interface HubFederationSyncResponse {
   peerId: string;
-  groupKey: string;
+  branch: string;
   previousCursor?: string;
   cursor: string;
   pulled: number;
@@ -28,7 +28,7 @@ export interface HubHttpFederationSyncInput extends HubFederationSyncInput {
 
 interface MergeFederationSyncPageInput {
   peerId: string;
-  groupKey: string;
+  branch: string;
   cursorKey: string;
   previousCursor?: string;
   page: HubSyncEventLogPage;
@@ -37,7 +37,7 @@ interface MergeFederationSyncPageInput {
 interface HttpFederationEventLogPullInput {
   peerBaseUrl: string;
   accessToken: string;
-  groupKey: string;
+  branch: string;
   cursor?: string;
   limit?: number;
   fetch?: typeof fetch;
@@ -49,21 +49,21 @@ export function federateHubSyncEvents(
   input: HubFederationSyncInput
 ): HubResult<HubFederationSyncResponse> {
   const peerId = input.peerId.trim();
-  const groupKey = input.groupKey.trim();
+  const branch = input.branch.trim();
 
   if (!peerId) {
     return hubError(400, 'federation.peer_id_required', 'peerId is required.');
   }
 
-  if (!groupKey) {
-    return hubError(400, 'federation.group_key_required', 'groupKey is required.');
+  if (!branch) {
+    return hubError(400, 'federation.group_key_required', 'branch is required.');
   }
 
-  if (!source.groups.has(groupKey)) {
+  if (!source.groups.has(branch)) {
     return hubError(404, 'federation.source_group_not_found', 'The source group does not exist.');
   }
 
-  if (!target.groups.has(groupKey)) {
+  if (!target.groups.has(branch)) {
     return hubError(404, 'federation.target_group_not_found', 'The target group does not exist.');
   }
 
@@ -73,12 +73,12 @@ export function federateHubSyncEvents(
     return limit;
   }
 
-  const cursorKey = createFederationCursorKey(peerId, groupKey);
+  const cursorKey = createFederationCursorKey(peerId, branch);
   const previousCursor = input.cursor ?? target.federationCursors.get(cursorKey);
-  const page = pullHubSyncEventLog(source, groupKey, previousCursor, limit.value);
+  const page = pullHubSyncEventLog(source, branch, previousCursor, limit.value);
   const mergeInput: MergeFederationSyncPageInput = {
     peerId,
-    groupKey,
+    branch,
     cursorKey,
     page
   };
@@ -95,7 +95,7 @@ export async function federateHubSyncEventsFromHttpPeer(
   input: HubHttpFederationSyncInput
 ): Promise<HubResult<HubFederationSyncResponse>> {
   const peerId = input.peerId.trim();
-  const groupKey = input.groupKey.trim();
+  const branch = input.branch.trim();
   const peerBaseUrl = input.peerBaseUrl.trim();
   const accessToken = input.accessToken.trim();
 
@@ -103,8 +103,8 @@ export async function federateHubSyncEventsFromHttpPeer(
     return hubError(400, 'federation.peer_id_required', 'peerId is required.');
   }
 
-  if (!groupKey) {
-    return hubError(400, 'federation.group_key_required', 'groupKey is required.');
+  if (!branch) {
+    return hubError(400, 'federation.group_key_required', 'branch is required.');
   }
 
   if (!peerBaseUrl) {
@@ -115,7 +115,7 @@ export async function federateHubSyncEventsFromHttpPeer(
     return hubError(400, 'federation.access_token_required', 'accessToken is required.');
   }
 
-  if (!target.groups.has(groupKey)) {
+  if (!target.groups.has(branch)) {
     return hubError(404, 'federation.target_group_not_found', 'The target group does not exist.');
   }
 
@@ -125,12 +125,12 @@ export async function federateHubSyncEventsFromHttpPeer(
     return limit;
   }
 
-  const cursorKey = createFederationCursorKey(peerId, groupKey);
+  const cursorKey = createFederationCursorKey(peerId, branch);
   const previousCursor = input.cursor ?? target.federationCursors.get(cursorKey);
   const pullInput: HttpFederationEventLogPullInput = {
     peerBaseUrl,
     accessToken,
-    groupKey
+    branch
   };
 
   if (previousCursor !== undefined) {
@@ -153,7 +153,7 @@ export async function federateHubSyncEventsFromHttpPeer(
 
   const mergeInput: MergeFederationSyncPageInput = {
     peerId,
-    groupKey,
+    branch,
     cursorKey,
     page: page.value
   };
@@ -167,13 +167,13 @@ export async function federateHubSyncEventsFromHttpPeer(
 
 function mergeFederationSyncPage(target: HubState, input: MergeFederationSyncPageInput): HubFederationSyncResponse {
   const merge = mergeHubSyncEventLog(target, {
-    groupKey: input.groupKey,
+    branch: input.branch,
     events: input.page.events,
     actor: input.peerId
   });
   const response: HubFederationSyncResponse = {
     peerId: input.peerId,
-    groupKey: input.groupKey,
+    branch: input.branch,
     cursor: input.page.cursor,
     pulled: input.page.events.length,
     accepted: merge.accepted,
@@ -198,9 +198,9 @@ function mergeFederationSyncPage(target: HubState, input: MergeFederationSyncPag
     appendHubAuditLog(target, {
       actor: input.peerId,
       action: 'federation.synced',
-      targetType: 'group',
-      targetId: input.groupKey,
-      groupKey: input.groupKey,
+      targetType: 'branch',
+      targetId: input.branch,
+      branch: input.branch,
       payload: auditPayload
     });
   }
@@ -208,14 +208,14 @@ function mergeFederationSyncPage(target: HubState, input: MergeFederationSyncPag
   return response;
 }
 
-function createFederationCursorKey(peerId: string, groupKey: string): string {
-  return `${peerId}:${groupKey}`;
+function createFederationCursorKey(peerId: string, branch: string): string {
+  return `${peerId}:${branch}`;
 }
 
 async function pullHttpFederationSyncEventLog(input: HttpFederationEventLogPullInput): Promise<HubResult<HubSyncEventLogPage>> {
   const fetcher = input.fetch ?? fetch;
   const url = new URL(`${input.peerBaseUrl.replace(/\/$/, '')}/api/v1/federation/sync-events`);
-  url.searchParams.set('groupKey', input.groupKey);
+  url.searchParams.set('branch', input.branch);
 
   if (input.cursor !== undefined) {
     url.searchParams.set('cursor', input.cursor);
@@ -275,7 +275,7 @@ function normalizeFederationHubSyncEvent(value: unknown): HubSyncEvent | undefin
     !isPlainRecord(value.payload) ||
     typeof value.createdAt !== 'string' ||
     typeof value.clientId !== 'string' ||
-    typeof value.groupKey !== 'string' ||
+    typeof value.branch !== 'string' ||
     typeof value.acceptedAt !== 'string'
   ) {
     return undefined;
@@ -287,7 +287,7 @@ function normalizeFederationHubSyncEvent(value: unknown): HubSyncEvent | undefin
     payload: value.payload,
     createdAt: value.createdAt,
     clientId: value.clientId,
-    groupKey: value.groupKey,
+    branch: value.branch,
     acceptedAt: value.acceptedAt
   };
 

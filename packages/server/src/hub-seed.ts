@@ -3,8 +3,8 @@ import {
   DEFAULT_GROUP_KEY,
   DEFAULT_LOCAL_INVITE_TOKEN,
   createEmptyHubGlobalProjection,
-  type HubGroup,
-  type HubGroupSeed,
+  type HubBranch,
+  type HubBranchSeed,
   type HubInvite,
   type HubInviteSeed,
   type HubProjectSeed,
@@ -49,7 +49,7 @@ export function createHubState(options: HubStateOptions = {}): HubState {
   const invites = options.invites ?? [
     {
       token: DEFAULT_LOCAL_INVITE_TOKEN,
-      groupKey: firstGroupKey
+      branch: firstGroupKey
     }
   ];
 
@@ -64,14 +64,14 @@ export function createHubState(options: HubStateOptions = {}): HubState {
   return state;
 }
 
-function addGroup(state: HubState, seed: HubGroupSeed): void {
+function addGroup(state: HubState, seed: HubBranchSeed): void {
   const key = seed.key.trim();
 
   if (!key) {
     return;
   }
 
-  const group: HubGroup = {
+  const group: HubBranch = {
     key,
     displayName: seed.displayName?.trim() || key,
     joinMode: seed.joinMode ?? 'invite'
@@ -85,13 +85,13 @@ function addGroup(state: HubState, seed: HubGroupSeed): void {
 }
 
 function addInvite(state: HubState, seed: HubInviteSeed): void {
-  if (!state.groups.has(seed.groupKey)) {
+  if (!state.groups.has(seed.branch)) {
     return;
   }
 
   const invite: HubInvite = {
     token: seed.token,
-    groupKey: seed.groupKey,
+    branch: seed.branch,
     uses: 0,
     createdAt: new Date().toISOString(),
     createdBy: 'system'
@@ -109,7 +109,7 @@ function addInvite(state: HubState, seed: HubInviteSeed): void {
 }
 
 function addProjectSeed(state: HubState, seed: HubProjectSeed): void {
-  if (!state.groups.has(seed.groupKey)) {
+  if (!state.groups.has(seed.branch)) {
     return;
   }
 
@@ -117,7 +117,7 @@ function addProjectSeed(state: HubState, seed: HubProjectSeed): void {
   const project: ProjectSummary = {
     id: seed.id,
     projectKey: seed.projectKey ?? seed.id,
-    groupKey: seed.groupKey,
+    branch: seed.branch,
     name: seed.name ?? seed.id,
     createdByMemberId: seed.createdByMemberId ?? 'system',
     createdAt
@@ -131,5 +131,5 @@ function addProjectSeed(state: HubState, seed: HubProjectSeed): void {
     project.access = seed.access;
   }
 
-  state.projects.set(projectMapKey(project.groupKey, project.id), project);
+  state.projects.set(projectMapKey(project.branch, project.id), project);
 }

@@ -5,7 +5,7 @@ import type { SyncEvent, SyncEventSignature } from '@devmesh/protocol';
 import {
   createHubState,
   DEFAULT_LOCAL_INVITE_TOKEN,
-  joinHubGroup,
+  joinHubBranch,
   type HubAuthContext
 } from '../src/hub-state.js';
 import { pushHubSyncEvents, replayHubSyncConflicts, verifyHubSyncEventLog } from '../src/hub-sync.js';
@@ -13,7 +13,7 @@ import { pushHubSyncEvents, replayHubSyncConflicts, verifyHubSyncEventLog } from
 describe('hub sync event log verification', () => {
   it('verifies log hash chains and signed event payloads', () => {
     const state = createHubState();
-    const joined = joinHubGroup(state, {
+    const joined = joinHubBranch(state, {
       inviteToken: DEFAULT_LOCAL_INVITE_TOKEN,
       displayName: 'Verifier',
       handle: 'verifier'
@@ -62,7 +62,7 @@ describe('hub sync event log verification', () => {
     });
     expect(
       verifyHubSyncEventLog(state, {
-        groupKey: auth.groupKey
+        branch: auth.branch
       })
     ).toEqual({
       ok: true,
@@ -70,7 +70,7 @@ describe('hub sync event log verification', () => {
       rejected: []
     });
 
-    const [firstEvent, secondEvent] = state.syncEvents.get(auth.groupKey) ?? [];
+    const [firstEvent, secondEvent] = state.syncEvents.get(auth.branch) ?? [];
 
     if (firstEvent === undefined || secondEvent?.log === undefined) {
       throw new Error('Expected stored sync events with log metadata.');
@@ -85,7 +85,7 @@ describe('hub sync event log verification', () => {
     };
 
     const verification = verifyHubSyncEventLog(state, {
-      groupKey: auth.groupKey,
+      branch: auth.branch,
       actor: 'auditor'
     });
 
@@ -113,8 +113,8 @@ describe('hub sync event log verification', () => {
           actor: 'auditor',
           action: 'sync.event_log_verification_failed',
           targetType: 'sync_log',
-          targetId: auth.groupKey,
-          groupKey: auth.groupKey,
+          targetId: auth.branch,
+          branch: auth.branch,
           payload: expect.objectContaining({
             checked: 2,
             rejected: expect.arrayContaining([
@@ -156,12 +156,12 @@ describe('hub sync conflict replay', () => {
       title: 'Offline conflict remote revision',
       summary: 'The remote client switched to a server-backed workflow.'
     });
-    const localJoined = joinHubGroup(state, {
+    const localJoined = joinHubBranch(state, {
       inviteToken: DEFAULT_LOCAL_INVITE_TOKEN,
       displayName: 'Local Writer',
       handle: 'local-writer'
     });
-    const remoteJoined = joinHubGroup(state, {
+    const remoteJoined = joinHubBranch(state, {
       inviteToken: DEFAULT_LOCAL_INVITE_TOKEN,
       displayName: 'Remote Writer',
       handle: 'remote-writer'
@@ -233,12 +233,12 @@ describe('hub sync conflict replay', () => {
     });
 
     const replay = await replayHubSyncConflicts(state, core, {
-      groupKey: localAuth.groupKey,
+      branch: localAuth.branch,
       cursor: firstPush.value.cursor,
       actor: 'sync-replayer'
     });
     const retry = await replayHubSyncConflicts(state, core, {
-      groupKey: localAuth.groupKey,
+      branch: localAuth.branch,
       cursor: firstPush.value.cursor,
       actor: 'sync-replayer'
     });
@@ -265,7 +265,7 @@ describe('hub sync conflict replay', () => {
         fromId: localRevision.id,
         toId: remoteRevision.id,
         createdBy: 'sync-replayer',
-        groupKey: localAuth.groupKey,
+        branch: localAuth.branch,
         reason: 'Diverged while offline'
       })
     ]);
@@ -275,7 +275,7 @@ describe('hub sync conflict replay', () => {
         action: 'sync.conflict_replayed',
         targetType: 'knowledge-edge',
         targetId: state.knowledgeEdges[0]?.id,
-        groupKey: localAuth.groupKey,
+        branch: localAuth.branch,
         payload: expect.objectContaining({
           knowledgeId: base.id,
           fromId: localRevision.id,
@@ -292,7 +292,7 @@ describe('hub sync conflict replay', () => {
 function createAuth(joined: {
   memberId: string;
   clientId: string;
-  groupKey: string;
+  branch: string;
   syncSigningSecret?: string;
 }): HubAuthContext {
   if (joined.syncSigningSecret === undefined) {
@@ -302,7 +302,7 @@ function createAuth(joined: {
   return {
     memberId: joined.memberId,
     clientId: joined.clientId,
-    groupKey: joined.groupKey,
+    branch: joined.branch,
     syncSigningSecret: joined.syncSigningSecret
   };
 }
@@ -322,7 +322,7 @@ function signSyncEvent(input: { auth: HubAuthContext; signedAt?: string; event: 
     .update(
       stableStringify({
         clientId: input.auth.clientId,
-        groupKey: input.auth.groupKey,
+        branch: input.auth.branch,
         event: {
           id: input.event.id,
           kind: input.event.kind,

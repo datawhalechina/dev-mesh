@@ -8,14 +8,14 @@ export interface ProjectBriefInput {
 
 export interface ProjectBriefResult {
   projectId: string;
-  groupKey: string;
+  branch: string;
   items: KnowledgeItem[];
 }
 
 export async function createProjectBrief(core: DevMeshCore, input: ProjectBriefInput = {}): Promise<ProjectBriefResult> {
   const config = await readProjectConfig(core.projectRoot);
   const projectKey = resolveProjectKey(input.project, config.projectKey);
-  const groupKey = config.knowledgeBranch.active;
+  const branch = config.knowledgeBranch.active;
   const candidates = await core.searchKnowledge({
     query: projectKey,
     layers: ['canonical'],
@@ -24,21 +24,21 @@ export async function createProjectBrief(core: DevMeshCore, input: ProjectBriefI
 
   return {
     projectId: projectKey,
-    groupKey,
+    branch,
     items: candidates
-      .filter((item) => canIncludeInProjectBrief(item, groupKey, projectKey))
+      .filter((item) => canIncludeInProjectBrief(item, branch, projectKey))
       .slice(0, input.limit ?? 5)
   };
 }
 
-function canIncludeInProjectBrief(item: KnowledgeItem, groupKey: string, projectKey: string): boolean {
+function canIncludeInProjectBrief(item: KnowledgeItem, branch: string, projectKey: string): boolean {
   if (item.visibility === 'org') {
     return true;
   }
 
-  const itemGroupKey = readKnowledgeMetadataString(item, 'groupKey');
+  const itemGroupKey = readKnowledgeMetadataString(item, 'branch');
 
-  if (itemGroupKey !== undefined && itemGroupKey !== groupKey) {
+  if (itemGroupKey !== undefined && itemGroupKey !== branch) {
     return false;
   }
 
