@@ -17,7 +17,7 @@ import {
   type CrdtChangeInput,
   knowledgeItemToNode,
   touchProjectDoc,
-  type BranchScopedNode,
+  type BranchScope,
   type KnowledgeNode,
   type ProjectDoc,
   type QualitySignalKind,
@@ -797,8 +797,8 @@ function compareKnowledgeItemsForExport(left: KnowledgeItem, right: KnowledgeIte
   return right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id);
 }
 
-function createBranchScope(doc: ProjectDoc): BranchScopedNode {
-  const group: BranchScopedNode = {
+function createBranchScope(doc: ProjectDoc): BranchScope {
+  const group: BranchScope = {
     branch: doc.branch,
     sourceProjectId: doc.project.id
   };
