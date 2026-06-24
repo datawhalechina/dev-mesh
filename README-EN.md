@@ -1,8 +1,8 @@
 <div align="center">
   <img src="apps/website/docs/public/img/logo.svg" width="72" alt="DevMesh logo">
   <h1>DevMesh</h1>
-  <h3>Local-first project memory for AI coding agents</h3>
-  <p><strong>MCP-native</strong> · <strong>knowledge follows the repo</strong> · <strong>team sync is optional</strong></p>
+  <h3>CRDT-powered local-first project memory for AI coding agents</h3>
+  <p><strong>Automerge CRDT core</strong> · <strong>MCP-native</strong> · <strong>knowledge follows the repo</strong> · <strong>team sync is optional</strong></p>
   <p>
     <a href="https://devmesh.xyun.dev/"><strong>Documentation & Website -></strong></a>
     ·
@@ -31,7 +31,7 @@
 
 DevMesh is a project knowledge layer for AI coding tools such as Codex, Claude Code, and opencode. It stores durable engineering context in the project's `.dev-mesh/` directory: decisions, conventions, task handoffs, useful commands, and pitfalls that future AI sessions should be able to retrieve.
 
-The default mode is local-first. You do not need to deploy a server, and raw conversations are not uploaded. When a team wants shared memory, DevMesh can optionally sync through a Hub Server.
+Built on Automerge CRDT: multiple collaborators can edit the same knowledge base offline without conflicts. The default mode is local-first. You do not need to deploy a server, and raw conversations are not uploaded. When a team wants shared memory, DevMesh can optionally sync through a Hub Server.
 
 ## Who It Is For
 

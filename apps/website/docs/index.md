@@ -7,8 +7,8 @@ sidebar: false
 aside: false
 hero:
   name: DevMesh
-  text: 本地优先的 AI 项目知识库
-  tagline: 用一个 CLI 把 Codex、Claude Code 和 opencode 接到同一个项目记忆里。知识默认写入 .dev-mesh，需要团队共享时再接入 Hub Server。
+  text: 本地优先的 AI 项目知识库（CRDT 驱动）
+  tagline: 基于 Automerge CRDT 内核，用一个 CLI 把 Codex、Claude Code 和 opencode 接到同一个项目记忆里。多人离线编辑无冲突，知识默认写入 .dev-mesh，需要团队共享时再接入 Hub Server。
   Notice:
     title: 使用已发布的 npm CLI 接入 DevMesh
     desc: 不需要先 clone 仓库。安装、初始化 MCP host，再让 AI 客户端按需沉淀项目知识。
@@ -26,8 +26,8 @@ hero:
       text: GitHub
       link: https://github.com/xy200303/dev-mesh
 features:
-  - title: 本地优先
-    details: 默认把知识、图谱和检索索引放在项目目录里，不依赖远端服务起步。
+  - title: CRDT 驱动 本地优先
+    details: 基于 Automerge CRDT 内核，多人离线编辑无冲突。知识、图谱和检索索引都放在项目目录里，不依赖远端服务起步。
   - title: MCP 原生
     details: 直接面向 Codex、Claude Code、opencode 暴露工具，不额外造一套旁路交互。
   - title: 知识跟随仓库

@@ -1,8 +1,8 @@
 <div align="center">
   <img src="apps/website/docs/public/img/logo.svg" width="72" alt="DevMesh logo">
   <h1>DevMesh</h1>
-  <h3>给 AI 编程助手使用的本地优先项目记忆</h3>
-  <p><strong>MCP 原生</strong> · <strong>知识跟随仓库</strong> · <strong>团队同步可选</strong></p>
+  <h3>给 AI 编程助手使用的 CRDT 驱动的本地优先项目记忆</h3>
+  <p><strong>Automerge CRDT 内核</strong> · <strong>MCP 原生</strong> · <strong>知识跟随仓库</strong> · <strong>团队同步可选</strong></p>
   <p>
     <a href="https://devmesh.xyun.dev/"><strong>Documentation & Website -></strong></a>
     ·
@@ -31,7 +31,7 @@
 
 DevMesh 是一个面向 Codex、Claude Code、opencode 等 AI 编程工具的项目知识层。它把稳定的开发经验、架构决策、任务进展、命令习惯和踩坑记录沉淀到项目里的 `.dev-mesh/`，让同一个仓库里的后续 AI 会话可以继续检索和复用这些上下文。
 
-默认模式完全本地优先：不需要先部署服务端，也不会上传原始对话。需要团队共享时，再通过 Hub Server 做可选同步。
+内核基于 Automerge CRDT，多人同时离线编辑同一份知识库不会产生冲突。默认模式完全本地优先：不需要先部署服务端，也不会上传原始对话。需要团队共享时，再通过 Hub Server 做可选同步。
 
 ## 项目受众
 
