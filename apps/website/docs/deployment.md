@@ -17,6 +17,25 @@ npm install -g devmesh@alpha
 CLI 参数 > process env > env file
 ```
 
+## Docker Hub 镜像
+
+生产部署推荐使用预构建的 Docker Hub 镜像，而不是从源码构建：
+
+```bash
+# 拉取最新 alpha 版本
+docker pull xy200303/devmesh-server:alpha
+docker pull xy200303/devmesh-web-admin:alpha
+```
+
+也可以指定具体版本：
+
+```bash
+docker pull xy200303/devmesh-server:v0.1.6
+docker pull xy200303/devmesh-web-admin:v0.1.6
+```
+
+镜像由 GitHub Actions 在每次版本 tag 推送时自动构建并发布到 Docker Hub。
+
 ## 最小 env 文件
 
 创建 `mesh-server.env`：

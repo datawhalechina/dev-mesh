@@ -2,6 +2,22 @@
 
 This directory contains the alpha Docker Compose stack for DevMesh.
 
+## Docker Hub Images
+
+Pre-built images are published to Docker Hub on every tagged release:
+
+- `xy200303/devmesh-server:alpha` — Hub Server + MCP endpoint
+- `xy200303/devmesh-web-admin:alpha` — Web Admin UI
+- `xy200303/devmesh-website:alpha` — Documentation website
+
+Pull the latest alpha images:
+
+```bash
+docker pull xy200303/devmesh-server:alpha
+docker pull xy200303/devmesh-web-admin:alpha
+docker pull xy200303/devmesh-website:alpha
+```
+
 ## Services
 
 - `postgres`: durable PostgreSQL storage for knowledge and Hub state.
