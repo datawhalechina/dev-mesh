@@ -392,9 +392,6 @@ export function knowledgeItemToNode(item: KnowledgeItem, group: BranchScope): Kn
     node.content = item.content;
   }
 
-  if (group.branchId !== undefined) {
-    node.branch = group.branch;
-  }
 
   if (group.sourceProjectId !== undefined) {
     node.sourceProjectId = group.sourceProjectId;

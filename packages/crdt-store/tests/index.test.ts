@@ -22,7 +22,6 @@ describe('@devmesh/crdt-store', () => {
       projectKey: 'alpha',
       name: 'Alpha',
       branch: 'frontend-platform',
-      branchId: 'group_default',
       now: () => new Date('2026-06-15T00:00:00.000Z')
     });
 
@@ -33,8 +32,7 @@ describe('@devmesh/crdt-store', () => {
         id: 'project_alpha',
         key: 'alpha',
         branch: 'frontend-platform',
-        branchId: 'group_default'
-      },
+        },
       knowledge: {},
       entities: {},
       relations: {},
@@ -60,14 +58,12 @@ describe('@devmesh/crdt-store', () => {
     const node = knowledgeItemToNode(item, {
       branch: 'frontend-platform',
       sourceProjectId: 'project_alpha',
-      branchId: 'group_default'
     });
 
     expect(node).toMatchObject({
       id: 'ki_design_group',
       branch: 'frontend-platform',
       sourceProjectId: 'project_alpha',
-      branchId: 'group_default',
       content: 'A project can use its own group for isolation.'
     });
   });
@@ -125,8 +121,7 @@ describe('@devmesh/crdt-store', () => {
       reason: 'Reviewed in admin',
       group: {
         branch: 'frontend-platform',
-        branchId: 'group_default'
-      },
+        },
       now: () => new Date('2026-06-15T00:00:00.000Z')
     });
 
@@ -136,7 +131,6 @@ describe('@devmesh/crdt-store', () => {
       actorId: 'member_alice',
       reason: 'Reviewed in admin',
       branch: 'frontend-platform',
-      branchId: 'group_default'
     });
   });
 
