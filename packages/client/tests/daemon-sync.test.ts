@@ -1161,7 +1161,7 @@ describe('daemon sync', () => {
       });
 
       await waitForProjectionDocument(projectRoot, 'kn_daemon_watch_1');
-      const status = await readDaemonSyncStatus(projectRoot);
+      const status = await waitForDaemonProjectionReady(projectRoot);
 
       expect(status).toMatchObject({
         projection: {
@@ -1273,6 +1273,31 @@ async function waitForDaemonStatus(projectRoot: string, timeoutMs = 3000): Promi
   }
 
   throw new Error('Timed out waiting for daemon sync status.');
+}
+
+async function waitForDaemonProjectionReady(
+  projectRoot: string,
+  timeoutMs = 5000
+): Promise<NonNullable<Awaited<ReturnType<typeof readDaemonSyncStatus>>>> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const status = await readDaemonSyncStatus(projectRoot);
+
+    if (
+      status?.projection.state === 'ready' &&
+      status.projection.rebuilt &&
+      status.projection.documentCount === 1 &&
+      status.crdt.materialized &&
+      status.crdt.projectionState === 'ready'
+    ) {
+      return status;
+    }
+
+    await sleep(25);
+  }
+
+  throw new Error('Timed out waiting for daemon projection status to become ready.');
 }
 
 async function waitForProjectionDocument(projectRoot: string, id: string, timeoutMs = 3000): Promise<void> {
