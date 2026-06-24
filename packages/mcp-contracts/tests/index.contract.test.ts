@@ -457,8 +457,8 @@ describe('MCP tool contract schemas', () => {
     );
 
     expect(registered).not.toContain('mesh_graph_path');
-    expect(registered).not.toContain('mesh_get_project_brief');
-    expect(MESH_POWER_TOOL_NAMES).toEqual(['mesh_get_project_brief', 'mesh_graph_path']);
+    expect(registered).toContain('mesh_get_project_brief');
+    expect(MESH_POWER_TOOL_NAMES).toEqual(['mesh_graph_path']);
   });
 
   it('registers power tools when power capability is enabled', () => {
@@ -503,9 +503,8 @@ describe('MCP tool contract schemas', () => {
     );
 
     expect(registered).toEqual([
-      ...MESH_CORE_TOOL_NAMES.slice(0, -1),
-      ...MESH_POWER_TOOL_NAMES,
-      MESH_CORE_TOOL_NAMES[MESH_CORE_TOOL_NAMES.length - 1]
+      ...MESH_CORE_TOOL_NAMES,
+      ...MESH_POWER_TOOL_NAMES
     ]);
   });
 

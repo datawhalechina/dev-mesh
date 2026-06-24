@@ -277,6 +277,7 @@ export type MeshResolveTermInput = z.infer<typeof meshResolveTermInputSchema>;
 export type MeshScanProjectKnowledgeInput = z.infer<typeof meshScanProjectKnowledgeInputSchema>;
 export type MeshExploreKnowledgeGraphInput = z.infer<typeof meshExploreKnowledgeGraphInputSchema>;
 export type MeshGraphPathInput = z.infer<typeof meshGraphPathInputSchema>;
+export type MeshGetProjectBriefInput = z.infer<typeof meshGetProjectBriefInputSchema>;
 export type MeshAdminGraphOverviewInput = z.infer<typeof meshAdminGraphOverviewInputSchema>;
 export type MeshAdminMemberActivityInput = z.infer<typeof meshAdminMemberActivityInputSchema>;
 export type MeshAdminQualityReviewInput = z.infer<typeof meshAdminQualityReviewInputSchema>;
@@ -397,10 +398,11 @@ export const MESH_CORE_TOOL_NAMES = [
   'mesh_search_member_experience',
   'mesh_resolve_term',
   'mesh_scan_project_knowledge',
-  'mesh_explore_knowledge_graph'
+  'mesh_explore_knowledge_graph',
+  'mesh_get_project_brief'
 ] as const satisfies readonly MeshToolName[];
 
-export const MESH_POWER_TOOL_NAMES = ['mesh_get_project_brief', 'mesh_graph_path'] as const satisfies readonly MeshToolName[];
+export const MESH_POWER_TOOL_NAMES = ['mesh_graph_path'] as const satisfies readonly MeshToolName[];
 
 export const MESH_ADMIN_TOOL_NAMES = [
   'mesh_admin_graph_overview',
@@ -667,35 +669,6 @@ export function registerMeshTools(
       )
   );
 
-  if (powerEnabled) {
-    server.registerTool(
-      'mesh_get_project_brief',
-      {
-        title: 'Get project brief',
-        description:
-          'Get the project brief before starting a task so the agent can inspect canonical project knowledge, related tasks, durable area experience, and recent handoff context.',
-        inputSchema: meshGetProjectBriefInputSchema.shape
-      },
-      async (args) =>
-        textToolResult(
-          'mesh_get_project_brief',
-          await handlers.getProjectBrief(meshGetProjectBriefInputSchema.parse(args))
-        )
-    );
-
-    server.registerTool(
-      'mesh_graph_path',
-      {
-        title: 'Find knowledge graph path',
-        description:
-          'Explain the shortest knowledge-relation path between two nodes or queries, including path steps, edge kinds, and an explanation of why the nodes connect.',
-        inputSchema: meshGraphPathInputSchema.shape
-      },
-      async (args) =>
-        textToolResult('mesh_graph_path', await handlers.graphPath(meshGraphPathInputSchema.parse(args)))
-    );
-  }
-
   server.registerTool(
     'mesh_explore_knowledge_graph',
     {
@@ -710,6 +683,35 @@ export function registerMeshTools(
         await handlers.exploreKnowledgeGraph(meshExploreKnowledgeGraphInputSchema.parse(args))
       )
   );
+
+  server.registerTool(
+      'mesh_get_project_brief',
+      {
+        title: 'Get project brief',
+        description:
+          'Get the project brief before starting a task so the agent can inspect canonical project knowledge, related tasks, durable area experience, and recent handoff context.',
+        inputSchema: meshGetProjectBriefInputSchema.shape
+      },
+      async (args) =>
+        textToolResult(
+          'mesh_get_project_brief',
+          await handlers.getProjectBrief(meshGetProjectBriefInputSchema.parse(args))
+        )
+    );
+
+  if (powerEnabled) {
+    server.registerTool(
+      'mesh_graph_path',
+      {
+        title: 'Find knowledge graph path',
+        description:
+          'Explain the shortest knowledge-relation path between two nodes or queries, including path steps, edge kinds, and an explanation of why the nodes connect.',
+        inputSchema: meshGraphPathInputSchema.shape
+      },
+      async (args) =>
+        textToolResult('mesh_graph_path', await handlers.graphPath(meshGraphPathInputSchema.parse(args)))
+    );
+  }
 
   if (adminEnabled) {
     server.registerTool(
