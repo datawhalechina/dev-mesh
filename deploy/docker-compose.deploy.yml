@@ -41,6 +41,8 @@ services:
 
   web-admin:
     image: xy200303/devmesh-web-admin:alpha
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://127.0.0.1:8721}
     depends_on:
       mesh-server:
         condition: service_healthy
