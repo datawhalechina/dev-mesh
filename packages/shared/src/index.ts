@@ -1,6 +1,6 @@
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-export const DEV_MESH_VERSION = '0.1.5';
+export const DEV_MESH_VERSION = '0.1.6';
 
 export interface Logger {
   debug(message: string, meta?: Record<string, unknown>): void;
