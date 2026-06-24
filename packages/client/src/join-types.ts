@@ -1,7 +1,7 @@
 export interface JoinServerOptions {
   globalRoot?: string;
   serverUrl: string;
-  groupKey?: string;
+  branch?: string;
   displayName: string;
   handle?: string;
   inviteToken?: string;
@@ -10,7 +10,7 @@ export interface JoinServerOptions {
 export interface JoinedServerRecord {
   serverUrl: string;
   mcpUrl: string;
-  groupKey: string;
+  branch: string;
   memberId: string;
   clientId: string;
   displayName: string;
@@ -27,7 +27,7 @@ export interface JoinServerResult {
   identityPath: string;
   serverUrl: string;
   mcpUrl: string;
-  groupKey: string;
+  branch: string;
   memberId: string;
   clientId: string;
   expiresAt?: string;

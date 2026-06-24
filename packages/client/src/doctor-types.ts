@@ -39,7 +39,7 @@ export interface GlobalIdentity {
 
 export interface JoinedServerIdentity {
   serverUrl?: string;
-  groupKey?: string;
+  branch?: string;
   clientId?: string;
   accessToken?: string;
 }

@@ -6,7 +6,7 @@ export interface HubAuditInput {
   action: string;
   targetType: string;
   targetId: string;
-  groupKey?: string;
+  branch?: string;
   payload?: Record<string, unknown>;
 }
 
@@ -20,8 +20,8 @@ export function appendHubAuditLog(state: HubState, input: HubAuditInput): HubAud
     createdAt: new Date().toISOString()
   };
 
-  if (input.groupKey !== undefined) {
-    log.groupKey = input.groupKey;
+  if (input.branch !== undefined) {
+    log.branch = input.branch;
   }
 
   if (input.payload !== undefined) {

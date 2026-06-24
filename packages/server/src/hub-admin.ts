@@ -140,14 +140,11 @@ export interface AdminKnowledgeEdgeSummary extends HubKnowledgeEdge {
 export interface AdminKnowledgeBranchPublishInput {
   sourceId?: string;
   targetBranchKey?: string;
-  targetBranchKey?: string;
   reason?: string;
 }
 
 export interface AdminKnowledgeBranchBulkPublishInput {
   sourceBranchKey?: string;
-  sourceGroupKey?: string;
-  targetBranchKey?: string;
   targetBranchKey?: string;
   sourceIds?: string[];
   reason?: string;
@@ -164,8 +161,6 @@ export interface AdminKnowledgeBranchBulkPublishResult {
 
 export interface AdminBranchMergePreviewInput {
   sourceBranchKey?: string;
-  sourceGroupKey?: string;
-  targetBranchKey?: string;
   targetBranchKey?: string;
   limit?: number;
 }
@@ -330,7 +325,7 @@ export async function createAdminBranchMergePreview(
   core: DevMeshCore,
   input: AdminBranchMergePreviewInput
 ): Promise<HubResult<AdminBranchMergePreview>> {
-  const sourceBranchKey = (input.sourceBranchKey ?? input.sourceGroupKey)?.trim();
+  const sourceBranchKey = (input.sourceBranchKey ?? input.sourceBranchKey)?.trim();
   const targetBranchKey = (input.targetBranchKey ?? input.targetBranchKey)?.trim();
 
   if (!sourceBranchKey || !targetBranchKey) {
@@ -715,11 +710,11 @@ export function createAdminProject(state: HubState, input: AdminProjectInput): H
 
 export function checkoutAdminProjectBranch(
   state: HubState,
-  sourceGroupKey: string,
+  sourceBranchKey: string,
   projectId: string,
   input: AdminProjectBranchInput
 ): HubResult<ProjectSummary> {
-  const project = state.projects.get(projectMapKey(sourceGroupKey, projectId));
+  const project = state.projects.get(projectMapKey(sourceBranchKey, projectId));
 
   if (project === undefined) {
     return hubError(404, 'admin.project_not_found', 'Project was not found.');
@@ -735,7 +730,7 @@ export function checkoutAdminProjectBranch(
     return hubError(404, 'admin.group_not_found', 'The target branch/group does not exist.');
   }
 
-  if (targetBranchKey === sourceGroupKey) {
+  if (targetBranchKey === sourceBranchKey) {
     return ok(withNormalizedAccess(project));
   }
 
@@ -761,7 +756,7 @@ export function checkoutAdminProjectBranch(
     };
   }
 
-  state.projects.delete(projectMapKey(sourceGroupKey, project.id));
+  state.projects.delete(projectMapKey(sourceBranchKey, project.id));
   state.projects.set(targetKey, moved);
   appendHubAuditLog(state, {
     actor: 'admin',
@@ -771,7 +766,7 @@ export function checkoutAdminProjectBranch(
     branch: targetBranchKey,
     payload: {
       projectKey: moved.projectKey,
-      fromBranch: sourceGroupKey,
+      fromBranch: sourceBranchKey,
       toBranch: targetBranchKey,
       resetRestrictedAcl: previousAccess.visibility === 'restricted'
     }
@@ -783,7 +778,7 @@ export function checkoutAdminProjectBranch(
     branch: targetBranchKey,
     payload: {
       projectKey: moved.projectKey,
-      fromBranch: sourceGroupKey,
+      fromBranch: sourceBranchKey,
       toBranch: targetBranchKey,
       resetRestrictedAcl: previousAccess.visibility === 'restricted'
     }
@@ -956,13 +951,13 @@ export async function publishAdminKnowledgeToBranch(
     return hubError(404, 'admin.knowledge_not_found', 'Source knowledge was not found.');
   }
 
-  const sourceGroupKey = readKnowledgeMetadataString(source, 'branch') ?? DEFAULT_GROUP_KEY;
+  const sourceBranchKey = readKnowledgeMetadataString(source, 'branch') ?? DEFAULT_GROUP_KEY;
 
-  if (sourceGroupKey === targetBranchKey) {
+  if (sourceBranchKey === targetBranchKey) {
     return hubError(409, 'admin.knowledge_publish_same_branch', 'Source knowledge is already in the target branch.');
   }
 
-  return ok(await publishKnowledgeItemToBranch(state, core, source, sourceGroupKey, targetBranchKey, input.reason, 'single'));
+  return ok(await publishKnowledgeItemToBranch(state, core, source, sourceBranchKey, targetBranchKey, input.reason, 'single'));
 }
 
 export async function publishAdminKnowledgeBatchToBranch(
@@ -970,7 +965,7 @@ export async function publishAdminKnowledgeBatchToBranch(
   core: DevMeshCore,
   input: AdminKnowledgeBranchBulkPublishInput
 ): Promise<HubResult<AdminKnowledgeBranchBulkPublishResult>> {
-  const sourceBranchKey = (input.sourceBranchKey ?? input.sourceGroupKey)?.trim();
+  const sourceBranchKey = (input.sourceBranchKey ?? input.sourceBranchKey)?.trim();
   const targetBranchKey = (input.targetBranchKey ?? input.targetBranchKey)?.trim();
 
   if (!sourceBranchKey || !targetBranchKey) {
@@ -1035,7 +1030,7 @@ async function publishKnowledgeItemToBranch(
   state: HubState,
   core: DevMeshCore,
   source: KnowledgeItem,
-  sourceGroupKey: string,
+  sourceBranchKey: string,
   targetBranchKey: string,
   reasonInput: string | undefined,
   publishMode: 'single' | 'bulk'
@@ -1056,7 +1051,7 @@ async function publishKnowledgeItemToBranch(
         branchKey: targetBranchKey,
         branch: targetBranchKey,
         publishedFromId: source.id,
-        publishedFromBranch: sourceGroupKey,
+        publishedFromBranch: sourceBranchKey,
         publishedFromKind: source.source.kind,
         publishedBy: 'admin',
         ...(reason ? { publishedReason: reason } : {})
@@ -1085,7 +1080,7 @@ async function publishKnowledgeItemToBranch(
     branch: targetBranchKey,
     payload: {
       sourceId: source.id,
-      sourceBranch: sourceGroupKey,
+      sourceBranch: sourceBranchKey,
       targetBranch: targetBranchKey,
       ...(reason ? { reason } : {})
     }
@@ -1097,7 +1092,7 @@ async function publishKnowledgeItemToBranch(
     branch: targetBranchKey,
     payload: {
       sourceId: source.id,
-      sourceBranch: sourceGroupKey,
+      sourceBranch: sourceBranchKey,
       targetBranch: targetBranchKey,
       mode: publishMode,
       ...(reason ? { reason } : {})

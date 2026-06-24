@@ -26,7 +26,7 @@ export interface AdminGlobalCrdtOperation {
   targetType: string;
   targetId: string;
   createdAt: string;
-  groupKey: string;
+  branch: string;
   payload: Record<string, unknown>;
 }
 
@@ -35,7 +35,7 @@ export interface AdminGlobalCrdtOperationInput {
   actor?: string;
   targetType: string;
   targetId: string;
-  groupKey?: string;
+  branch?: string;
   payload?: Record<string, unknown>;
 }
 
@@ -52,7 +52,7 @@ export function appendAdminGlobalCrdtOperation(
     targetType: input.targetType,
     targetId: input.targetId,
     createdAt: timestamp,
-    groupKey: input.groupKey ?? SERVER_GLOBAL_GROUP_KEY,
+    branch: input.branch ?? SERVER_GLOBAL_GROUP_KEY,
     payload: sanitizeCrdtRecord(input.payload ?? {})
   };
   const document = getOrCreateServerGlobalDocument(state, timestamp);
@@ -88,7 +88,7 @@ export function appendAdminGlobalCrdtOperation(
       headsAfter,
       receivedAt: timestamp,
       clientId: 'admin',
-      groupKey: operation.groupKey,
+      branch: operation.branch,
       actorId: operation.actor,
       createdAt: timestamp,
       summary: operation.action
@@ -157,7 +157,7 @@ function updateServerGlobalProjectionDocument(state: HubState, document: HubCrdt
 }
 
 function createGlobalProjectionCounts(documents: HubGlobalProjectionDocument[]): HubState['globalProjection']['counts'] {
-  const groups = new Set(documents.map((document) => document.groupKey).filter((groupKey): groupKey is string => groupKey !== undefined));
+  const groups = new Set(documents.map((document) => document.branch).filter((branch): branch is string => branch !== undefined));
 
   return {
     documents: documents.length,
@@ -174,7 +174,7 @@ function createDocumentKey(document: CrdtSyncDocumentRef): string {
     .update(
       stableStringify({
         kind: document.kind,
-        groupKey: document.groupKey,
+        branch: document.branch,
         projectKey: document.projectKey,
         documentId: document.documentId,
         namespace: document.namespace
@@ -193,8 +193,8 @@ function cloneDocumentRef(document: CrdtSyncDocumentRef): CrdtSyncDocumentRef {
     kind: document.kind
   };
 
-  if (document.groupKey !== undefined) {
-    clone.groupKey = document.groupKey;
+  if (document.branch !== undefined) {
+    clone.branch = document.branch;
   }
 
   if (document.projectKey !== undefined) {

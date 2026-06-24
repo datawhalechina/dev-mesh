@@ -45,7 +45,7 @@ async function writeJoinedIdentity(identityPath: string, record: JoinedServerRec
     [key: string]: unknown;
   }>(identityPath, {});
   const joinedServers = (identity.joinedServers ?? []).filter(
-    (item) => !(item.serverUrl === record.serverUrl && item.groupKey === record.groupKey)
+    (item) => !(item.serverUrl === record.serverUrl && item.branch === record.branch)
   );
 
   joinedServers.push(record);
@@ -75,7 +75,7 @@ function createJoinedConfigBlocks(record: JoinedServerRecord): string {
     '',
     '[[groups]]',
     `server_url = "${escapeToml(record.serverUrl)}"`,
-    `group_key = "${escapeToml(record.groupKey)}"`,
+    `group_key = "${escapeToml(record.branch)}"`,
     `member_id = "${escapeToml(record.memberId)}"`,
     `client_id = "${escapeToml(record.clientId)}"`,
     `display_name = "${escapeToml(record.displayName)}"`,
@@ -135,7 +135,7 @@ function isMatchingJoinBlock(block: string[], record: JoinedServerRecord): boole
     return serverMatch;
   }
 
-  return serverMatch && text.includes(`group_key = "${escapeToml(record.groupKey)}"`);
+  return serverMatch && text.includes(`group_key = "${escapeToml(record.branch)}"`);
 }
 
 function setAutomationAutoSync(content: string): string {
