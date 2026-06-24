@@ -80,6 +80,23 @@ export interface ServerMeta {
   updatedAt: string;
 }
 
+export interface BranchNode {
+  branchId: string;
+  branch: string;
+  displayName: string;
+  description?: string;
+  joinMode: 'invite' | 'open' | 'admin';
+  memberIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BranchScope {
+  branch: string;
+  branchId?: string;
+  sourceProjectId?: string;
+}
+
 export interface ProjectNode extends ProjectMeta {
   description?: string;
 }
@@ -351,7 +368,7 @@ export function createServerGlobalDoc(input: CreateServerGlobalDocInput): Server
   };
 }
 
-export function knowledgeItemToNode(item: KnowledgeItem, group: BranchScopedNode): KnowledgeNode {
+export function knowledgeItemToNode(item: KnowledgeItem, group: BranchScope): KnowledgeNode {
   const node: KnowledgeNode = {
     id: item.id,
     layer: item.layer,
@@ -376,7 +393,7 @@ export function knowledgeItemToNode(item: KnowledgeItem, group: BranchScopedNode
   }
 
   if (group.branchId !== undefined) {
-    node.branchId = group.branchId;
+    node.branch = group.branch;
   }
 
   if (group.sourceProjectId !== undefined) {
@@ -398,7 +415,7 @@ export async function importV1JsonlToProjectDoc(
   input: ImportV1JsonlToProjectDocInput
 ): Promise<ImportV1JsonlToProjectDocResult> {
   const sourceFiles = new Set<string>();
-  const group: BranchScopedNode = {
+  const group: BranchScope = {
     branch: input.doc.branch,
     sourceProjectId: input.doc.project.id
   };
@@ -883,7 +900,7 @@ export function createQualitySignal(input: {
   knowledgeId: string;
   kind: QualitySignalKind;
   actorId: string;
-  group: BranchScopedNode;
+  group: BranchScope;
   value?: number;
   reason?: string;
   now?: () => Date;
@@ -919,7 +936,7 @@ export function createQualitySignal(input: {
   }
 
   if (input.group.branchId !== undefined) {
-    signal.branchId = input.group.branchId;
+    signal.branch = input.group.branch;
   }
 
   if (input.group.sourceProjectId !== undefined) {
@@ -1028,7 +1045,7 @@ async function readJsonlRecords(path: string): Promise<unknown[]> {
   return records;
 }
 
-function projectKnowledgeEdgeToRelation(edge: ProjectKnowledgeEdgeRecord, group: BranchScopedNode): RelationEdge {
+function projectKnowledgeEdgeToRelation(edge: ProjectKnowledgeEdgeRecord, group: BranchScope): RelationEdge {
   const relation: RelationEdge = {
     id: edge.id,
     from: edge.fromId,
@@ -1042,7 +1059,7 @@ function projectKnowledgeEdgeToRelation(edge: ProjectKnowledgeEdgeRecord, group:
   };
 
   if (group.branchId !== undefined) {
-    relation.branchId = group.branchId;
+    relation.branch = group.branch;
   }
 
   if (group.sourceProjectId !== undefined) {
@@ -1054,7 +1071,7 @@ function projectKnowledgeEdgeToRelation(edge: ProjectKnowledgeEdgeRecord, group:
 
 function knowledgeRatingToQualitySignals(
   rating: KnowledgeRatingRecord,
-  group: BranchScopedNode,
+  group: BranchScope,
   fallbackActorId = 'migration'
 ): QualitySignal[] {
   const actorId = rating.createdBy?.memberId ?? rating.createdBy?.handle ?? fallbackActorId;
@@ -1113,7 +1130,7 @@ function knowledgeRatingToQualitySignals(
 
 function knowledgeUsageToQualitySignal(
   usage: KnowledgeUsageRecord,
-  group: BranchScopedNode,
+  group: BranchScope,
   fallbackActorId = 'migration'
 ): QualitySignal {
   return createQualitySignal(
@@ -1132,7 +1149,7 @@ function knowledgeUsageToQualitySignal(
 function importEventHints(
   doc: ProjectDoc,
   event: DevMeshEventRecord,
-  group: BranchScopedNode,
+  group: BranchScope,
   fallbackActorId = 'migration'
 ): ImportEventHintsResult {
   const result: ImportEventHintsResult = {
@@ -1381,7 +1398,7 @@ function qualitySignalInput(input: {
   knowledgeId: string;
   kind: QualitySignalKind;
   actorId: string;
-  group: BranchScopedNode;
+  group: BranchScope;
   value?: number | undefined;
   reason?: string | undefined;
   now?: (() => Date) | undefined;
@@ -1389,7 +1406,7 @@ function qualitySignalInput(input: {
   knowledgeId: string;
   kind: QualitySignalKind;
   actorId: string;
-  group: BranchScopedNode;
+  group: BranchScope;
   value?: number;
   reason?: string;
   now?: () => Date;
@@ -1398,7 +1415,7 @@ function qualitySignalInput(input: {
     knowledgeId: string;
     kind: QualitySignalKind;
     actorId: string;
-    group: BranchScopedNode;
+    group: BranchScope;
     value?: number;
     reason?: string;
     now?: () => Date;
