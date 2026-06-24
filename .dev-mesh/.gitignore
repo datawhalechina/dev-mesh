@@ -11,3 +11,6 @@ knowledge/ratings/
 knowledge/usage/
 *.sqlite
 *.db
+state/
+crdt/sync/
+exports/

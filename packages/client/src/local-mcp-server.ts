@@ -23,6 +23,7 @@ import {
   type MeshDeleteKnowledgeInput,
   type MeshGraphPathInput,
   type MeshExploreKnowledgeGraphInput,
+  type MeshGetProjectBriefInput,
   type MeshLinkKnowledgeInput,
   type MeshListKnowledgeInput,
   type MeshScanProjectKnowledgeInput,
@@ -75,6 +76,7 @@ export function createLocalMeshToolHandlers(runtime: DevMeshClientRuntime): Mesh
     getProjectionStatus: () => runtime.projectionStatus(),
     rebuildProjection: () => runtime.rebuildProjectionsFromCrdt(),
     scanProjectKnowledge: (input) => runtime.scanProjectKnowledge(toScanProjectKnowledgeInput(input)),
+    getProjectBrief: (input) => runtime.getProjectBrief(toGetProjectBriefInput(input)),
     exploreKnowledgeGraph: (input) => runtime.exploreKnowledgeGraph(toExploreKnowledgeGraphInput(input)),
     searchMemberExperience(input) {
       return runtime.searchContext({
@@ -430,6 +432,12 @@ function toLinkKnowledgeInput(input: MeshLinkKnowledgeInput): Parameters<DevMesh
 function toScanProjectKnowledgeInput(input: MeshScanProjectKnowledgeInput): MeshScanProjectKnowledgeInput {
   return {
     limit: input.limit
+  };
+}
+
+function toGetProjectBriefInput(input: MeshGetProjectBriefInput): { project?: string } {
+  return {
+    project: input.project
   };
 }
 

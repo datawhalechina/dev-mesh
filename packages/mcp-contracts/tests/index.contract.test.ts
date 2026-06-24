@@ -17,6 +17,7 @@ import {
   meshCaptureKnowledgeInputSchema,
   meshDeleteKnowledgeInputSchema,
   meshExploreKnowledgeGraphInputSchema,
+  meshGetProjectBriefInputSchema,
   meshGetKnowledgeInputSchema,
   meshGetStatusInputSchema,
   meshLinkKnowledgeInputSchema,
@@ -277,6 +278,7 @@ describe('MCP tool contract schemas', () => {
       searchMemberExperience: vi.fn(async () => ({ query: 'auth', items: [] })),
       resolveTerm: vi.fn(async () => [{ id: 'ki_term', title: 'Term item' }]),
       scanProjectKnowledge: vi.fn(async () => ({ projectRoot: '/tmp/project', findings: [] })),
+      getProjectBrief: vi.fn(async () => ({ projectId: 'frontend-dashboard', groupKey: 'frontend', items: [] })),
       graphPath: vi.fn(async () => ({
         sourceNodeId: 'knowledge:ki_1',
         targetNodeId: 'knowledge:ki_2',
@@ -379,6 +381,15 @@ describe('MCP tool contract schemas', () => {
       })
     );
 
+    const briefIndex = registered.findIndex((tool) => tool.name === 'mesh_get_project_brief');
+    const briefResult = await registered[briefIndex]?.callback({});
+    expect(readRegisteredToolText(briefResult)).toContain('Project brief');
+    expect(handlers.getProjectBrief).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: 'auto'
+      })
+    );
+
     vi.mocked(handlers.getStatus).mockResolvedValueOnce('DevMesh status');
     const textResult = await registered[0]?.callback({});
 
@@ -434,6 +445,7 @@ describe('MCP tool contract schemas', () => {
         searchMemberExperience: vi.fn(async () => ({})),
         resolveTerm: vi.fn(async () => ({})),
         scanProjectKnowledge: vi.fn(async () => ({})),
+        getProjectBrief: vi.fn(async () => ({})),
         graphPath: vi.fn(async () => ({})),
         exploreKnowledgeGraph: vi.fn(async () => ({}))
       },
@@ -445,7 +457,8 @@ describe('MCP tool contract schemas', () => {
     );
 
     expect(registered).not.toContain('mesh_graph_path');
-    expect(MESH_POWER_TOOL_NAMES).toEqual(['mesh_graph_path']);
+    expect(registered).not.toContain('mesh_get_project_brief');
+    expect(MESH_POWER_TOOL_NAMES).toEqual(['mesh_get_project_brief', 'mesh_graph_path']);
   });
 
   it('registers power tools when power capability is enabled', () => {
@@ -478,6 +491,7 @@ describe('MCP tool contract schemas', () => {
         searchMemberExperience: vi.fn(async () => ({})),
         resolveTerm: vi.fn(async () => ({})),
         scanProjectKnowledge: vi.fn(async () => ({})),
+        getProjectBrief: vi.fn(async () => ({})),
         graphPath: vi.fn(async () => ({})),
         exploreKnowledgeGraph: vi.fn(async () => ({}))
       },
@@ -527,6 +541,7 @@ describe('MCP tool contract schemas', () => {
         searchMemberExperience: vi.fn(async () => ({})),
         resolveTerm: vi.fn(async () => ({})),
         scanProjectKnowledge: vi.fn(async () => ({})),
+        getProjectBrief: vi.fn(async () => ({})),
         graphPath: vi.fn(async () => ({})),
         exploreKnowledgeGraph: vi.fn(async () => ({}))
       },

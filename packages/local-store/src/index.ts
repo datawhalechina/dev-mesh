@@ -133,6 +133,7 @@ export {
   filterProjectKnowledgeEdgesByBranchScope,
   listProjectKnowledgeEdges
 } from './knowledge-edges.js';
+export { createProjectBrief } from './project-brief.js';
 export {
   appendKnowledgeRating,
   captureProjectKnowledge,

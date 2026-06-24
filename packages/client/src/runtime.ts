@@ -25,6 +25,7 @@ import {
   acceptPendingKnowledge,
   captureProjectKnowledge,
   captureProjectTask,
+  createProjectBrief,
   createProjectKnowledgeEdge,
   deleteProjectKnowledge,
   enqueuePendingKnowledge,
@@ -182,6 +183,7 @@ export interface DevMeshClientRuntime {
   setBranchPolicy(input: KnowledgeBranchPolicyInput): Promise<KnowledgeBranchListResult>;
   searchContext(input: BuildContextPackInput): Promise<unknown>;
   scanProjectKnowledge(input?: ProjectKnowledgeScanInput): Promise<unknown>;
+  getProjectBrief(input?: { project?: string; limit?: number }): Promise<unknown>;
   exportKnowledge(input?: ExportProjectKnowledgeInput): Promise<ExportProjectKnowledgeResult>;
   exploreKnowledgeGraph(input?: BranchScopedGraphExploreInput): Promise<ProjectKnowledgeGraphExploreResult>;
   findKnowledgeGraphPath(input?: BranchScopedGraphPathInput): Promise<ProjectKnowledgeGraphPathResult>;
@@ -453,6 +455,9 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
     },
     async scanProjectKnowledge(input = {}) {
       return readProjectKnowledgeScan(projectRoot, input);
+    },
+    async getProjectBrief(input = {}) {
+      return createProjectBrief(core, input);
     },
     exportKnowledge: (input = {}) => exportProjectCrdtKnowledgeJsonl(projectRoot, input),
     async exploreKnowledgeGraph(input = {}) {

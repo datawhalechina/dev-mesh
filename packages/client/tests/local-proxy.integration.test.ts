@@ -212,6 +212,11 @@ describe('local MCP proxy', () => {
         arguments: {}
       });
       const projectionRebuildText = readTextToolResult(projectionRebuildResult);
+      const briefResult = await client.callTool({
+        name: 'mesh_get_project_brief',
+        arguments: {}
+      });
+      const briefText = readTextToolResult(briefResult);
       const knowledgeJsonl = await readFile(
         join(projectRoot, '.dev-mesh', 'knowledge', 'canonical', 'entries.jsonl'),
         'utf8'
@@ -250,6 +255,7 @@ describe('local MCP proxy', () => {
           'mesh_search_member_experience',
           'mesh_resolve_term',
           'mesh_scan_project_knowledge',
+          'mesh_get_project_brief',
           'mesh_graph_path',
           'mesh_explore_knowledge_graph'
         ])
@@ -309,6 +315,8 @@ describe('local MCP proxy', () => {
       expect(deletedText).toContain('event: kind=knowledge.deleted');
       expect(projectionRebuildText).toContain('Projection rebuilt');
       expect(projectionRebuildText).toContain('documents:');
+      expect(briefText).toContain('Project brief');
+      expect(briefText).toContain('projectId: auto');
       expect(knowledgeJsonl).toContain('"title":"Local proxy captures knowledge"');
       expect(knowledgeJsonl).toContain('"branch":"frontend"');
       expect(knowledgeJsonl).toContain('"status":"tombstone"');

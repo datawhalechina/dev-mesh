@@ -190,6 +190,10 @@ export const meshScanProjectKnowledgeInputSchema = z.object({
   limit: z.number().int().min(1).max(200).default(50)
 });
 
+export const meshGetProjectBriefInputSchema = z.object({
+  project: z.string().min(1).default('auto')
+});
+
 const knowledgeGraphNodeKinds = ['knowledge', 'para', 'type', 'tag', 'member', 'source'] as const;
 const knowledgeGraphEdgeKinds = [
   'authored_by',
@@ -332,6 +336,7 @@ export interface MeshToolHandlers {
   searchMemberExperience(input: MeshSearchMemberExperienceInput): Promise<unknown>;
   resolveTerm(input: MeshResolveTermInput): Promise<unknown>;
   scanProjectKnowledge(input: MeshScanProjectKnowledgeInput): Promise<unknown>;
+  getProjectBrief(input: MeshGetProjectBriefInput): Promise<unknown>;
   graphPath(input: MeshGraphPathInput): Promise<unknown>;
   exploreKnowledgeGraph(input: MeshExploreKnowledgeGraphInput): Promise<unknown>;
   adminGraphOverview?(input: MeshAdminGraphOverviewInput): Promise<unknown>;
@@ -363,6 +368,7 @@ export type MeshToolName =
   | 'mesh_resolve_term'
   | 'mesh_scan_project_knowledge'
   | 'mesh_graph_path'
+  | 'mesh_get_project_brief'
   | 'mesh_admin_graph_overview'
   | 'mesh_admin_member_activity'
   | 'mesh_admin_quality_review'
@@ -394,7 +400,7 @@ export const MESH_CORE_TOOL_NAMES = [
   'mesh_explore_knowledge_graph'
 ] as const satisfies readonly MeshToolName[];
 
-export const MESH_POWER_TOOL_NAMES = ['mesh_graph_path'] as const satisfies readonly MeshToolName[];
+export const MESH_POWER_TOOL_NAMES = ['mesh_get_project_brief', 'mesh_graph_path'] as const satisfies readonly MeshToolName[];
 
 export const MESH_ADMIN_TOOL_NAMES = [
   'mesh_admin_graph_overview',
@@ -663,6 +669,21 @@ export function registerMeshTools(
 
   if (powerEnabled) {
     server.registerTool(
+      'mesh_get_project_brief',
+      {
+        title: 'Get project brief',
+        description:
+          'Get the project brief before starting a task so the agent can inspect canonical project knowledge, related tasks, durable area experience, and recent handoff context.',
+        inputSchema: meshGetProjectBriefInputSchema.shape
+      },
+      async (args) =>
+        textToolResult(
+          'mesh_get_project_brief',
+          await handlers.getProjectBrief(meshGetProjectBriefInputSchema.parse(args))
+        )
+    );
+
+    server.registerTool(
       'mesh_graph_path',
       {
         title: 'Find knowledge graph path',
@@ -831,6 +852,8 @@ export function formatMeshToolOutput(toolName: MeshToolName, value: unknown): st
       return formatProjectScan(value);
     case 'mesh_graph_path':
       return formatKnowledgeGraphPath(value);
+    case 'mesh_get_project_brief':
+      return formatProjectBrief(value);
     case 'mesh_admin_graph_overview':
       return formatAdminGraphOverview(value);
     case 'mesh_admin_member_activity':
@@ -1153,6 +1176,28 @@ function formatProjectScan(value: unknown): string {
 
   if (typeof value.instruction === 'string') {
     lines.push(`instruction: ${truncate(value.instruction)}`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatProjectBrief(value: unknown): string {
+  if (!isRecord(value)) {
+    return formatGeneric(value);
+  }
+
+  const items = toRecordArray(value.items);
+  const lines = ['Project brief'];
+  pushField(lines, 'projectId', value.projectId);
+  pushField(lines, 'groupKey', value.groupKey);
+  lines.push(`items: ${items.length}`);
+
+  for (const [index, item] of items.slice(0, 8).entries()) {
+    lines.push(formatKnowledgeListItem(index + 1, item));
+  }
+
+  if (items.length === 0) {
+    lines.push('No brief items returned.');
   }
 
   return lines.join('\n');

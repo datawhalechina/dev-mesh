@@ -3401,6 +3401,7 @@ describe('hub server HTTP integration', () => {
           'mesh_search_context',
           'mesh_capture_knowledge',
           'mesh_link_knowledge',
+          'mesh_get_project_brief',
           'mesh_graph_path'
         ])
       );
@@ -3465,11 +3466,18 @@ describe('hub server HTTP integration', () => {
         }
       });
       const contextText = readTextToolResult(search);
+      const brief = await client.callTool({
+        name: 'mesh_get_project_brief',
+        arguments: {}
+      });
+      const briefText = readTextToolResult(brief);
 
       expect(contextText).toContain('query: streamable HTTP');
       expect(contextText).toContain(`id=${capturedId}`);
       expect(contextText).toContain('MCP streamable HTTP capture');
       expect(contextText).toContain('qualityScore=');
+      expect(briefText).toContain('Project brief');
+      expect(briefText).toContain('projectId: auto');
       expect(edgeText).toContain('Linked knowledge');
       expect(edgeText).toContain('kind: supersedes');
       expect(edgeText).toContain(`fromId: ${capturedId}`);

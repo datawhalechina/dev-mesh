@@ -33,6 +33,7 @@ import {
 import {
   captureProjectKnowledge,
   captureProjectTask,
+  createProjectBrief,
   createProjectKnowledgeEdge,
   deleteProjectKnowledge,
   readProjectProjectionStatus,
@@ -282,7 +283,7 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
         limit: input.limit
       });
     },
-    async scanProjectKnowledge(input: MeshScanProjectKnowledgeInput) {
+  async scanProjectKnowledge(input: MeshScanProjectKnowledgeInput) {
       return {
         projectRoot: core.projectRoot,
         instruction: 'Project-wide scanning is only meaningful in the local daemon where Git and filesystem access are available.',
@@ -294,6 +295,9 @@ export function createMeshMcpServer(core: DevMeshCore, options: MeshMcpServerOpt
           todoFiles: []
         }
       };
+    },
+    async getProjectBrief(input) {
+      return createProjectBrief(core, input);
     },
     async graphPath(input: MeshGraphPathInput) {
       const branchCore = coreForBranch(input.branch, core);

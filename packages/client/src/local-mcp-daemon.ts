@@ -17,6 +17,7 @@ import type {
   MeshDeleteKnowledgeInput,
   MeshGraphPathInput,
   MeshExploreKnowledgeGraphInput,
+  MeshGetProjectBriefInput,
   MeshGetKnowledgeInput,
   MeshGetStatusInput,
   MeshLinkKnowledgeInput,
@@ -355,6 +356,12 @@ function createDaemonAwareHandlers(
         )
       );
     },
+    async getProjectBrief(input: MeshGetProjectBriefInput) {
+      return formatMeshToolOutput(
+        'mesh_get_project_brief',
+        await callDaemonOrLocal('mesh_get_project_brief', input, () => localHandlers.getProjectBrief(input), options)
+      );
+    },
     async graphPath(input) {
       return formatMeshToolOutput(
         'mesh_graph_path',
@@ -408,10 +415,11 @@ async function callDaemonOrLocal(
     | MeshCaptureKnowledgeInput
     | MeshUpdateKnowledgeInput
     | MeshDeleteKnowledgeInput
-    | MeshCaptureTaskInput
-    | MeshGraphPathInput
-    | MeshExploreKnowledgeGraphInput
-    | MeshLinkKnowledgeInput
+  | MeshCaptureTaskInput
+  | MeshGraphPathInput
+  | MeshExploreKnowledgeGraphInput
+  | MeshGetProjectBriefInput
+  | MeshLinkKnowledgeInput
     | MeshScanProjectKnowledgeInput
     | MeshRateKnowledgeInput
     | MeshSearchMemberExperienceInput
