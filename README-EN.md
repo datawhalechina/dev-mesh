@@ -143,7 +143,7 @@ docker run -d --name devmesh-web-admin \
 Or use `docker compose` to start everything (including PostgreSQL) in one command:
 
 ```bash
-curl -O https://raw.githubusercontent.com/datawhalechina/dev-mesh/main/deploy/docker-compose.yml
+curl -O https://raw.githubusercontent.com/datawhalechina/dev-mesh/main/deploy/docker-compose.deploy.yml
 docker compose -f docker-compose.yml up -d
 ```
 

@@ -126,7 +126,7 @@ docker run -d --name devmesh-web-admin   -p 5173:80   xy200303/devmesh-web-admin
 或者用 `docker compose` 一键启动所有服务（含 PostgreSQL）：
 
 ```bash
-curl -O https://raw.githubusercontent.com/datawhalechina/dev-mesh/main/deploy/docker-compose.yml
+curl -O https://raw.githubusercontent.com/datawhalechina/dev-mesh/main/deploy/docker-compose.deploy.yml
 docker compose -f docker-compose.yml up -d
 ```
 
