@@ -278,7 +278,7 @@ describe('MCP tool contract schemas', () => {
       searchMemberExperience: vi.fn(async () => ({ query: 'auth', items: [] })),
       resolveTerm: vi.fn(async () => [{ id: 'ki_term', title: 'Term item' }]),
       scanProjectKnowledge: vi.fn(async () => ({ projectRoot: '/tmp/project', findings: [] })),
-      getProjectBrief: vi.fn(async () => ({ projectId: 'frontend-dashboard', groupKey: 'frontend', items: [] })),
+      getProjectBrief: vi.fn(async () => ({ projectId: 'frontend-dashboard', branch: 'frontend', items: [] })),
       graphPath: vi.fn(async () => ({
         sourceNodeId: 'knowledge:ki_1',
         targetNodeId: 'knowledge:ki_2',

@@ -24,7 +24,7 @@ describe('PostgreSQL Hub state store', () => {
       invites: [
         {
           token: 'inv_design',
-          groupKey: 'design'
+          branch: 'design'
         }
       ]
     });
@@ -32,7 +32,7 @@ describe('PostgreSQL Hub state store', () => {
     state.members.set('member_design_alice', {
       memberId: 'member_design_alice',
       clientId: 'client_design_alice',
-      groupKey: 'design',
+      branch: 'design',
       displayName: 'Alice',
       handle: 'alice',
       joinedAt: '2026-06-07T00:00:00.000Z',
@@ -42,14 +42,14 @@ describe('PostgreSQL Hub state store', () => {
       token: 'mesh_original',
       memberId: 'member_design_alice',
       clientId: 'client_design_alice',
-      groupKey: 'design',
+      branch: 'design',
       syncSigningSecret: 'sync_design_secret',
       expiresAt: '2026-06-14T00:00:00.000Z'
     });
     state.projects.set('design:hub-store', {
       id: 'hub-store',
       projectKey: 'hub-store',
-      groupKey: 'design',
+      branch: 'design',
       name: 'Hub Store',
       createdByMemberId: 'member_design_alice',
       createdAt: '2026-06-07T00:00:00.000Z'
@@ -60,7 +60,7 @@ describe('PostgreSQL Hub state store', () => {
       action: 'hub_state.saved',
       targetType: 'hub-state',
       targetId: 'default',
-      groupKey: 'design',
+      branch: 'design',
       createdAt: '2026-06-07T00:00:01.000Z'
     });
 
@@ -77,7 +77,7 @@ describe('PostgreSQL Hub state store', () => {
     });
     expect(restored.invites.get('inv_design')).toMatchObject({
       token: 'inv_design',
-      groupKey: 'design'
+      branch: 'design'
     });
     expect(restored.members.get('member_design_alice')).toMatchObject({
       clientId: 'client_design_alice'
@@ -87,7 +87,7 @@ describe('PostgreSQL Hub state store', () => {
     });
     expect(restored.projects.get('design:hub-store')).toMatchObject({
       id: 'hub-store',
-      groupKey: 'design'
+      branch: 'design'
     });
     expect(restored.auditLogs).toEqual([
       expect.objectContaining({

@@ -159,12 +159,12 @@ describe('local project store', () => {
       expect(initialized.heads.length).toBeGreaterThan(0);
       expect(initialized.doc).toMatchObject({
         schemaVersion: 2,
-        groupKey: 'main',
+        branch: 'main',
         project: {
           id: 'org/repo',
           key: 'org/repo',
           name: 'Repo',
-          groupKey: 'main'
+          branch: 'main'
         },
         knowledge: {},
         relations: {},
@@ -263,7 +263,7 @@ describe('local project store', () => {
       expect(imported.importedAuditEvents).toBeGreaterThanOrEqual(6);
       expect(imported.doc.knowledge[durable.item.id]).toMatchObject({
         title: 'Import through local-store',
-        groupKey: 'main',
+        branch: 'main',
         sourceProjectId: 'org/repo'
       });
       expect(imported.doc.knowledge[obsolete.item.id]).toMatchObject({

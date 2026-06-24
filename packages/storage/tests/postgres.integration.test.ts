@@ -123,7 +123,7 @@ describe('PostgreSQL knowledge repository integration', () => {
           invites: [
             {
               token: 'inv_platform',
-              groupKey: 'platform'
+              branch: 'platform'
             }
           ]
         });
@@ -134,7 +134,7 @@ describe('PostgreSQL knowledge repository integration', () => {
           action: 'hub_state.postgres_saved',
           targetType: 'hub-state',
           targetId: 'default',
-          groupKey: 'platform',
+          branch: 'platform',
           createdAt: '2026-06-07T00:00:00.000Z'
         });
         await store.save(state);
@@ -149,12 +149,12 @@ describe('PostgreSQL knowledge repository integration', () => {
         });
         expect(reloaded.invites.get('inv_platform')).toMatchObject({
           token: 'inv_platform',
-          groupKey: 'platform'
+          branch: 'platform'
         });
         expect(reloaded.auditLogs).toEqual([
           expect.objectContaining({
             action: 'hub_state.postgres_saved',
-            groupKey: 'platform'
+            branch: 'platform'
           })
         ]);
       } finally {
