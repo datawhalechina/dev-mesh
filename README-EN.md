@@ -106,6 +106,49 @@ Local runtime state that should not be committed:
 
 When someone clones a project that already contains DevMesh knowledge, their local DevMesh can load the shared knowledge from the repo. Indexes, daemon state, sync cursors, and sensitive runtime files are regenerated on their machine.
 
+## One-Click Deploy
+
+All server components are available as Docker Hub images:
+
+```bash
+# Pull images
+docker pull xy200303/devmesh-server:alpha
+docker pull xy200303/devmesh-web-admin:alpha
+
+# Start PostgreSQL
+docker run -d --name devmesh-postgres \
+  -e POSTGRES_DB=devmesh -e POSTGRES_USER=devmesh -e POSTGRES_PASSWORD=devmesh \
+  -v devmesh-pg:/var/lib/postgresql/data \
+  postgres:16-alpine
+
+# Start Hub Server
+docker run -d --name devmesh-server \
+  -p 8721:8721 \
+  -e DEV_MESH_HOST=0.0.0.0 \
+  -e DEV_MESH_PORT=8721 \
+  -e DEV_MESH_BASE_URL=http://127.0.0.1:8721 \
+  -e DEV_MESH_PROJECT_ROOT=/data/devmesh \
+  -e DEV_MESH_POSTGRES_URL=postgres://devmesh:devmesh@devmesh-postgres:5432/devmesh \
+  -e DEV_MESH_POSTGRES_KNOWLEDGE_TABLE=dev_mesh_knowledge_items \
+  -e DEV_MESH_POSTGRES_HUB_STATE_TABLE=dev_mesh_hub_state \
+  --link devmesh-postgres \
+  xy200303/devmesh-server:alpha
+
+# Start Web Admin
+docker run -d --name devmesh-web-admin \
+  -p 5173:80 \
+  xy200303/devmesh-web-admin:alpha
+```
+
+Or use `docker compose` to start everything (including PostgreSQL) in one command:
+
+```bash
+curl -O https://raw.githubusercontent.com/datawhalechina/dev-mesh/main/deploy/docker-compose.yml
+docker compose -f docker-compose.yml up -d
+```
+
+Visit `http://127.0.0.1:5173` for the admin dashboard.
+
 ## Common Commands
 
 | Command | Purpose |

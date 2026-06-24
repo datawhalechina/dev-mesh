@@ -106,6 +106,32 @@ DevMesh 使用“前台 MCP launcher 按需拉起项目 daemon”的模式：
 
 这意味着别人 clone 一个带有 DevMesh 知识的项目后，本地 DevMesh 会加载项目里的共享知识；索引、daemon 状态、同步游标和敏感运行态会在对方机器上重新生成。
 
+## 一键部署
+
+服务端需要的全部组件都打包成了 Docker Hub 镜像，一行命令拉起来：
+
+```bash
+# 拉取镜像
+docker pull xy200303/devmesh-server:alpha
+docker pull xy200303/devmesh-web-admin:alpha
+
+# 启动（需要 PostgreSQL）
+docker run -d --name devmesh-postgres   -e POSTGRES_DB=devmesh -e POSTGRES_USER=devmesh -e POSTGRES_PASSWORD=devmesh   -v devmesh-pg:/var/lib/postgresql/data   postgres:16-alpine
+
+docker run -d --name devmesh-server   -p 8721:8721   -e DEV_MESH_HOST=0.0.0.0   -e DEV_MESH_PORT=8721   -e DEV_MESH_BASE_URL=http://127.0.0.1:8721   -e DEV_MESH_PROJECT_ROOT=/data/devmesh   -e DEV_MESH_POSTGRES_URL=postgres://devmesh:devmesh@devmesh-postgres:5432/devmesh   -e DEV_MESH_POSTGRES_KNOWLEDGE_TABLE=dev_mesh_knowledge_items   -e DEV_MESH_POSTGRES_HUB_STATE_TABLE=dev_mesh_hub_state   --link devmesh-postgres   xy200303/devmesh-server:alpha
+
+docker run -d --name devmesh-web-admin   -p 5173:80   xy200303/devmesh-web-admin:alpha
+```
+
+或者用 `docker compose` 一键启动所有服务（含 PostgreSQL）：
+
+```bash
+curl -O https://raw.githubusercontent.com/datawhalechina/dev-mesh/main/deploy/docker-compose.yml
+docker compose -f docker-compose.yml up -d
+```
+
+部署完成后访问 `http://127.0.0.1:5173` 进入管理后台。
+
 ## 常用命令
 
 | 命令 | 用途 |

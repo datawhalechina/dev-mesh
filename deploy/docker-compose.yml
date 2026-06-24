@@ -16,11 +16,9 @@ services:
       - devmesh-postgres:/var/lib/postgresql/data
 
   mesh-server:
-    image: xy200303/devmesh-server:alpha
-    # To build locally instead, replace the image line above with:
-    # build:
-    #   context: ..
-    #   dockerfile: apps/mesh-server/Dockerfile
+    build:
+      context: ..
+      dockerfile: apps/mesh-server/Dockerfile
     environment:
       DEV_MESH_HOST: 0.0.0.0
       DEV_MESH_PORT: 8721
@@ -44,11 +42,9 @@ services:
       retries: 12
 
   web-admin:
-    image: xy200303/devmesh-web-admin:alpha
-    # To build locally instead, replace the image line above with:
-    # build:
-    #   context: ..
-    #   dockerfile: apps/web-admin/Dockerfile
+    build:
+      context: ..
+      dockerfile: apps/web-admin/Dockerfile
     depends_on:
       mesh-server:
         condition: service_healthy
