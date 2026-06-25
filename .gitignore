@@ -18,3 +18,5 @@ apps/website/docs/.vitepress/cache/
 apps/website/docs/.vitepress/dist/
 apps/website/docs/.vitepress/.temp/
 .tmp/
+
+.dev-mesh/crdt/
