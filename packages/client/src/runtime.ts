@@ -488,12 +488,12 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
         readDaemonSyncHeads(projectRoot)
       ]);
 
-      return {
-        service: 'devmesh',
-        version: DEV_MESH_VERSION,
-        mode: daemonSync.enabled && daemonSync.remotes.length > 0 ? 'remote' : 'local-only',
-        schemaVersion: config.schemaVersion,
-        projectRoot,
+     return {
+       service: 'devmesh',
+       version: DEV_MESH_VERSION,
+       mode: daemonSync?.enabled && daemonSync.remotes.length > 0 ? 'remote' : 'local-only',
+       schemaVersion: config.schemaVersion,
+       projectRoot,
         storeRoot: store.storeRoot,
         knowledgeItems: items.length,
         autoInit: config.automation.autoInit,
