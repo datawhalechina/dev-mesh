@@ -639,6 +639,120 @@ describe('hub server HTTP integration', () => {
     }
   });
 
+  it('recovers v2 CRDT exchange when a persisted snapshot is invalid', async () => {
+    const store = new TestHubStateStore();
+    const { heads, changes } = createAutomergeSyncPayload((doc) => {
+      doc.schemaVersion = 2;
+      doc.knowledge = {
+        ki_snapshot_recovery: {
+          id: 'ki_snapshot_recovery',
+          title: 'Snapshot recovery',
+          summary: 'The hub can replay valid changes if a persisted snapshot is corrupt.'
+        }
+      };
+    });
+    const first = await startHubServer({
+      core: createDevMeshCore(),
+      hubStateStore: store,
+      hub: {
+        groups: [
+          {
+            key: 'frontend-team',
+            displayName: 'Frontend Team'
+          }
+        ],
+        invites: [
+          {
+            token: 'inv_frontend',
+            branch: 'frontend-team'
+          }
+        ]
+      }
+    });
+    let joined: JoinResponseBody | undefined;
+
+    try {
+      joined = (
+        await requestJson<JoinResponseBody>(`${first.url}/api/v1/join`, {
+          method: 'POST',
+          body: {
+            inviteToken: 'inv_frontend',
+            displayName: 'Xiaoyun',
+            handle: 'xiaoyun'
+          }
+        })
+      ).body;
+
+      const pushed = await requestJson(`${first.url}/api/v2/sync/exchange`, {
+        method: 'POST',
+        headers: authHeaders(joined.accessToken),
+        body: {
+          clientId: joined.clientId,
+          projectKey: 'frontend-dashboard',
+          heads,
+          changes
+        }
+      });
+
+      expect(pushed.status).toBe(200);
+    } finally {
+      await first.app.close();
+    }
+
+    if (joined === undefined) {
+      throw new Error('Expected join to complete before snapshot recovery restart.');
+    }
+
+    const corruptedState = await store.load();
+    const document = [...corruptedState.crdtDocuments.values()].find(
+      (candidate): candidate is HubCrdtDocument => candidate.document.kind === 'project'
+    );
+
+    if (document === undefined) {
+      throw new Error('Expected a persisted project CRDT document.');
+    }
+
+    document.snapshot = Buffer.from('not an automerge snapshot', 'utf8').toString('base64');
+    await store.save(corruptedState);
+
+    const second = await startHubServer({
+      core: createDevMeshCore(),
+      hubStateStore: store
+    });
+
+    try {
+      const pulled = await requestJson(`${second.url}/api/v2/sync/exchange`, {
+        method: 'POST',
+        headers: authHeaders(joined.accessToken),
+        body: {
+          clientId: joined.clientId,
+          projectKey: 'frontend-dashboard',
+          heads: [],
+          changes: []
+        }
+      });
+      const recoveredState = await store.load();
+      const recoveredDocument = [...recoveredState.crdtDocuments.values()].find(
+        (candidate): candidate is HubCrdtDocument => candidate.document.kind === 'project'
+      );
+
+      expect(pulled.status).toBe(200);
+      expect(pulled.body).toMatchObject({
+        heads,
+        changes: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.stringMatching(/^am_[a-f0-9]{32}$/),
+            engine: 'automerge',
+            encoding: 'base64'
+          })
+        ])
+      });
+      expect(recoveredDocument?.snapshot).not.toBe(Buffer.from('not an automerge snapshot', 'utf8').toString('base64'));
+    } finally {
+      await second.app.close();
+    }
+  });
+
   it('stores group-scoped sync events with incremental cursors and idempotent retries', async () => {
     const { app, url } = await startHubServer({
       core: createDevMeshCore(),
@@ -3555,7 +3669,7 @@ describe('hub server HTTP integration', () => {
       await adminClient?.close().catch(() => undefined);
       await client.close().catch(() => undefined);
       await app.close();
-      await rm(projectRoot, { recursive: true, force: true });
+      await rm(projectRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   }, 30000);
 

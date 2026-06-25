@@ -799,7 +799,7 @@ function compareKnowledgeItemsForExport(left: KnowledgeItem, right: KnowledgeIte
 
 function createBranchScope(doc: ProjectDoc): BranchScope {
   const group: BranchScope = {
-    branch: doc.project.branch,
+    branch: doc.project.branch ?? 'default',
     sourceProjectId: doc.project.id
   };
 

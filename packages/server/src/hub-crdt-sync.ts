@@ -485,7 +485,16 @@ function getOrCreateHubCrdtDocument(
 
 function loadAutomergeDocument(document: HubCrdtDocument): AutomergeDoc<Record<string, unknown>> {
   if (document.snapshot !== undefined) {
-    return Automerge.load<Record<string, unknown>>(decodeBase64(document.snapshot) ?? new Uint8Array());
+    const decodedSnapshot = decodeBase64(document.snapshot);
+
+    if (decodedSnapshot !== undefined) {
+      try {
+        return Automerge.load<Record<string, unknown>>(decodedSnapshot);
+      } catch {
+        // Fall through and rebuild from retained changes. Older prerelease builds
+        // could persist an invalid snapshot; one bad snapshot must not brick sync.
+      }
+    }
   }
 
   let doc = Automerge.init<Record<string, unknown>>();
@@ -497,8 +506,13 @@ function loadAutomergeDocument(document: HubCrdtDocument): AutomergeDoc<Record<s
       continue;
     }
 
-    const [nextDoc] = Automerge.applyChanges(doc, [decoded] as AutomergeBinaryChange[]);
-    doc = nextDoc;
+    try {
+      const [nextDoc] = Automerge.applyChanges(doc, [decoded] as AutomergeBinaryChange[]);
+      doc = nextDoc;
+    } catch {
+      // Keep the hub available even if a historical retained change is corrupt.
+      // The following exchange will persist a fresh snapshot from valid state.
+    }
   }
 
   return doc;
