@@ -20,9 +20,9 @@ services:
       context: ..
       dockerfile: apps/mesh-server/Dockerfile
     environment:
-      DEV_MESH_HOST: 0.0.0.0
+      DEV_MESH_HOST: ${DEV_MESH_HOST:-0.0.0.0}
       DEV_MESH_PORT: 8721
-      DEV_MESH_BASE_URL: http://127.0.0.1:8721
+      DEV_MESH_BASE_URL: ${DEV_MESH_BASE_URL:-http://localhost:8721}
       DEV_MESH_PROJECT_ROOT: /data/devmesh
       DEV_MESH_POSTGRES_URL: postgres://devmesh:devmesh@postgres:5432/devmesh
       DEV_MESH_POSTGRES_KNOWLEDGE_TABLE: dev_mesh_knowledge_items
@@ -45,6 +45,8 @@ services:
     build:
       context: ..
       dockerfile: apps/web-admin/Dockerfile
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://mesh-server:8721}
     depends_on:
       mesh-server:
         condition: service_healthy
