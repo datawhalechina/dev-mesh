@@ -7,7 +7,7 @@ export function registerJoinCommand(program: Command): void {
     .command('join')
     .description('Join a remote DevMesh server group')
     .argument('<server>', 'server URL, IP, or host:port')
-    .requiredOption('--group <branch>', 'server group key')
+    .requiredOption('--branch <branch>', 'server group key')
     .requiredOption('--name <displayName>', 'member display name')
     .option('--handle <handle>', 'member handle')
     .requiredOption('--token <inviteToken>', 'invite token')
@@ -16,7 +16,7 @@ export function registerJoinCommand(program: Command): void {
     .action(async (server: string, options: JoinCommandOptions) => {
       const joinOptions: JoinServerOptions = {
         serverUrl: server,
-        branch: options.group,
+        branch: options.branch,
         displayName: options.name,
         inviteToken: options.token
       };
@@ -48,7 +48,7 @@ function formatJoinResult(result: JoinServerResult): string {
 type JoinServerResult = Awaited<ReturnType<typeof joinServerGroup>>;
 
 interface JoinCommandOptions {
-  group: string;
+  branch: string;
   name: string;
   handle?: string;
   token: string;

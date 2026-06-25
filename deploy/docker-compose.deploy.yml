@@ -47,7 +47,7 @@ services:
       mesh-server:
         condition: service_healthy
     ports:
-      - "0.0.0.0:5173:80"
+      - "0.0.0.0:5180:80"
 
 volumes:
   devmesh-postgres:

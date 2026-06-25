@@ -491,7 +491,7 @@ export function createDevMeshClientRuntime(options: DevMeshClientOptions = {}): 
       return {
         service: 'devmesh',
         version: DEV_MESH_VERSION,
-        mode: 'local-only',
+        mode: daemonSync.enabled && daemonSync.remotes.length > 0 ? 'remote' : 'local-only',
         schemaVersion: config.schemaVersion,
         projectRoot,
         storeRoot: store.storeRoot,

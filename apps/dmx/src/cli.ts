@@ -15,6 +15,7 @@ import { registerProxyCommand } from './commands/proxy.js';
 import { registerRateCommand } from './commands/rate.js';
 import { registerSearchCommand } from './commands/search.js';
 import { registerServeCommand } from './commands/serve.js';
+import { registerSyncCommand } from './commands/sync.js';
 import { registerStatusCommand } from './commands/status.js';
 
 export function createDmxProgram(): Command {
@@ -35,7 +36,7 @@ export function createDmxProgram(): Command {
   registerGraphCommand(program);
   registerDoctorCommand(program);
   registerProxyCommand(program);
-  registerServeCommand(program);
+  registerServeCommand(program);`n  registerSyncCommand(program);
 
   return program;
 }

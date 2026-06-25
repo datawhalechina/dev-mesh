@@ -31,6 +31,7 @@ import {
   type MeshSearchContextInput,
   type MeshUpdateKnowledgeInput
 } from '@devmesh/mcp-contracts';
+import { runDaemonSyncOnce } from './daemon-sync.js';
 import type { DevMeshClientRuntime } from './runtime.js';
 
 export function createLocalMeshMcpServer(runtime: DevMeshClientRuntime): McpServer {
@@ -53,6 +54,19 @@ export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers)
       power: true
     }
   });
+
+  // Manual sync trigger
+  mcp.registerTool(
+    'mesh_trigger_sync',
+    {
+      title: 'Trigger manual sync',
+      description: 'Immediately trigger a CRDT sync exchange with all joined remote servers.'
+    },
+    async (_, extra) => {
+      const status = await runDaemonSyncOnce();
+      return { content: [{ type: 'text', text: JSON.stringify(status, null, 2) }] };
+    }
+  );
 
   return mcp;
 }
