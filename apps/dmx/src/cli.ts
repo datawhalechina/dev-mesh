@@ -36,7 +36,8 @@ export function createDmxProgram(): Command {
   registerGraphCommand(program);
   registerDoctorCommand(program);
   registerProxyCommand(program);
-  registerServeCommand(program);`n  registerSyncCommand(program);
+  registerServeCommand(program);
+  registerSyncCommand(program);
 
   return program;
 }

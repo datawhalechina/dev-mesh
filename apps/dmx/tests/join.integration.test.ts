@@ -38,8 +38,8 @@ describe('dmx CLI join', () => {
         [
           'join',
           serverUrl,
-          '--group',
-          'frontend-team',
+           '--branch',
+           'frontend-team',
           '--name',
           'Xiaoyun',
           '--handle',

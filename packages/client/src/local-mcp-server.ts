@@ -62,7 +62,7 @@ export function createLocalMeshMcpServerWithHandlers(handlers: MeshToolHandlers)
       title: 'Trigger manual sync',
       description: 'Immediately trigger a CRDT sync exchange with all joined remote servers.'
     },
-    async (_, extra) => {
+    async (extra) => {
       const status = await runDaemonSyncOnce();
       return { content: [{ type: 'text', text: JSON.stringify(status, null, 2) }] };
     }

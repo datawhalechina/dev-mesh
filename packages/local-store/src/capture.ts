@@ -108,7 +108,7 @@ export async function captureProjectTask(
 }
 
 async function resolveCaptureBranch(projectRoot: string, options: ProjectCaptureOptions): Promise<string> {
-  return options.branch ?? (await readProjectBranchScope(projectRoot)).active;
+  return options.branch ?? (await readProjectBranchScope(projectRoot)).active ?? 'default';
 }
 
 function withKnowledgeBranch(input: CaptureKnowledgeInput, branch: string): CaptureKnowledgeInput {
