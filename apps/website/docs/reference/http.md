@@ -83,7 +83,7 @@ DEV_MESH_HUB_URL=https://your-devmesh-hub.example.com
 | --- | --- | --- | --- |
 | `POST` | `/api/v1/sync/push` | bearer | 推送本地事件。 |
 | `GET` | `/api/v1/sync/pull?cursor=<cursor>` | bearer | 拉取远端事件。 |
-| `GET` | `/api/v1/federation/sync-events?groupKey=<group>&cursor=<cursor>&limit=<n>` | bearer | 读取带 hash log metadata 的同步事件日志。 |
+| `GET` | `/api/v1/federation/sync-events?branch=<branch>&cursor=<cursor>&limit=<n>` | bearer | 读取带 hash log metadata 的同步事件日志。 |
 | `GET` | `/api/v1/projects` | bearer | 列出当前成员可访问项目。 |
 | `POST` | `/api/v1/projects` | bearer | 创建项目。 |
 | `GET` | `/api/v1/projects/:id/brief` | bearer | 生成项目知识 brief。 |

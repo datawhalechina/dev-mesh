@@ -67,7 +67,7 @@ Join a shared team Hub:
 
 ```bash
 dmx join https://your-devmesh-hub.example.com \
-  --group frontend \
+  --branch frontend \
   --name Alice \
   --token <invite-token>
 ```
@@ -154,7 +154,7 @@ Visit `http://127.0.0.1:5173` for the admin dashboard.
 | Command | Purpose |
 | --- | --- |
 | `dmx init` | Configure local MCP hosts or initialize the current project. |
-| `dmx join <server>` | Join a team Hub group and enable optional sync. |
+| `dmx join <server>` | Join a team Hub branch and enable optional sync. |
 | `dmx status` | Show version, project store, daemon, and knowledge counts. |
 | `dmx doctor` | Check store, privacy, sync, daemon, and MCP host configuration. |
 | `dmx capture` | Manually capture a knowledge item or queue it for review. |

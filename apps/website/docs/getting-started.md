@@ -82,7 +82,7 @@ dmx status
 本地使用不需要 Hub Server。团队要共享知识时，再让管理员部署 Hub Server，并用邀请链接加入：
 
 ```powershell
-dmx join https://your-devmesh-hub.example.com --group default --name local --token <invite-token>
+dmx join https://your-devmesh-hub.example.com --branch default --name local --token <invite-token>
 ```
 
 加入后，项目 daemon 会在 `auto_sync` 开启时自动 push / pull，把远端知识回放到本地 `.dev-mesh/knowledge/`，供搜索和图谱探索使用。

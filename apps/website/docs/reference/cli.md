@@ -68,13 +68,13 @@ dmx init --global --tool codex --tool claude --scope user
 ### `dmx join <server>`
 
 ```bash
-dmx join https://your-devmesh-hub.example.com --group default --name Alice --token <invite-token>
+dmx join https://your-devmesh-hub.example.com --branch default --name Alice --token <invite-token>
 ```
 
 | 参数 | 说明 |
 | --- | --- |
 | `<server>` | Hub Server URL、IP 或 `host:port`。 |
-| `--group <groupKey>` | 团队组 key。 |
+| `--branch <branch>` | 团队 branch。 |
 | `--name <displayName>` | 成员显示名。 |
 | `--handle <handle>` | 可选成员 handle。 |
 | `--token <inviteToken>` | 邀请 token。 |

@@ -37,7 +37,7 @@ packages/
 Hub Server 提供团队化能力：
 
 - 项目和成员注册。
-- 邀请 token 和 group 加入流程。
+- 邀请 token 和 branch 加入流程。
 - 同步状态管理。
 - Hub 状态持久化。
 - 管理 API 和管理后台。

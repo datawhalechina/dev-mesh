@@ -67,7 +67,7 @@ dmx search "release workflow"
 
 ```bash
 dmx join https://your-devmesh-hub.example.com \
-  --group frontend \
+  --branch frontend \
   --name Alice \
   --token <invite-token>
 ```
@@ -137,7 +137,7 @@ docker compose -f docker-compose.yml up -d
 | 命令 | 用途 |
 | --- | --- |
 | `dmx init` | 初始化本机 MCP host 配置，或初始化当前项目。 |
-| `dmx join <server>` | 加入团队 Hub group，启用可选同步。 |
+| `dmx join <server>` | 加入团队 Hub branch，启用可选同步。 |
 | `dmx status` | 查看版本、项目 store、daemon 和知识数量。 |
 | `dmx doctor` | 检查本地 store、隐私、同步、daemon 和 MCP host 配置。 |
 | `dmx capture` | 手动写入一条知识，或放入 review inbox。 |
