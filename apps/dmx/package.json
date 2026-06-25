@@ -1,6 +1,6 @@
 {
   "name": "devmesh",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "DevMesh local-first project context CLI",
   "type": "module",
   "repository": {
