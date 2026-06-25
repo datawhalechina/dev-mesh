@@ -32,7 +32,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "8721:8721"
+      - "0.0.0.0:8721:8721"
     volumes:
       - devmesh-server-data:/data/devmesh
     healthcheck:
@@ -51,7 +51,7 @@ services:
       mesh-server:
         condition: service_healthy
     ports:
-      - "5173:80"
+      - "0.0.0.0:5173:80"
 
   # website:
   #   build:
