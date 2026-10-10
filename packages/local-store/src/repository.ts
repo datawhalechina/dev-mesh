@@ -6,7 +6,8 @@ import {
   type KnowledgeRepository,
   type SearchKnowledgeInput
 } from '@devmesh/core';
-import { appendJsonLine, getKnowledgeFile } from './files.js';
+import { getProjectAutomergePath } from '@devmesh/crdt-store';
+import { appendJsonLine, getKnowledgeFile, pathExists } from './files.js';
 import {
   filterAndRankKnowledgeItems,
   filterKnowledgeItems,
@@ -15,7 +16,11 @@ import {
 } from './knowledge-files.js';
 import { ensureProjectStore, readProjectBranchScope } from './project-store.js';
 import { trySearchProjectIndex } from './indexer.js';
-import { loadBranchKnowledgeItemsFromCrdt } from './crdt.js';
+import {
+  loadBranchKnowledgeItemsFromCrdt,
+  loadProjectKnowledgeItemsFromCrdt,
+  upsertProjectKnowledgeToCrdt
+} from './crdt.js';
 import type { ProjectBranchScope } from './types.js';
 
 export class JsonlKnowledgeRepository implements KnowledgeRepository {
@@ -28,6 +33,10 @@ export class JsonlKnowledgeRepository implements KnowledgeRepository {
     const store = await ensureProjectStore(this.projectRoot);
 
     await appendJsonLine(getKnowledgeFile(store.paths.knowledgeDir, item.layer), item);
+
+    if (await pathExists(getProjectAutomergePath(store.storeRoot))) {
+      await upsertProjectKnowledgeToCrdt(this.projectRoot, item);
+    }
   }
 
   async get(id: string): Promise<KnowledgeItem | undefined> {
@@ -118,8 +127,16 @@ export class JsonlKnowledgeRepository implements KnowledgeRepository {
     return readProjectBranchScope(this.projectRoot);
   }
 
-  private loadItems(): Promise<KnowledgeItem[]> {
-    return loadProjectKnowledgeItems(this.projectRoot);
+  private async loadItems(): Promise<KnowledgeItem[]> {
+    const items = await loadProjectKnowledgeItems(this.projectRoot);
+    const byId = new Map(items.map((item) => [item.id, item]));
+
+    // CRDT has resolved remote updates and tombstones; stale JSONL timestamps must not override that state.
+    for (const item of await loadProjectKnowledgeItemsFromCrdt(this.projectRoot)) {
+      byId.set(item.id, item);
+    }
+
+    return [...byId.values()];
   }
 }
 

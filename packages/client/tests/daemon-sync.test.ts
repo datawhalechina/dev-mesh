@@ -29,8 +29,97 @@ import {
   runDaemonSyncOnce,
   startDaemonSyncWorker
 } from '../src/daemon-sync.js';
+import { createDevMeshClientRuntime } from '../src/runtime.js';
 
 describe('daemon sync', () => {
+  it('reads synced additions, updates, and tombstones through normal client queries', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dev-mesh-sync-queries-'));
+    const projectRoot = join(root, 'local');
+    const remoteRoot = join(root, 'remote');
+    const globalRoot = join(root, 'global');
+
+    try {
+      for (const directory of [projectRoot, remoteRoot]) {
+        await ensureProjectStore(directory, { projectKey: 'sync-queries' });
+      }
+      await mkdir(globalRoot);
+      await writeFile(join(globalRoot, 'identity.json'), JSON.stringify({
+        joinedServers: [createJoinedServerRecord('queries', 'main')]
+      }));
+      const local = await captureProjectKnowledge(projectRoot, {
+        id: 'kn_local', type: 'decision', title: 'Local decision', summary: 'Keep local work.'
+      });
+      const inactive = await captureProjectKnowledge(projectRoot, {
+        id: 'kn_inactive', type: 'decision', title: 'Inactivebranchtoken', summary: 'Other branch work.'
+      }, { branch: 'other' });
+      const legacy = { ...local.item, id: 'kn_jsonl_only', title: 'Legacy JSONL decision' };
+      const jsonlPath = join(projectRoot, '.dev-mesh', 'knowledge', 'extract', 'entries.jsonl');
+      await writeFile(jsonlPath, `${JSON.stringify(legacy)}\n`, { flag: 'a' });
+      const remote = await captureProjectKnowledge(remoteRoot, {
+        id: 'kn_remote', type: 'decision', title: 'Remotenewtoken', summary: 'Shared decision.'
+      });
+      const fetchStub = async (_input: string | URL, init?: RequestInit): Promise<Response> => {
+        const request = JSON.parse(init?.body as string) as TestCrdtSyncRequest;
+        const remoteChanges = await readProjectCrdtChangesSince(remoteRoot, request.heads);
+        await applyProjectCrdtChanges(remoteRoot, request.changes.map(decodeTestCrdtChange));
+        const remoteState = await readProjectCrdtSyncState(remoteRoot);
+
+        return jsonResponse({
+          document: request.document,
+          acceptedChanges: request.changes.map((change) => ({ id: change.id, headsAfter: remoteState.heads })),
+          rejected: [],
+          heads: remoteState.heads,
+          changes: remoteChanges.changes.map(toTestCrdtSyncChange)
+        });
+      };
+      const sync = () => runDaemonSyncOnce({ projectRoot, globalRoot, fetch: fetchStub });
+      const runtime = createDevMeshClientRuntime({ projectRoot });
+      const remoteRuntime = createDevMeshClientRuntime({ projectRoot: remoteRoot });
+      const status = await sync();
+
+      expect(status.remotes[0]?.lastError).toBeUndefined();
+      expect(status.remotes[0]?.appliedChanges).toBeGreaterThan(0);
+      expect(status.projection.state).toBe('ready');
+      expect.soft(await runtime.getKnowledge(remote.item.id)).toMatchObject({ title: 'Remotenewtoken' });
+      expect.soft((await runtime.listKnowledge()).items.map((item) => item.id)).toEqual(
+        expect.arrayContaining([local.item.id, legacy.id, remote.item.id])
+      );
+      expect.soft((await runtime.core.searchKnowledge({ query: 'Remotenewtoken' })).map((item) => item.id))
+        .toContain(remote.item.id);
+      expect.soft(await runtime.getKnowledge(inactive.item.id)).toMatchObject({ found: false });
+      expect.soft((await runtime.listKnowledge()).items.map((item) => item.id)).not.toContain(inactive.item.id);
+      expect.soft((await runtime.core.searchKnowledge({ query: 'Inactivebranchtoken' })).map((item) => item.id))
+        .not.toContain(inactive.item.id);
+      expect.soft((await runtime.listKnowledge({ branch: 'other' })).items.map((item) => item.id))
+        .toContain(inactive.item.id);
+
+      // A stale JSONL snapshot must not defeat CRDT convergence because of clock skew.
+      await writeFile(jsonlPath, `${JSON.stringify({ ...remote.item, updatedAt: '2099-01-01T00:00:00.000Z' })}\n`, { flag: 'a' });
+      const jsonlBefore = await readFile(jsonlPath, 'utf8');
+      await remoteRuntime.updateKnowledge({ id: remote.item.id, title: 'Remoteupdatedtoken' });
+      await sync();
+
+      expect.soft(await runtime.getKnowledge(remote.item.id)).toMatchObject({ title: 'Remoteupdatedtoken' });
+      expect.soft((await runtime.listKnowledge()).items.find((item) => item.id === remote.item.id))
+        .toMatchObject({ title: 'Remoteupdatedtoken' });
+      expect.soft((await runtime.core.searchKnowledge({ query: 'Remoteupdatedtoken' })).find((item) => item.id === remote.item.id))
+        .toMatchObject({ title: 'Remoteupdatedtoken' });
+
+      await remoteRuntime.deleteKnowledge({ id: remote.item.id });
+      await sync();
+
+      expect.soft(await runtime.getKnowledge(remote.item.id)).toMatchObject({ status: 'tombstone' });
+      expect.soft((await runtime.listKnowledge()).items.map((item) => item.id)).not.toContain(remote.item.id);
+      expect.soft((await runtime.core.searchKnowledge({ query: 'Remoteupdatedtoken' })).map((item) => item.id))
+        .not.toContain(remote.item.id);
+      expect.soft(await runtime.getKnowledge(local.item.id)).toEqual(local.item);
+      expect.soft(await runtime.getKnowledge(legacy.id)).toEqual(legacy);
+      expect.soft(await readFile(jsonlPath, 'utf8')).toBe(jsonlBefore);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('exchanges local and remote CRDT changes and records sync status', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-daemon-sync-project-'));
     const remoteRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-daemon-sync-remote-'));

@@ -105,6 +105,10 @@ Codex Agent -> Client (Daemon) -> CRDT Store (Automerge)
 
 **投影的动机**：Automerge 文档是 CRDT 优化的存储格式，不适合直接做全量搜索或图遍历。投影层将 CRDT 数据的"物化视图"建为高性能索引。
 
+普通知识读取（get/list/search）以 CRDT 文档中同 ID 的当前记录为准，包括 tombstone；尚未进入 CRDT 的 JSONL 条目继续作为兼容回退。分支过滤在合并后的记录上执行。查询不会创建缺失的 CRDT 文档，也不会改写可提交的 JSONL 文件。
+
+已有 CRDT 文档时，repository 的知识写入同时更新 JSONL 和 CRDT，保证直接通过 core 更新、评分或删除后能读回当前记录。重复写入完全相同的记录不会产生额外 CRDT 变更；尚未初始化 CRDT 的旧项目仍保留纯 JSONL 写入行为。
+
 ---
 
 ## 4. 数据模型

@@ -1,5 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import type { KnowledgeItem } from '@devmesh/core';
 import {
   KNOWLEDGE_GRAPH_SEMANTIC_EDGE_KINDS,
@@ -406,6 +407,12 @@ export async function loadProjectKnowledgeItemsFromCrdt(
   projectRoot: string,
   options: RebuildProjectProjectionsFromCrdtOptions = {}
 ): Promise<KnowledgeItem[]> {
+  const store = await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey));
+
+  if (!(await pathExists(getProjectAutomergePath(store.storeRoot)))) {
+    return [];
+  }
+
   const backend = await createProjectCrdtBackend(projectRoot, options);
   const doc = (await backend.load()) as ProjectDoc;
 
@@ -483,13 +490,23 @@ export async function upsertProjectKnowledgeToCrdt(
   options: UpsertProjectKnowledgeToCrdtOptions = {}
 ): Promise<UpsertProjectKnowledgeToCrdtResult> {
   const backend = await createProjectCrdtBackend(projectRoot, options);
+  const current = (await backend.load()) as ProjectDoc;
+  const node = knowledgeItemToNode(item, createBranchScope(current));
+
+  if (isDeepStrictEqual(current.knowledge[item.id], node)) {
+    return {
+      path: getProjectAutomergePath((await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey))).storeRoot),
+      doc: current,
+      heads: await backend.getHeads(),
+      knowledgeId: item.id
+    };
+  }
+
   const changeInput: CrdtChangeInput<AutomergeProjectDoc> = {
     actorId: options.actorId ?? readKnowledgeActorId(item.createdBy),
     summary: options.summary ?? `Upsert knowledge ${item.id}`,
     mutate(doc) {
-      const group = createBranchScope(doc as ProjectDoc);
-
-      doc.knowledge[item.id] = knowledgeItemToNode(item, group);
+      doc.knowledge[item.id] = node;
       doc.project.updatedAt = item.updatedAt;
       return doc;
     }

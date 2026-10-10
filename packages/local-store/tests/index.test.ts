@@ -24,6 +24,7 @@ import {
   readProjectConfig,
   readProjectQualityProjection,
   readProjectProjectionStatus,
+  readProjectCrdtSyncState,
   loadProjectKnowledgeItemsFromCrdt,
   recordKnowledgeUsage,
   rateProjectKnowledge,
@@ -33,10 +34,65 @@ import {
   rejectPendingKnowledge,
   searchProjectIndex,
   writeProjectConfig,
-  updateProjectKnowledge
+  updateProjectKnowledge,
+  upsertProjectKnowledgeToCrdt
 } from '../src/index.js';
 
 describe('local project store', () => {
+  it('reads back direct core mutations when the repository already has a CRDT document', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-core-writes-'));
+
+    try {
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const core = createDevMeshCore({ projectRoot, repository });
+      const captured = await captureProjectKnowledge(projectRoot, {
+        id: 'kn_direct_core', type: 'decision', title: 'Original title', summary: 'Direct repository writes.'
+      });
+      const updated = await core.updateKnowledge({ id: captured.item.id, title: 'Updated title' });
+      expect.soft(await core.getKnowledge(captured.item.id)).toEqual(updated);
+
+      const rated = await core.rateKnowledge({ id: captured.item.id, rating: 1 });
+      expect.soft(await core.getKnowledge(captured.item.id)).toEqual(rated);
+
+      const deleted = await core.deleteKnowledge({ id: captured.item.id });
+      expect.soft(await core.getKnowledge(captured.item.id)).toEqual(deleted);
+      expect.soft(await repository.list()).toEqual([]);
+
+      const before = await readProjectCrdtSyncState(projectRoot);
+      await upsertProjectKnowledgeToCrdt(projectRoot, deleted);
+      const after = await readProjectCrdtSyncState(projectRoot);
+      expect.soft(after.heads).toEqual(before.heads);
+      expect.soft(after.changeCount).toBe(before.changeCount);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps JSONL-only knowledge readable without initializing an empty CRDT document', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-jsonl-only-'));
+
+    try {
+      const store = await ensureProjectStore(projectRoot, { projectKey: 'legacy' });
+      const repository = new JsonlKnowledgeRepository(projectRoot);
+      const item = createKnowledgeItem({
+        id: 'kn_legacy', type: 'decision', title: 'Legacytoken', summary: 'Read shared JSONL knowledge.'
+      });
+      await repository.upsert(item);
+
+      await expect(repository.get(item.id)).resolves.toEqual(item);
+      await expect(repository.list()).resolves.toEqual([item]);
+      await expect(repository.search({ query: 'Legacytoken' })).resolves.toEqual([item]);
+      await expect(loadProjectKnowledgeItemsFromCrdt(projectRoot)).resolves.toEqual([]);
+      await expect(stat(join(store.paths.crdtDir, 'project.automerge'))).rejects.toMatchObject({ code: 'ENOENT' });
+
+      const imported = await importProjectJsonlToCrdt(projectRoot);
+      expect(imported.importedKnowledge).toBe(1);
+      expect(imported.doc.knowledge[item.id]?.title).toBe(item.title);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
   it('bootstraps .dev-mesh and stores knowledge as jsonl', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dev-mesh-'));
 
