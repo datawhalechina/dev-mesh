@@ -1,4 +1,5 @@
 import { stat } from 'node:fs/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { join } from 'node:path';
 import type { KnowledgeItem } from '@devmesh/core';
 import {
@@ -165,11 +166,12 @@ export async function initializeProjectCrdtStore(
 ): Promise<ProjectCrdtStoreResult> {
   const store = await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey));
   const backend = await createProjectCrdtBackend(projectRoot, options);
+  const snapshot = await backend.readSnapshot();
 
   return {
     path: getProjectAutomergePath(store.storeRoot),
-    doc: (await backend.load()) as ProjectDoc,
-    heads: await backend.getHeads()
+    doc: snapshot.doc as ProjectDoc,
+    heads: snapshot.heads
   };
 }
 
@@ -190,12 +192,13 @@ export async function readProjectCrdtSyncState(
   }
 
   const backend = await createProjectCrdtBackend(projectRoot, options);
+  const snapshot = await backend.readChangesSnapshot();
 
   return {
     path,
     initialized: true,
-    heads: await backend.getHeads(),
-    changeCount: (await backend.getAllChanges()).length
+    heads: snapshot.heads,
+    changeCount: snapshot.changeCount
   };
 }
 
@@ -220,23 +223,15 @@ export async function readProjectCrdtChangesSince(
   }
 
   const backend = await createProjectCrdtBackend(projectRoot, options);
-  let changes: Uint8Array[];
-
-  try {
-    changes = await backend.getChangesSince(sinceHeads);
-  } catch {
-    changes = await backend.getAllChanges();
-  }
-
-  const currentHeads = await backend.getHeads();
+  const snapshot = await backend.readChangesSnapshot(sinceHeads);
 
   return {
     path,
     initialized: true,
-    heads: currentHeads,
-    changeCount: (await backend.getAllChanges()).length,
+    heads: snapshot.heads,
+    changeCount: snapshot.changeCount,
     sinceHeads,
-    changes
+    changes: snapshot.changes
   };
 }
 
@@ -263,22 +258,16 @@ export async function readBranchCrdtChangesSince(
   }
 
   const backend = await createBranchCrdtBackend(projectRoot, branchKey, options);
-  let changes: Uint8Array[];
-
-  try {
-    changes = await backend.getChangesSince(sinceHeads);
-  } catch {
-    changes = await backend.getAllChanges();
-  }
+  const snapshot = await backend.readChangesSnapshot(sinceHeads);
 
   return {
     branchKey,
     path,
     initialized: true,
-    heads: await backend.getHeads(),
-    changeCount: (await backend.getAllChanges()).length,
+    heads: snapshot.heads,
+    changeCount: snapshot.changeCount,
     sinceHeads,
-    changes
+    changes: snapshot.changes
   };
 }
 
@@ -320,13 +309,14 @@ export async function readBranchCrdtSyncState(
   }
 
   const backend = await createBranchCrdtBackend(projectRoot, branchKey, options);
+  const snapshot = await backend.readChangesSnapshot();
 
   return {
     branchKey,
     path,
     initialized: true,
-    heads: await backend.getHeads(),
-    changeCount: (await backend.getAllChanges()).length
+    heads: snapshot.heads,
+    changeCount: snapshot.changeCount
   };
 }
 
@@ -360,11 +350,12 @@ export async function importProjectJsonlToCrdt(
 
   if (options.overwrite !== true && (await pathExists(path))) {
     const existing = await createProjectCrdtBackend(projectRoot, options);
+    const snapshot = await existing.readSnapshot();
 
     return {
       path,
-      doc: (await existing.load()) as ProjectDoc,
-      heads: await existing.getHeads(),
+      doc: snapshot.doc as ProjectDoc,
+      heads: snapshot.heads,
       importedKnowledge: 0,
       importedRelations: 0,
       importedQualitySignals: 0,
@@ -387,18 +378,23 @@ export async function importProjectJsonlToCrdt(
   const imported = await importV1JsonlToProjectDoc(importInput);
   const backend = await createProjectCrdtBackend(projectRoot, options, imported.doc);
 
-  await backend.save(imported.doc as AutomergeProjectDoc);
+  let saved: Awaited<ReturnType<typeof backend.saveIfAbsent>>;
+  if (options.overwrite === true) {
+    saved = { ...await backend.saveSnapshot(imported.doc as AutomergeProjectDoc), created: true };
+  } else {
+    saved = await backend.saveIfAbsent(imported.doc as AutomergeProjectDoc);
+  }
 
   return {
     path,
-    doc: (await backend.load()) as ProjectDoc,
-    heads: await backend.getHeads(),
-    importedKnowledge: imported.importedKnowledge,
-    importedRelations: imported.importedRelations,
-    importedQualitySignals: imported.importedQualitySignals,
-    importedAuditEvents: imported.importedAuditEvents,
-    skipped: imported.skipped,
-    sourceFiles: imported.sourceFiles
+    doc: saved.doc as ProjectDoc,
+    heads: saved.heads,
+    importedKnowledge: saved.created ? imported.importedKnowledge : 0,
+    importedRelations: saved.created ? imported.importedRelations : 0,
+    importedQualitySignals: saved.created ? imported.importedQualitySignals : 0,
+    importedAuditEvents: saved.created ? imported.importedAuditEvents : 0,
+    skipped: saved.created ? imported.skipped : 0,
+    sourceFiles: saved.created ? imported.sourceFiles : []
   };
 }
 
@@ -457,7 +453,8 @@ export async function exportProjectCrdtKnowledgeJsonl(
 ): Promise<ExportProjectCrdtKnowledgeJsonlResult> {
   const store = await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey));
   const backend = await createProjectCrdtBackend(projectRoot, options);
-  const doc = (await backend.load()) as ProjectDoc;
+  const snapshot = await backend.readSnapshot();
+  const doc = snapshot.doc as ProjectDoc;
   const crdtPath = getProjectAutomergePath(store.storeRoot);
   const outputPath = options.path ?? join(store.paths.exportsDir, 'knowledge.jsonl');
   const includeTombstones = options.includeTombstones ?? true;
@@ -471,7 +468,7 @@ export async function exportProjectCrdtKnowledgeJsonl(
   return {
     path: outputPath,
     crdtPath,
-    heads: await backend.getHeads(),
+    heads: snapshot.heads,
     exportedKnowledge: items.length,
     skippedTombstones: allItems.length - items.length
   };
@@ -488,8 +485,11 @@ export async function upsertProjectKnowledgeToCrdt(
     summary: options.summary ?? `Upsert knowledge ${item.id}`,
     mutate(doc) {
       const group = createBranchScope(doc as ProjectDoc);
-
-      doc.knowledge[item.id] = knowledgeItemToNode(item, group);
+      const node = knowledgeItemToNode(item, group);
+      const existing = doc.knowledge[item.id];
+      // Draft nodes are Automerge proxies; compare their JSON values.
+      if (existing !== undefined && isDeepStrictEqual(JSON.parse(JSON.stringify(existing)), node)) return doc;
+      doc.knowledge[item.id] = node;
       doc.project.updatedAt = item.updatedAt;
       return doc;
     }
@@ -504,7 +504,7 @@ export async function upsertProjectKnowledgeToCrdt(
   return {
     path: getProjectAutomergePath((await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey))).storeRoot),
     doc: result.doc as ProjectDoc,
-    heads: await backend.getHeads(),
+    heads: result.change.headsAfter,
     knowledgeId: item.id
   };
 }
@@ -547,7 +547,7 @@ export async function createProjectRelationInCrdt(
   return {
     path: getProjectAutomergePath((await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey))).storeRoot),
     doc: result.doc as ProjectDoc,
-    heads: await backend.getHeads(),
+    heads: result.change.headsAfter,
     relationId: input.id
   };
 }
@@ -600,7 +600,7 @@ export async function createProjectQualitySignalInCrdt(
   return {
     path: getProjectAutomergePath((await ensureProjectStore(projectRoot, projectKeyOptions(options.projectKey))).storeRoot),
     doc: result.doc as ProjectDoc,
-    heads: await backend.getHeads(),
+    heads: result.change.headsAfter,
     qualitySignalId: input.id
   };
 }
@@ -613,7 +613,8 @@ export async function rebuildProjectProjectionsFromCrdt(
   const backend = await createProjectCrdtBackend(projectRoot, options);
   const projectionBackend = new LocalProjectionBackend({ indexDir: store.paths.indexDir });
   const crdtPath = getProjectAutomergePath(store.storeRoot);
-  const doc = (await backend.load()) as ProjectDoc;
+  const snapshot = await backend.readSnapshot();
+  const doc = snapshot.doc as ProjectDoc;
   const config = await readProjectConfigFile(store.paths.config);
   const items = mergeKnowledgeItems([
     ...Object.values(doc.knowledge).map(knowledgeNodeToItem),
@@ -627,7 +628,7 @@ export async function rebuildProjectProjectionsFromCrdt(
       ? []
       : await loadBranchKnowledgeEdgesFromCrdt(projectRoot, config.knowledgeBranch.base, options))
   ];
-  const sourceHeads = await backend.getHeads();
+  const sourceHeads = snapshot.heads;
   const rebuilt = await projectionBackend.dropAndRebuild({
     crdtPath,
     sourceHeads,

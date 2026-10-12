@@ -549,6 +549,8 @@ function defaultStoreGitignoreLines(): string[] {
     'visualizations/',
     'queue/',
     'crdt/sync/',
+    'crdt/**/*.lock.sqlite*',
+    'crdt/**/.*.automerge.*.tmp',
     'exports/',
     'secrets/',
     'events/',

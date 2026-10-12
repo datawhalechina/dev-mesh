@@ -13,7 +13,7 @@ Thanks for helping improve DevMesh. This project is still in alpha, so useful co
 
 Requirements:
 
-- Node.js 22+
+- Node.js 22.13+ on the 22.x line, or 23.4+ (the built-in SQLite module must be available without an experimental flag)
 - pnpm 10.6.2+
 
 Install dependencies:

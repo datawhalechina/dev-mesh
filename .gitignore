@@ -20,3 +20,5 @@ apps/website/docs/.vitepress/.temp/
 .tmp/
 
 .dev-mesh/crdt/
+*.automerge.lock.sqlite*
+.*.automerge.*.tmp

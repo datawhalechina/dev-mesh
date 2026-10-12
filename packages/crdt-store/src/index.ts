@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { readFile, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import * as Automerge from '@automerge/automerge';
 import type {
   Change as AutomergeBinaryChange,
@@ -21,6 +21,7 @@ import {
   type ParaRef
 } from '@devmesh/core';
 import { nowIso } from '@devmesh/shared';
+import { replaceFileAtomically, withFileTransaction } from './file-transaction.js';
 
 export const CRDT_STORE_SCHEMA_VERSION = 2;
 export const PROJECT_AUTOMERGE_RELATIVE_PATH = join('crdt', 'project.automerge');
@@ -281,6 +282,17 @@ export interface ApplyAutomergeChangesResult<TDoc> {
   headsBefore: string[];
   headsAfter: string[];
   applied: number;
+}
+
+export interface CrdtFileSnapshot<TDoc> {
+  doc: TDoc;
+  heads: string[];
+}
+
+export interface CrdtFileChangesSnapshot {
+  heads: string[];
+  changeCount: number;
+  changes: Uint8Array[];
 }
 
 export interface ImportV1JsonlToProjectDocInput {
@@ -556,83 +568,113 @@ export class InMemoryCrdtBackend<TDoc> implements CrdtBackend<TDoc> {
 }
 
 export class AutomergeFileCrdtBackend<TDoc extends Record<string, unknown>> implements CrdtBackend<TDoc> {
-  private automergeDoc: AutomergeDoc<TDoc> | undefined;
+  private readonly actorId: string;
 
-  constructor(private readonly options: AutomergeFileCrdtBackendOptions<TDoc>) {}
+  constructor(private readonly options: AutomergeFileCrdtBackendOptions<TDoc>) {
+    this.actorId = options.actorId ?? randomUUID().replaceAll('-', '');
+  }
 
   async load(): Promise<TDoc> {
-    return automergeDocToPlain(await this.loadAutomergeDoc());
+    return (await this.readSnapshot()).doc;
+  }
+
+  async readSnapshot(): Promise<CrdtFileSnapshot<TDoc>> {
+    return this.snapshot(await this.loadAutomergeDoc());
   }
 
   async save(doc: TDoc): Promise<void> {
-    await this.persistAutomergeDoc(createSeededAutomergeDoc(doc, this.options.actorId));
+    await this.saveSnapshot(doc);
+  }
+
+  async saveSnapshot(doc: TDoc): Promise<CrdtFileSnapshot<TDoc>> {
+    return withFileTransaction(this.options.path, async (path) => {
+      const seeded = createSeededAutomergeDoc(doc, this.actorId);
+      await this.persistAutomergeDoc(path, seeded);
+      return this.snapshot(seeded);
+    });
+  }
+
+  async saveIfAbsent(doc: TDoc): Promise<CrdtFileSnapshot<TDoc> & { created: boolean }> {
+    return withFileTransaction(this.options.path, async (path) => {
+      const existing = await this.readAutomergeDoc(path);
+      if (existing !== undefined) return { ...this.snapshot(existing), created: false };
+      const seeded = createSeededAutomergeDoc(doc, this.actorId);
+      await this.persistAutomergeDoc(path, seeded);
+      return { ...this.snapshot(seeded), created: true };
+    });
   }
 
   async getHeads(): Promise<string[]> {
-    return [...Automerge.getHeads(await this.loadAutomergeDoc())];
+    return (await this.readSnapshot()).heads;
   }
 
   async change(input: CrdtChangeInput<TDoc>): Promise<CrdtChangeResult<TDoc>> {
-    const current = await this.loadAutomergeDoc();
-    const headsBefore = [...Automerge.getHeads(current)];
-    const createdAtDate = input.now?.() ?? new Date();
-    const createdAt = createdAtDate.toISOString();
-    const changed = Automerge.change(
-      current,
-      {
-        message: input.summary,
-        time: Math.floor(createdAtDate.getTime() / 1000)
-      },
-      (draft) => {
-        const draftDoc = draft as TDoc;
-        const mutated = input.mutate(draftDoc);
+    return withFileTransaction(this.options.path, async (path) => {
+      const existing = await this.readAutomergeDoc(path);
+      const current = existing ?? this.createInitialDoc();
+      const headsBefore = [...Automerge.getHeads(current)];
+      const createdAtDate = input.now?.() ?? new Date();
+      const createdAt = createdAtDate.toISOString();
+      const changed = Automerge.change(
+        current,
+        {
+          message: input.summary,
+          time: Math.floor(createdAtDate.getTime() / 1000)
+        },
+        (draft) => {
+          const draftDoc = draft as TDoc;
+          const mutated = input.mutate(draftDoc);
 
-        if (mutated !== draftDoc) {
-          replaceDocumentContents(draftDoc, mutated);
+          if (mutated !== draftDoc) {
+            replaceDocumentContents(draftDoc, mutated);
+          }
         }
-      }
-    );
-    const headsAfter = [...Automerge.getHeads(changed)];
-    const binaryChanges = copyBinaryChanges([Automerge.getLastLocalChange(changed)].filter(isUint8Array));
-    const doc = automergeDocToPlain(changed);
-    const change = createAutomergeChange({
-      actorId: input.actorId,
-      createdAt,
-      headsBefore,
-      headsAfter,
-      summary: input.summary,
-      binaryChanges,
-      nextDoc: doc
+      );
+      const headsAfter = [...Automerge.getHeads(changed)];
+      const binaryChanges = copyBinaryChanges(Automerge.getChanges(current, changed));
+      const doc = automergeDocToPlain(changed);
+      const change = createAutomergeChange({
+        actorId: input.actorId,
+        createdAt,
+        headsBefore,
+        headsAfter,
+        summary: input.summary,
+        binaryChanges,
+        nextDoc: doc
+      });
+
+      if (existing === undefined || binaryChanges.length > 0) await this.persistAutomergeDoc(path, changed);
+
+      return {
+        doc,
+        change
+      };
     });
-
-    await this.persistAutomergeDoc(changed);
-
-    return {
-      doc,
-      change
-    };
   }
 
   async apply(change: CrdtChange<TDoc>): Promise<CrdtChangeResult<TDoc>> {
-    if (change.binaryChanges?.length) {
+    if (change.binaryChanges !== undefined) {
       const result = await this.applyAutomergeChanges(change.binaryChanges);
 
       return {
         doc: result.doc,
         change: {
           ...change,
+          headsBefore: result.headsBefore,
           headsAfter: result.headsAfter
         }
       };
     }
 
-    const nextDoc = change.apply(await this.load());
-    await this.save(nextDoc);
-
-    return {
-      doc: await this.load(),
-      change
-    };
+    return withFileTransaction(this.options.path, async (path) => {
+      const current = (await this.readAutomergeDoc(path)) ?? this.createInitialDoc();
+      const next = createSeededAutomergeDoc(change.apply(automergeDocToPlain(current)), this.actorId);
+      await this.persistAutomergeDoc(path, next);
+      return {
+        doc: automergeDocToPlain(next),
+        change: { ...change, headsBefore: [...Automerge.getHeads(current)], headsAfter: [...Automerge.getHeads(next)] }
+      };
+    });
   }
 
   async getAllChanges(): Promise<Uint8Array[]> {
@@ -643,76 +685,73 @@ export class AutomergeFileCrdtBackend<TDoc extends Record<string, unknown>> impl
     return copyBinaryChanges(Automerge.getChangesSince(await this.loadAutomergeDoc(), heads as AutomergeHeads));
   }
 
+  async readChangesSnapshot(heads: string[] = []): Promise<CrdtFileChangesSnapshot> {
+    const current = await this.loadAutomergeDoc();
+    const allChanges = Automerge.getAllChanges(current);
+    let changes: AutomergeBinaryChange[];
+    try {
+      changes = Automerge.getChangesSince(current, heads as AutomergeHeads);
+    } catch {
+      changes = allChanges;
+    }
+    return { heads: [...Automerge.getHeads(current)], changeCount: allChanges.length, changes: copyBinaryChanges(changes) };
+  }
+
   async applyAutomergeChanges(changes: Uint8Array[]): Promise<ApplyAutomergeChangesResult<TDoc>> {
-    const current =
-      changes.length === 0 ? await this.loadAutomergeDoc() : await this.loadAutomergeDocForIncomingChanges();
-    const headsBefore = [...Automerge.getHeads(current)];
-    const orderedChanges = orderAutomergeChangesByDependencies(changes, current);
-    const [next] =
-      orderedChanges.length === 0
-        ? [current]
-        : Automerge.applyChanges(current, orderedChanges as AutomergeBinaryChange[]);
-    const headsAfter = [...Automerge.getHeads(next)];
+    return withFileTransaction(this.options.path, async (path) => {
+      const existing = await this.readAutomergeDoc(path);
+      const current = existing ?? (changes.length === 0 ? this.createInitialDoc() : Automerge.init<TDoc>(this.actorId));
+      const headsBefore = [...Automerge.getHeads(current)];
+      const orderedChanges = orderAutomergeChangesByDependencies(changes, current);
+      const [next] =
+        orderedChanges.length === 0
+          ? [current]
+          : Automerge.applyChanges(current, orderedChanges as AutomergeBinaryChange[]);
+      const headsAfter = [...Automerge.getHeads(next)];
 
-    await this.persistAutomergeDoc(next);
+      if (existing === undefined || orderedChanges.length > 0) await this.persistAutomergeDoc(path, next);
 
-    return {
-      doc: automergeDocToPlain(next),
-      headsBefore,
-      headsAfter,
-      applied: orderedChanges.length
-    };
+      return {
+        doc: automergeDocToPlain(next),
+        headsBefore,
+        headsAfter,
+        applied: orderedChanges.length
+      };
+    });
   }
 
   private async loadAutomergeDoc(): Promise<AutomergeDoc<TDoc>> {
-    if (this.automergeDoc !== undefined) {
-      return this.automergeDoc;
-    }
+    const existing = await this.readAutomergeDoc(this.options.path);
+    if (existing !== undefined) return existing;
+    return withFileTransaction(this.options.path, async (path) => {
+      const current = await this.readAutomergeDoc(path);
+      if (current !== undefined) return current;
+      const initial = this.createInitialDoc();
+      await this.persistAutomergeDoc(path, initial);
+      return initial;
+    });
+  }
 
+  private async readAutomergeDoc(path: string): Promise<AutomergeDoc<TDoc> | undefined> {
     try {
-      const content = await readFile(this.options.path);
-      this.automergeDoc = Automerge.load<TDoc>(new Uint8Array(content), this.options.actorId);
-
-      return this.automergeDoc;
+      return Automerge.load<TDoc>(new Uint8Array(await readFile(path)), this.actorId);
     } catch (error) {
-      if (!isNodeError(error) || error.code !== 'ENOENT') {
-        throw error;
-      }
-
-      const initialDoc =
-        typeof this.options.initialDoc === 'function' ? this.options.initialDoc() : this.options.initialDoc;
-      this.automergeDoc = createSeededAutomergeDoc(initialDoc, this.options.actorId);
-      await this.persistAutomergeDoc(this.automergeDoc);
-
-      return this.automergeDoc;
+      if (!isNodeError(error) || error.code !== 'ENOENT') throw error;
+      return undefined;
     }
   }
 
-  private async loadAutomergeDocForIncomingChanges(): Promise<AutomergeDoc<TDoc>> {
-    if (this.automergeDoc !== undefined) {
-      return this.automergeDoc;
-    }
-
-    try {
-      const content = await readFile(this.options.path);
-      this.automergeDoc = Automerge.load<TDoc>(new Uint8Array(content), this.options.actorId);
-
-      return this.automergeDoc;
-    } catch (error) {
-      if (!isNodeError(error) || error.code !== 'ENOENT') {
-        throw error;
-      }
-
-      this.automergeDoc = Automerge.init<TDoc>(this.options.actorId);
-
-      return this.automergeDoc;
-    }
+  private createInitialDoc(): AutomergeDoc<TDoc> {
+    const doc = typeof this.options.initialDoc === 'function' ? this.options.initialDoc() : this.options.initialDoc;
+    return createSeededAutomergeDoc(doc, this.actorId);
   }
 
-  private async persistAutomergeDoc(doc: AutomergeDoc<TDoc>): Promise<void> {
-    await mkdir(dirname(this.options.path), { recursive: true });
-    await writeFile(this.options.path, Buffer.from(Automerge.save(doc)));
-    this.automergeDoc = doc;
+  private snapshot(doc: AutomergeDoc<TDoc>): CrdtFileSnapshot<TDoc> {
+    return { doc: automergeDocToPlain(doc), heads: [...Automerge.getHeads(doc)] };
+  }
+
+  private async persistAutomergeDoc(path: string, doc: AutomergeDoc<TDoc>): Promise<void> {
+    await replaceFileAtomically(path, Automerge.save(doc));
   }
 }
 
@@ -867,10 +906,6 @@ function replaceDocumentContents<TDoc extends Record<string, unknown>>(target: T
 
 function copyBinaryChanges(changes: Uint8Array[]): Uint8Array[] {
   return changes.map((change) => new Uint8Array(change));
-}
-
-function isUint8Array(value: unknown): value is Uint8Array {
-  return value instanceof Uint8Array;
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

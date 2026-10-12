@@ -119,6 +119,8 @@ describe('local project store', () => {
       const gitignore = await readFile(join(first.storeRoot, '.gitignore'), 'utf8');
       expect(gitignore).toContain('state/');
       expect(gitignore).toContain('crdt/sync/');
+      expect(gitignore).toContain('crdt/**/*.lock.sqlite*');
+      expect(gitignore).toContain('crdt/**/.*.automerge.*.tmp');
       expect(gitignore).toContain('exports/');
       expect(gitignore).toContain('index/');
       expect(gitignore).toContain('visualizations/');
